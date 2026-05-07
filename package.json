@@ -1,0 +1,26 @@
+{
+  "name": "html-to-pdf-client",
+  "version": "0.0.0",
+  "description": "Client-side, vector-fidelity HTML→PDF library — from scratch, no third-party PDF generators.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "loop": "node scripts/loop.mjs",
+    "render": "node scripts/render-with-lib.mjs",
+    "rasterize": "node scripts/pdf-to-png.mjs",
+    "diff": "node scripts/diff.mjs",
+    "demo": "node scripts/serve-demo.mjs",
+    "screenshot-reference": "node scripts/screenshot-reference.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0",
+    "pdfjs-dist": "^4.10.38",
+    "@napi-rs/canvas": "^0.1.65",
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0",
+    "kleur": "^4.1.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

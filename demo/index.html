@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HTML→PDF Client — Live Demo</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 24px; max-width: 1200px; }
+  textarea { width: 100%; height: 240px; font-family: ui-monospace, monospace; }
+  button { padding: 8px 16px; background: #289e22; color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
+  iframe { width: 100%; height: 70vh; border: 1px solid #ccc; margin-top: 16px; }
+  .row { display: flex; gap: 12px; align-items: center; }
+</style>
+</head>
+<body>
+<h1>HTML → PDF (client-side, vector fidelity)</h1>
+<div class="row">
+  <button id="run">Convert to PDF</button>
+  <span id="status"></span>
+</div>
+<textarea id="input">Paste HTML here, or leave blank to use the bundled fixture.</textarea>
+<iframe id="preview"></iframe>
+
+<script type="module">
+  import { htmlToPdf } from '../src/index.js';
+
+  document.getElementById('run').addEventListener('click', async () => {
+    const status = document.getElementById('status');
+    status.textContent = 'rendering...';
+    const t0 = performance.now();
+
+    let html = document.getElementById('input').value.trim();
+    if (!html || html.startsWith('Paste HTML')) {
+      html = await fetch('../reference/source.html').then(r => r.text());
+    }
+
+    const bytes = await htmlToPdf(html, {
+      pageSize: 'A4',
+      orientation: 'landscape',
+      margin: 0,
+    });
+
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    document.getElementById('preview').src = URL.createObjectURL(blob);
+    status.textContent = `${(bytes.byteLength / 1024).toFixed(1)} KB · ${(performance.now() - t0).toFixed(0)} ms`;
+  });
+</script>
+</body>
+</html>

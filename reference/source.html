@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Fiche de contrôle — Topo.ninja</title>
+
+  <!-- Inter + JetBrains Mono : fonts qu'on devra parser/subset/embed dans le PDF -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <style>
+    /* === Theme tokens (résolution des CSS vars du template) === */
+    :root {
+      --topo-template-primary-color: #289e22;
+      --topo-template-secondary-color: #1f7a1c;
+      --topo-template-tertiary-color: #d8efd6;
+      --topo-template-tool-color: #e3571b;
+      --topo-template-body-text-color: #0f172a;
+      --topo-template-header-text-color: #ffffff;
+      --topo-template-point-id-bg: #289e22;
+      --topo-template-point-id-text: #ffffff;
+      --topo-template-table-col-bg: #d8efd6;
+      --topo-template-table-col-text: #1f2937;
+      --topo-template-table-text: #0f172a;
+      --topo-template-card-title-bg: transparent;
+      --topo-template-card-title-text: #6b7280;
+      --topo-template-table-header-bg: transparent;
+      --topo-template-table-header-text: #6b7280;
+      --topo-template-footer-bg: #f9fafb;
+      --topo-template-footer-text: #6b7280;
+    }
+
+    /* === Template CSS (tel quel depuis l'app) === */
+    :root {
+      --primary-color: var(--topo-template-primary-color);
+      --primary-strong: color-mix(in srgb, var(--primary-color) 85%, black);
+      --secondary-color: var(--topo-template-secondary-color);
+      --tertiary-color: var(--topo-template-tertiary-color);
+      --table-row-border: var(--table-col-bg);
+      --bg-page: #ffffff;
+      --bg-card: #ffffff;
+      --border-soft: #d0d7e2;
+      --text-main: var(--topo-template-body-text-color);
+      --text-header: var(--topo-template-header-text-color);
+      --text-muted: #6b7280;
+      --point-id-bg: var(--topo-template-point-id-bg);
+      --point-id-text: var(--topo-template-point-id-text);
+      --table-col-bg: var(--topo-template-table-col-bg);
+      --table-col-text: var(--topo-template-table-col-text);
+      --table-text: var(--topo-template-table-text);
+      --card-title-bg: var(--topo-template-card-title-bg);
+      --card-title-text: var(--topo-template-card-title-text);
+      --table-header-bg: var(--topo-template-table-header-bg);
+      --table-header-text: var(--topo-template-table-header-text);
+      --footer-bg: var(--topo-template-footer-bg);
+      --footer-text: var(--topo-template-footer-text);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+                   Roboto, Helvetica, Arial, sans-serif;
+      font-size: 10px;
+      line-height: 1.3;
+      color: var(--text-main);
+      background: var(--bg-page);
+    }
+
+    @page { size: A4 landscape; margin: 0; }
+
+    html { width: 297mm; height: 210mm; }
+
+    .page {
+      width: 297mm;
+      height: 210mm;
+      padding: 2mm 4mm;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .page-inner {
+      flex: 1;
+      background: #fff;
+      border-radius: 3mm;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 2mm 5mm;
+      background: linear-gradient(135deg, var(--primary-color), var(--primary-strong));
+      color: var(--text-header);
+    }
+
+    .header-left { display: flex; flex-direction: column; gap: 0.6mm; }
+    .header-topline { font-size: 8px; text-transform: uppercase; letter-spacing: 0.12em; opacity: 0.9; }
+    .header-main { display: flex; gap: 4mm; align-items: baseline; }
+    .header-logo { font-size: 11px; font-weight: 700; }
+    .header-point { font-size: 13px; font-weight: 600; text-transform: uppercase; }
+
+    .header-right { font-size: 8px; text-align: right; display: flex; flex-direction: column; gap: 0.8mm; }
+    .header-info-line { display: flex; justify-content: flex-end; align-items: center; white-space: nowrap; gap: 4mm; }
+
+    .header-badge { background: rgba(15,23,42,0.18); padding: 0.4mm 2.5mm; border-radius: 999px; }
+
+    .MAIN { flex: 1; padding: 3mm 5mm 2mm 5mm; background: #f9fafb; display: flex; flex-direction: column; gap: 2.5mm; }
+
+    .project-info { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5mm; }
+    .info-field { background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: 2mm; padding: 1.3mm 2.2mm; }
+    .info-label { font-size: 8px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); font-weight: 600; }
+    .info-value { font-size: 9px; margin-top: 0.5mm; }
+
+    .axis-id { background: var(--point-id-bg); border: 1px solid var(--point-id-bg); border-radius: 2mm; padding: 2mm 2.5mm; display: flex; justify-content: space-between; align-items: center; }
+    .axis-id-left { font-weight: 600; letter-spacing: 0.12em; color: var(--point-id-text); text-transform: uppercase; }
+
+    .pill { font-size: 8px; padding: 0.2mm 1.8mm; border-radius: 999px; border: 1px solid var(--primary-color); background: var(--primary-color); color: white; }
+
+    .body-wrap { flex: 1; display: flex; gap: 2.5mm; min-height: 0; }
+    .left-cont, .right-cont { display: flex; flex-direction: column; gap: 2.5mm; min-height: 0; }
+    .left-cont { flex: 5; }
+    .right-cont { flex: 4; }
+
+    .card { background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: 2.5mm; display: flex; flex-direction: column;  }
+    .card-header { padding: 1.2mm 2.2mm; border-bottom: 1px solid var(--border-soft); display: flex; justify-content: space-between; align-items: center; background: var(--card-title-bg); }
+    .card-title { font-size: 8px; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 600; color: var(--card-title-text); }
+    .card-body { padding: 1.8mm 2.2mm 2mm 2.2mm; flex: 1; }
+    .scheme-card .card-body { padding: 0; }
+    .cardphoto { height: 90mm !important; max-height: 90mm; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { font-size: 8px; padding: 1.3mm 1.6mm; border-bottom: 1px solid var(--table-row-border); text-align: center; }
+    th { background: var(--table-col-bg); color: var(--table-col-text); font-weight: 600; }
+    td { color: var(--table-text); }
+    tr:last-child td { border-bottom: none; }
+    .coord-mono { font-family: "JetBrains Mono", Menlo, Consolas, monospace; }
+
+    .photo-container, .map-container { flex: 1; border-radius: 2mm; background: #e5e7eb; display: flex; align-items: center; justify-content: center; overflow: hidden; min-height: 40mm;  height: 100%; }
+    .map-container img { width: 100%; height: 100%; object-fit: cover; }
+
+    .scheme-body { flex: 1; display: flex; justify-content: center; align-items: center; }
+
+    .scheme-container {
+      background: #ffffff;
+      border-radius: 2mm;
+      max-height: 66mm;
+      height: 100%;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .scheme-container img, .scheme-container svg { width: 100%; height: 100%; object-fit: contain; }
+
+    .scheme-card { flex: 1; display: flex; flex-direction: column; }
+
+    .footer-bar { border-top: 1px solid #e5e7eb; background: var(--footer-bg); padding: 1.8mm 5mm; font-size: 8px; display: flex; justify-content: space-between; align-items: center; color: var(--footer-text); }
+    .footer-brand { font-weight: 600; color: var(--primary-color); }
+    .footer-page-pill { padding: 0.4mm 2.3mm; border-radius: 999px; border: 1px solid #e5e7eb; background: #fff; color: var(--text-main); }
+    .footer-bar a { color: inherit; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="page-inner">
+      <div class="header">
+        <div class="header-left" style="flex-direction:row; align-items:center; gap:3mm;">
+          <div style="flex-shrink:0;"></div>
+          <div style="display:flex; flex-direction:column; gap:0.7mm;">
+            <div class="header-topline">FICHE DE CONTRÔLE</div>
+            <div class="header-main">
+              <div class="header-logo">Topo.ninja</div>
+              <div class="header-point">P001</div>
+            </div>
+          </div>
+        </div>
+        <div class="header-right">
+          <div class="header-info-line">
+            <span class="header-info-item">Date : 08/05/2026</span>
+            <span class="header-info-item">Version : 1.0</span>
+            <span class="header-info-item">Type : Fiche de contrôle</span>
+          </div>
+          <div class="header-badge">SCR : <strong>EPSG:3942</strong></div>
+        </div>
+      </div>
+
+      <div class="MAIN">
+        <div class="project-info">
+          <div class="info-field"><div class="info-label">Client</div><div class="info-value">Client Démo</div></div>
+          <div class="info-field"><div class="info-label">Référence</div><div class="info-value">DEMO-2026-001</div></div>
+          <div class="info-field"><div class="info-label">Site</div><div class="info-value">Site exemple</div></div>
+          <div class="info-field"><div class="info-label">Relevé par</div><div class="info-value">Jean Dupont</div></div>
+          <div class="info-field"><div class="info-label">Rapport par</div><div class="info-value">Jean Dupont</div></div>
+          <div class="info-field"><div class="info-label">Tolérance</div><div class="info-value">2 cm</div></div>
+          <div class="info-field"><div class="info-label">Date d'implantation</div><div class="info-value">15/11/2024</div></div>
+          <div class="info-field"><div class="info-label">Contact</div><div class="info-value"><a href="mailto:contact@topo.ninja" style="color:#289e22;text-decoration:underline;">contact@topo.ninja</a></div></div>
+        </div>
+
+        <div class="axis-id">
+          <div class="axis-id-left">P001</div>
+        </div>
+
+        <div class="body-wrap">
+          <div class="left-cont">
+            <div class="card">
+              <div class="card-header"><div class="card-title">Points contrôlés</div></div>
+              <div class="card-body">
+                <table>
+                  <colgroup>
+                    <col style="width:28%" />
+                    <col style="width:24%" />
+                    <col style="width:24%" />
+                    <col style="width:24%" />
+                  </colgroup>
+                  <thead>
+                    <tr><th>Point</th><th>X</th><th>Y</th><th>Z</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>Projet – P001</td><td class="coord-mono">2179485.989</td><td class="coord-mono">1208403.395</td><td class="coord-mono">1.419</td></tr>
+                    <tr><td>Contrôle – C001</td><td class="coord-mono">2179485.991</td><td class="coord-mono">1208403.393</td><td class="coord-mono">0.000</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header"><div class="card-title">Écarts mesurés</div></div>
+              <div class="card-body">
+                <table>
+                  <colgroup>
+                    <col style="width:20%" />
+                    <col style="width:20%" />
+                    <col style="width:20%" />
+                    <col style="width:20%" />
+                    <col style="width:20%" />
+                  </colgroup>
+                  <thead>
+                    <tr><th>ΔX</th><th>ΔY</th><th>ΔZ</th><th>ΔH (XY)</th><th>Δ3D</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="coord-mono">0.002</td>
+                      <td class="coord-mono">-0.002</td>
+                      <td class="coord-mono">-1.419</td>
+                      <td class="coord-mono">0.003</td>
+                      <td class="coord-mono">1.419</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card scheme-card">
+              <div class="card-header"><div class="card-title">Schéma</div></div>
+              <div class="card-body scheme-body">
+                <div class="scheme-container">
+<svg style="width:100%;height:100%;display:block;" xmlns="http://www.w3.org/2000/svg" width="160mm" height="90mm" viewBox="0 0 160 90">
+  <rect x="0" y="0" width="160" height="90" fill="#ffffff" />
+  <g>
+    <line x1="4" y1="45" x2="156" y2="45" stroke="#cbd5e1" stroke-width="0.6" />
+    <line x1="80" y1="4" x2="80" y2="86" stroke="#cbd5e1" stroke-width="0.6" />
+    <line x1="83" y1="43.5" x2="83" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="86" y1="43.5" x2="86" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="89" y1="43.5" x2="89" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="92" y1="43.5" x2="92" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="95" y1="43.5" x2="95" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="98" y1="43.5" x2="98" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="101" y1="43.5" x2="101" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="104" y1="43.5" x2="104" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="107" y1="43.5" x2="107" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="110" y1="43.5" x2="110" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="113" y1="43.5" x2="113" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="116" y1="43.5" x2="116" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="119" y1="43.5" x2="119" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="122" y1="43.5" x2="122" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="125" y1="43.5" x2="125" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="128" y1="43.5" x2="128" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="131" y1="43.5" x2="131" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="134" y1="43.5" x2="134" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="137" y1="43.5" x2="137" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="140" y1="43.5" x2="140" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="143" y1="43.5" x2="143" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="146" y1="43.5" x2="146" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="149" y1="43.5" x2="149" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="152" y1="43.5" x2="152" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="155" y1="43.5" x2="155" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="77" y1="43.5" x2="77" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="74" y1="43.5" x2="74" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="71" y1="43.5" x2="71" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="68" y1="43.5" x2="68" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="65" y1="43.5" x2="65" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="62" y1="43.5" x2="62" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="59" y1="43.5" x2="59" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="56" y1="43.5" x2="56" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="53" y1="43.5" x2="53" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="50" y1="43.5" x2="50" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="47" y1="43.5" x2="47" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="44" y1="43.5" x2="44" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="41" y1="43.5" x2="41" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="38" y1="43.5" x2="38" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="35" y1="43.5" x2="35" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="32" y1="43.5" x2="32" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="29" y1="43.5" x2="29" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="26" y1="43.5" x2="26" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="23" y1="43.5" x2="23" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="20" y1="43.5" x2="20" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="17" y1="43.5" x2="17" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="14" y1="43.5" x2="14" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="11" y1="43.5" x2="11" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="8" y1="43.5" x2="8" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="5" y1="43.5" x2="5" y2="46.5" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="48" x2="81.5" y2="48" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="51" x2="81.5" y2="51" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="54" x2="81.5" y2="54" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="57" x2="81.5" y2="57" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="60" x2="81.5" y2="60" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="63" x2="81.5" y2="63" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="66" x2="81.5" y2="66" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="69" x2="81.5" y2="69" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="72" x2="81.5" y2="72" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="75" x2="81.5" y2="75" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="78" x2="81.5" y2="78" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="81" x2="81.5" y2="81" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="84" x2="81.5" y2="84" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="42" x2="81.5" y2="42" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="39" x2="81.5" y2="39" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="36" x2="81.5" y2="36" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="33" x2="81.5" y2="33" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="30" x2="81.5" y2="30" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="27" x2="81.5" y2="27" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="24" x2="81.5" y2="24" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="21" x2="81.5" y2="21" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="18" x2="81.5" y2="18" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="15" x2="81.5" y2="15" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="12" x2="81.5" y2="12" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="9" x2="81.5" y2="9" stroke="#94a3b8" stroke-width="0.4" />
+    <line x1="78.5" y1="6" x2="81.5" y2="6" stroke="#94a3b8" stroke-width="0.4" />
+    <circle cx="80" cy="45" r="15" fill="none" stroke="black" stroke-width="1" stroke-opacity="0.65" />
+    <line x1="80" y1="45" x2="86" y2="51" stroke="#e3571b" stroke-width="0.45" />
+    <circle cx="86" cy="51" r="15" fill="#e3571b" fill-opacity="0.65" stroke="#e3571b" stroke-width="1" />
+    <circle cx="86" cy="51" r="2" fill="#e3571b" />
+  </g>
+  <g transform="translate(4, 88)">
+    <line x1="0" y1="0" x2="3" y2="0" stroke="#94a3b8" stroke-width="0.7" />
+    <line x1="0" y1="-1" x2="0" y2="1" stroke="#94a3b8" stroke-width="0.5" />
+    <line x1="3" y1="-1" x2="3" y2="1" stroke="#94a3b8" stroke-width="0.5" />
+    <text x="5" y="1.5" font-family="Inter, Arial" font-size="3.5" fill="#4b5563">1 mm (1 grad.)</text>
+  </g>
+</svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="right-cont">
+            <div class="card cardphoto">
+              <div class="card-header"><div class="card-title">Photo terrain</div></div>
+              <div class="card-body"><div class="photo-container"></div></div>
+            </div>
+
+            <div class="card">
+              <div class="card-header"><div class="card-title">Note technique</div></div>
+              <div class="card-body">
+                <div style="font-size:8px; line-height:1.25; white-space: pre-wrap; word-wrap: break-word; max-height:30mm; overflow:hidden;">Levé effectué selon les normes IGN en vigueur. Tous les points ont été mesurés avec une précision centimétrique. Les données GPS ont été corrigées avec la station de base locale.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-bar">
+        <div class="footer-brand">Topo.ninja</div>
+        <div><a href="https://topo.ninja">https://topo.ninja</a> &mdash; <a href="mailto:contact@topo.ninja">contact@topo.ninja</a></div>
+        <div style="display:flex; gap:2mm; align-items:center;">
+          <div class="footer-page-pill"><a href="#sommaire">Sommaire</a></div>
+          <div class="footer-page-pill">1 / 1</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
