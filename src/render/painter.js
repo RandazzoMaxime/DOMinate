@@ -240,9 +240,23 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
   const color = parseColor(b.style.color);
   const fontSizeCss = parsePx(b.style.fontSize) || 10;
   const weight = parseInt(b.style.fontWeight, 10) || 400;
+  // Detect alternate font families. CSS computed fontFamily is the full chain string,
+  // e.g. "Arial, Helvetica, sans-serif". We match the FIRST family (browsers always
+  // try in order, so the first available wins; with our embedded Inter, an Arial
+  // request should still pick Arial-like rendering).
+  const fontFam = (b.style.fontFamily || '').toLowerCase();
+  const altKey = /^['"]?(arial|helvetica)\b/.test(fontFam) ? (fontFam.match(/^['"]?(arial|helvetica)/i)[1].toLowerCase()) : null;
+  const altMap = altKey && fontMap.alternates ? fontMap.alternates[altKey] : null;
+
   // Pick the closest available weight + the matching fallback chain.
   let fontHandle, fallbacks;
-  if (fontMap.embedded) {
+  if (altMap) {
+    if      (weight >= 700) fontHandle = altMap.bold;
+    else if (weight >= 600) fontHandle = altMap.semibold;
+    else if (weight >= 500) fontHandle = altMap.medium;
+    else                    fontHandle = altMap.regular;
+    fallbacks = [];  // base 14 doesn't need glyph fallbacks
+  } else if (fontMap.embedded) {
     if      (weight >= 700) { fontHandle = fontMap.bold;     fallbacks = fontMap.fallbacks.bold; }
     else if (weight >= 600) { fontHandle = fontMap.semibold; fallbacks = fontMap.fallbacks.semibold; }
     else if (weight >= 500) { fontHandle = fontMap.medium;   fallbacks = fontMap.fallbacks.medium; }

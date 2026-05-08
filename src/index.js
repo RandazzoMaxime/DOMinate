@@ -88,6 +88,10 @@ export async function htmlToPdf(input, opts = {}) {
       embed(inters.greek[600], 'Inter-SemiBold-Greek'),
       embed(inters.greek[700], 'Inter-Bold-Greek'),
     ]);
+    // Helvetica/Arial alternates use the PDF base-14 Helvetica to match the typical
+    // reference rendering (which falls back to Arial when no @font-face Inter is set).
+    const helv = doc.addStandardFont('Helvetica');
+    const helvBold = doc.addStandardFont('Helvetica-Bold');
     fontMap = {
       regular:    r400, medium: r500 || r400, semibold: r600 || r400, bold: r700 || r600 || r400,
       oblique:    r400,
@@ -97,6 +101,12 @@ export async function htmlToPdf(input, opts = {}) {
         medium:   [g500 || g400].filter(Boolean),
         semibold: [g600 || g400].filter(Boolean),
         bold:     [g700 || g600 || g400].filter(Boolean),
+      },
+      // Alternate font families. Painter uses these when computed fontFamily starts
+      // with the matching name.
+      alternates: {
+        helvetica:      { regular: helv, bold: helvBold, semibold: helvBold, medium: helv },
+        arial:          { regular: helv, bold: helvBold, semibold: helvBold, medium: helv },
       },
       embedded: true,
     };
