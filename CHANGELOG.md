@@ -128,17 +128,28 @@ Newest entries at the bottom. One section per accepted iteration.
 **Files:** scripts/audit.mjs, reference/wizard.audit.json, reference/report.{html,audit.json}
 **Result:** all 4 fixtures pass functional gates ✓ (links/text/fonts).
 
+## Iteration 18 — per-character font fallback (Latin + Greek)
+
+**Change:** Inter Latin subset (67 KB/weight) doesn't include Greek capital Δ (U+0394). Loaded the Greek subset alongside (16 KB/weight extra). painter splitTextByFont splits a string into runs, each picking the best font (Latin first, Greek fallback) for each character. ΔX/ΔY/ΔZ etc. now render properly instead of the .notdef bar.
+**Files:** assets/fonts/Inter-{400,500,600,700}-greek.ttf, src/index.js, src/render/painter.js
+
+## Iteration 19 — wizard viewport fix
+
+**Change:** wizard reference screenshot is 1600×1280 from a tool that used viewport=1600 with scale=1, not viewport=800 with scale=2 as I assumed. At 800px Tailwind responsive `lg:` breakpoint doesn't trigger and the layout collapses to mobile/tablet. Fixed wizard.audit.json to use the correct viewport.
+**Files:** reference/wizard.audit.json
+**Diff:** wizard 23.239% → 7.746%  ✓ (-15.5 pts) — biggest single-iter drop after iter 3
+
 ---
 
 ## Final state at 2026-05-08T05:15Z (session stop)
 
 | Fixture | Diff vs ref | Links | Text | Fonts |
 |---------|-------------|-------|------|-------|
-| source       | **1.438%** | 4/4 ✓ | ok ✓ | ok ✓ |
-| source-flat  | **2.587%** | 3/3 ✓ | ok ✓ | ok ✓ |
-| wizard       | 23.239%    | 5/5 ✓ | ok ✓ | ok ✓ |
-| report       | 14.254%    | 2/2 ✓ | ok ✓ | ok ✓ |
-| **overall**  | **13.537%** |  |  |  |
+| source       | **1.435%** | 4/4 ✓ | ok ✓ | ok ✓ |
+| source-flat  | **2.578%** | 3/3 ✓ | ok ✓ | ok ✓ |
+| wizard       | **7.746%** | 5/5 ✓ | ok ✓ | ok ✓ |
+| report       | 11.428%    | 2/2 ✓ | ok ✓ | ok ✓ |
+| **overall**  | **6.274%** |  |  |  |
 
 **All 4 fixtures pass every functional gate.** Only the visual-diff threshold
 (<0.1%) remains for full PASS. Remaining diff dominated by:
