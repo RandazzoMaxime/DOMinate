@@ -135,9 +135,9 @@
     <div>
       <h2>Avancement global</h2>
       <div class="stat-grid">
-        <div class="stat"><div class="stat-num">10</div><div class="stat-label">Itérations commitées</div></div>
-        <div class="stat"><div class="stat-num">3</div><div class="stat-label">Fixtures HTML</div></div>
-        <div class="stat"><div class="stat-num">≈ 1.6 K</div><div class="stat-label">LOC de lib (src/)</div></div>
+        <div class="stat"><div class="stat-num">12</div><div class="stat-label">Itérations commitées</div></div>
+        <div class="stat"><div class="stat-num">4</div><div class="stat-label">Fixtures HTML</div></div>
+        <div class="stat"><div class="stat-num">≈ 1.5 K</div><div class="stat-label">LOC de lib (src/)</div></div>
       </div>
 
       <h3>Diff visuel par fixture (référence Chromium 96 DPI)</h3>
@@ -165,15 +165,16 @@
       <h2 style="margin-top: 4mm;">Pipeline réalisé</h2>
       <p>Architecture <em>browser-as-layout-engine</em>: la lib ne réimplémente pas le moteur CSS de Chromium. Elle utilise <code>getBoundingClientRect</code> + <code>getComputedStyle</code> dans une iframe cachée comme primitive runtime, puis émet du PDF vectoriel à partir des positions/styles calculés. Cela préserve la promesse "100% client, qualité Playwright" en évitant de réécrire 30M de LOC de Blink.</p>
 
-      <h3>Modules implémentés (src/)</h3>
+      <h3>Modules implémentés (src/, ≈ 1.5 K LOC)</h3>
       <ul>
-        <li><strong>core/pdf.js</strong> — writer PDF 1.7 from scratch: objets indirects, xref, content streams, ops <code>q Q rg RG re f S BT ET Tf Tm Tj W n m l c</code>, axial shading dict, link annotations</li>
+        <li><strong>core/pdf.js</strong> — writer PDF 1.7 from scratch: objets indirects, xref, content streams, ops <code>q Q rg RG re f S BT ET Tf Tm Tj W n m l c sh Do cm</code>, axial shading dict, link annotations, XObject resources</li>
         <li><strong>core/fonts/sfnt.js</strong> — parseur TTF/OTF minimal: head, hhea, hmtx, maxp, cmap (formats 4 et 12)</li>
-        <li><strong>core/fonts/embed.js</strong> — embed Type 0 / CIDFontType2 / Identity-H + ToUnicode CMap + FontFile2 FlateDecode</li>
-        <li><strong>dom/walker.js</strong> — parcourt l'iframe, capture style calculé + rects (Range API)</li>
+        <li><strong>core/fonts/embed.js</strong> — embed Type 0 + CIDFontType2 + Identity-H + ToUnicode CMap + FontFile2 FlateDecode</li>
+        <li><strong>core/images/jpeg.js</strong> — JPEG passthrough comme XObject /DCTDecode (parse SOI/SOFn pour w/h)</li>
+        <li><strong>dom/walker.js</strong> — parcourt iframe, capture style calculé + rects (Range API), filtre icon fonts</li>
         <li><strong>dom/utils.js</strong> — parseColor (rgb / rgba / color(srgb) / #hex / transparent), parsePx</li>
-        <li><strong>render/painter.js</strong> — visite les boxes et émet ops PDF: rectangles, border-radius (Bezier cubique par coin), gradients linéaires (axial shading), texte (hex GIDs)</li>
-        <li><strong>render/svg.js</strong> — supporte rect / line / circle / ellipse / text via <code>getScreenCTM()</code></li>
+        <li><strong>render/painter.js</strong> — visite les boxes et émet ops PDF: rectangles, border-radius (Bezier par coin), gradients linéaires axial, texte hex GIDs, images, links</li>
+        <li><strong>render/svg.js</strong> — rect / line / circle / ellipse / text via <code>getScreenCTM()</code> par élément</li>
       </ul>
     </div>
 

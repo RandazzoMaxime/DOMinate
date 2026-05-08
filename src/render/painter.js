@@ -27,7 +27,7 @@ export function paint(doc, fontMap, page, boxes /*, pageHeightCssPx (unused) */)
   for (const b of boxes) {
     if (b.kind === 'svg-rect')    paintSvgRect(page, b, pageHeightPdf);
     if (b.kind === 'svg-line')    paintSvgLine(page, b, pageHeightPdf);
-    if (b.kind === 'svg-ellipse') paintSvgEllipse(page, b, pageHeightPdf);
+    if (b.kind === 'svg-ellipse') paintSvgEllipse(page, b, pageHeightPdf, doc);
   }
   for (const b of boxes) {
     if (b.kind === 'text') paintText(page, fontMap, b, pageHeightPdf);
@@ -71,7 +71,7 @@ function paintSvgLine(page, b, pageHeightPdf) {
   page.restoreState();
 }
 
-function paintSvgEllipse(page, b, pageHeightPdf) {
+function paintSvgEllipse(page, b, pageHeightPdf, doc) {
   const cx = b.cx * CSS_TO_PDF;
   const cy = cssYToPdfY(b.cy, pageHeightPdf);
   const rx = b.rx * CSS_TO_PDF;
@@ -79,6 +79,13 @@ function paintSvgEllipse(page, b, pageHeightPdf) {
   const k = 0.5522847498;
   // Cubic Bezier approximation of a circle/ellipse, 4 quarter arcs.
   page.saveState();
+  // Apply fill-opacity / stroke-opacity through an ExtGState (PDF transparency).
+  const fillAlpha = (b.fillOpacity != null ? b.fillOpacity : 1) * (b.fill ? b.fill.a : 1);
+  const strokeAlpha = (b.strokeOpacity != null ? b.strokeOpacity : 1) * (b.stroke ? b.stroke.a : 1);
+  if (fillAlpha < 1 || strokeAlpha < 1) {
+    const gs = doc.addExtGState({ ca: fillAlpha, CA: strokeAlpha });
+    page.setExtGState(gs);
+  }
   if (b.fill && b.fillOpacity > 0 && b.fill.a > 0) {
     page.setFillRgb(b.fill.r, b.fill.g, b.fill.b);
   }

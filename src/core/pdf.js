@@ -81,6 +81,20 @@ export class PdfDocument {
   }
 
   /**
+   * Add an extended graphics state for fill/stroke transparency.
+   * @param {{ca?: number, CA?: number}} opts  ca = fill alpha, CA = stroke alpha (0..1)
+   * Returns a handle: { alias: 'Gs1', objRef }
+   */
+  addExtGState({ ca = 1, CA = 1 } = {}) {
+    const alias = 'Gs' + (this._extGStateCounter = (this._extGStateCounter || 0) + 1);
+    const obj = this._allocObject({
+      Type: name('ExtGState'),
+      ca, CA,
+    });
+    return { alias, objRef: obj, kind: 'extGState' };
+  }
+
+  /**
    * Add a 2-stop axial (linear) gradient shading. Coordinates are in PDF user units.
    * Returns a handle: { alias: 'Sh1', objRef }
    */
@@ -233,6 +247,8 @@ class Page {
     this.shadingsUsed = new Set();
     /** image XObjects used on this page (Resources /XObject dict) */
     this.xobjectsUsed = new Set();
+    /** extGState handles used on this page (Resources /ExtGState dict) */
+    this.extGStateUsed = new Set();
     /** link annotations to be added to /Annots */
     this.annots = [];
   }
@@ -309,6 +325,12 @@ class Page {
   /** Set current path as clipping path (non-zero), then no-op end so subsequent ops are clipped. */
   clipPath() { this._push('W n\n'); }
 
+  /** Activate an extended graphics state (e.g. fill alpha) until the next Q. */
+  setExtGState(gs) {
+    this.extGStateUsed.add(gs);
+    this._push(`/${gs.alias} gs\n`);
+  }
+
   /**
    * Draw an Image XObject scaled to (x, y, w, h) in PDF user units (origin bottom-left).
    * Uses cm to translate+scale, then Do. The image's intrinsic dimensions are 1×1 unit.
@@ -371,6 +393,9 @@ class Page {
     // Build /Resources/XObject dict
     const xobjectDict = {};
     for (const x of this.xobjectsUsed) xobjectDict[x.alias] = x.objRef;
+    // Build /Resources/ExtGState dict
+    const extGStateDict = {};
+    for (const g of this.extGStateUsed) extGStateDict[g.alias] = g.objRef;
 
     // Build annotations
     const annotRefs = [];
@@ -392,6 +417,7 @@ class Page {
     };
     if (Object.keys(shadingDict).length) resources.Shading = shadingDict;
     if (Object.keys(xobjectDict).length) resources.XObject = xobjectDict;
+    if (Object.keys(extGStateDict).length) resources.ExtGState = extGStateDict;
 
     const pageDict = {
       Type: name('Page'),
