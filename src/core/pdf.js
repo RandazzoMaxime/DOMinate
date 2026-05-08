@@ -234,6 +234,57 @@ class Page {
    */
   fillRect(x, y, w, h) { this._push(`${num(x)} ${num(y)} ${num(w)} ${num(h)} re f\n`); }
 
+  /**
+   * Stroke an axis-aligned rectangle outline.
+   */
+  strokeRect(x, y, w, h) { this._push(`${num(x)} ${num(y)} ${num(w)} ${num(h)} re S\n`); }
+
+  /**
+   * Build (but don't fill/stroke) a rounded-rect sub-path. Use after `q`, before `f`/`S`/`W n`.
+   * Per-corner radii are clamped to half the smaller dimension. PDF coords (Y up).
+   */
+  pathRoundedRect(x, y, w, h, r) {
+    if (typeof r === 'number') r = { tl: r, tr: r, br: r, bl: r };
+    // Clamp
+    const maxR = Math.min(w, h) / 2;
+    const tl = Math.min(r.tl || 0, maxR);
+    const tr = Math.min(r.tr || 0, maxR);
+    const br = Math.min(r.br || 0, maxR);
+    const bl = Math.min(r.bl || 0, maxR);
+    const k = 0.5522847498;  // cubic Bezier circle factor
+
+    // PDF coords: rectangle is from (x,y) to (x+w, y+h), with y+h being TOP.
+    // Walk: bottom-left → bottom-right → top-right → top-left → close
+    // Start at the bottom-left after the corner
+    const ops = [];
+    ops.push(`${num(x + bl)} ${num(y)} m`);
+    ops.push(`${num(x + w - br)} ${num(y)} l`);
+    if (br > 0) {
+      ops.push(`${num(x + w - br + br * k)} ${num(y)} ${num(x + w)} ${num(y + br - br * k)} ${num(x + w)} ${num(y + br)} c`);
+    }
+    ops.push(`${num(x + w)} ${num(y + h - tr)} l`);
+    if (tr > 0) {
+      ops.push(`${num(x + w)} ${num(y + h - tr + tr * k)} ${num(x + w - tr + tr * k)} ${num(y + h)} ${num(x + w - tr)} ${num(y + h)} c`);
+    }
+    ops.push(`${num(x + tl)} ${num(y + h)} l`);
+    if (tl > 0) {
+      ops.push(`${num(x + tl - tl * k)} ${num(y + h)} ${num(x)} ${num(y + h - tl + tl * k)} ${num(x)} ${num(y + h - tl)} c`);
+    }
+    ops.push(`${num(x)} ${num(y + bl)} l`);
+    if (bl > 0) {
+      ops.push(`${num(x)} ${num(y + bl - bl * k)} ${num(x + bl - bl * k)} ${num(y)} ${num(x + bl)} ${num(y)} c`);
+    }
+    ops.push(`h`);
+    this._push(ops.join('\n') + '\n');
+  }
+
+  /** Fill the current path with the non-zero winding rule. */
+  fillPath() { this._push('f\n'); }
+  /** Stroke the current path. */
+  strokePath() { this._push('S\n'); }
+  /** Set current path as clipping path (non-zero), then no-op end so subsequent ops are clipped. */
+  clipPath() { this._push('W n\n'); }
+
   // ── text ──────────────────────────────────────────────────────────────────
   beginText() { this._push('BT\n'); }
   endText() { this._push('ET\n'); }

@@ -4,7 +4,7 @@
 // Border-radius, gradients, SVG, and font embedding are added in later iterations.
 
 import { CSS_TO_PDF, cssYToPdfY } from '../core/pdf.js';
-import { parseColor, parsePx } from '../dom/walker.js';
+import { parseColor, parsePx } from '../dom/utils.js';
 
 /**
  * @param {import('../core/pdf.js').PdfDocument} doc
@@ -16,16 +16,100 @@ import { parseColor, parsePx } from '../dom/walker.js';
 export function paint(doc, fontMap, page, boxes /*, pageHeightCssPx (unused) */) {
   const pageHeightPdf = page.height;  // PDF user units
 
-  // Draw boxes first (background/border), then text on top.
+  // Draw boxes first (background/border), then SVG shapes, then text on top, then links.
   for (const b of boxes) {
     if (b.kind === 'box') paintBox(page, b, pageHeightPdf);
   }
   for (const b of boxes) {
+    if (b.kind === 'svg-rect')    paintSvgRect(page, b, pageHeightPdf);
+    if (b.kind === 'svg-line')    paintSvgLine(page, b, pageHeightPdf);
+    if (b.kind === 'svg-ellipse') paintSvgEllipse(page, b, pageHeightPdf);
+  }
+  for (const b of boxes) {
     if (b.kind === 'text') paintText(page, fontMap, b, pageHeightPdf);
+    if (b.kind === 'svg-text') paintSvgText(page, fontMap, b, pageHeightPdf);
   }
   for (const b of boxes) {
     if (b.kind === 'link') paintLink(page, b, pageHeightPdf);
   }
+}
+
+function paintSvgRect(page, b, pageHeightPdf) {
+  const x = b.x * CSS_TO_PDF;
+  const y = cssYToPdfY(b.y + b.h, pageHeightPdf);
+  const w = b.w * CSS_TO_PDF;
+  const h = b.h * CSS_TO_PDF;
+  if (b.fill && b.fill.a > 0) {
+    page.saveState();
+    page.setFillRgb(b.fill.r, b.fill.g, b.fill.b);
+    page.fillRect(x, y, w, h);
+    page.restoreState();
+  }
+  if (b.stroke && b.stroke.a > 0 && b.strokeWidth > 0) {
+    page.saveState();
+    page.setStrokeRgb(b.stroke.r, b.stroke.g, b.stroke.b);
+    page.setLineWidth(b.strokeWidth * CSS_TO_PDF);
+    page.strokeRect(x, y, w, h);
+    page.restoreState();
+  }
+}
+
+function paintSvgLine(page, b, pageHeightPdf) {
+  if (!b.stroke || b.stroke.a === 0) return;
+  const x1 = b.x1 * CSS_TO_PDF;
+  const y1 = cssYToPdfY(b.y1, pageHeightPdf);
+  const x2 = b.x2 * CSS_TO_PDF;
+  const y2 = cssYToPdfY(b.y2, pageHeightPdf);
+  page.saveState();
+  page.setStrokeRgb(b.stroke.r, b.stroke.g, b.stroke.b);
+  page.setLineWidth(Math.max(0.1, b.strokeWidth * CSS_TO_PDF));
+  page._push(`${num(x1)} ${num(y1)} m ${num(x2)} ${num(y2)} l S\n`);
+  page.restoreState();
+}
+
+function paintSvgEllipse(page, b, pageHeightPdf) {
+  const cx = b.cx * CSS_TO_PDF;
+  const cy = cssYToPdfY(b.cy, pageHeightPdf);
+  const rx = b.rx * CSS_TO_PDF;
+  const ry = b.ry * CSS_TO_PDF;
+  const k = 0.5522847498;
+  // Cubic Bezier approximation of a circle/ellipse, 4 quarter arcs.
+  page.saveState();
+  if (b.fill && b.fillOpacity > 0 && b.fill.a > 0) {
+    page.setFillRgb(b.fill.r, b.fill.g, b.fill.b);
+  }
+  if (b.stroke && b.strokeWidth > 0) {
+    page.setStrokeRgb(b.stroke.r, b.stroke.g, b.stroke.b);
+    page.setLineWidth(Math.max(0.1, b.strokeWidth * CSS_TO_PDF));
+  }
+  // Path
+  const ops = [];
+  ops.push(`${num(cx + rx)} ${num(cy)} m`);
+  ops.push(`${num(cx + rx)} ${num(cy + ry * k)} ${num(cx + rx * k)} ${num(cy + ry)} ${num(cx)} ${num(cy + ry)} c`);
+  ops.push(`${num(cx - rx * k)} ${num(cy + ry)} ${num(cx - rx)} ${num(cy + ry * k)} ${num(cx - rx)} ${num(cy)} c`);
+  ops.push(`${num(cx - rx)} ${num(cy - ry * k)} ${num(cx - rx * k)} ${num(cy - ry)} ${num(cx)} ${num(cy - ry)} c`);
+  ops.push(`${num(cx + rx * k)} ${num(cy - ry)} ${num(cx + rx)} ${num(cy - ry * k)} ${num(cx + rx)} ${num(cy)} c`);
+  page._push(ops.join('\n') + '\n');
+  // Paint operator: B = fill + stroke; b = fill + stroke + close
+  if (b.fill && b.fill.a > 0 && b.stroke && b.stroke.a > 0) page._push('B\n');
+  else if (b.fill && b.fill.a > 0) page._push('f\n');
+  else if (b.stroke && b.stroke.a > 0) page._push('S\n');
+  else page._push('n\n');
+  page.restoreState();
+}
+
+function paintSvgText(page, fontMap, b, pageHeightPdf) {
+  if (!b.text || !b.text.trim()) return;
+  const xPdf = b.baselineX * CSS_TO_PDF;
+  const yPdf = cssYToPdfY(b.baselineY, pageHeightPdf);
+  page.saveState();
+  if (b.textColor) page.setFillRgb(b.textColor.r, b.textColor.g, b.textColor.b);
+  page.beginText();
+  page.setFont(fontMap.regular, b.textSizeCss * CSS_TO_PDF);
+  page.setTextPos(xPdf, yPdf);
+  page.showText(b.text);
+  page.endText();
+  page.restoreState();
 }
 
 function paintBox(page, b, pageHeightPdf) {
@@ -35,34 +119,65 @@ function paintBox(page, b, pageHeightPdf) {
   const w = b.w * CSS_TO_PDF;
   const h = b.h * CSS_TO_PDF;
 
+  // Per-corner border-radius (CSS px → PDF user units).
+  // CSS shorthand maps to: top-left, top-right, bottom-right, bottom-left.
+  // PDF coord has Y inverted, so what CSS calls "top-left" lands at the upper-left
+  // of our PDF rectangle (which in PDF coords means y + h, x). Our pathRoundedRect
+  // expects { tl, tr, br, bl } where tl = upper-left in PDF coords. Map directly.
+  const radii = {
+    tl: parsePx(b.style.borderTopLeftRadius)     * CSS_TO_PDF,
+    tr: parsePx(b.style.borderTopRightRadius)    * CSS_TO_PDF,
+    br: parsePx(b.style.borderBottomRightRadius) * CSS_TO_PDF,
+    bl: parsePx(b.style.borderBottomLeftRadius)  * CSS_TO_PDF,
+  };
+  const hasRadius = radii.tl + radii.tr + radii.br + radii.bl > 0;
+
   // Background-image (linear-gradient) takes priority over background-color in CSS.
-  // Iter 3 uses a solid-fill approximation (start color of the gradient). Iter 4 will
-  // upgrade to a real PDF axial shading dictionary so the gradient is faithful.
+  // Iter 3 uses a solid-fill approximation (start color of the gradient).
   const grad = parseLinearGradient(b.style.backgroundImage);
-  if (grad && grad.stops.length) {
+
+  function paintFill(color) {
     page.saveState();
-    const c = grad.stops[0].color;
-    page.setFillRgb(c.r, c.g, c.b);
-    page.fillRect(x, y, w, h);
-    page.restoreState();
-  } else if (fill && fill.a > 0) {
-    page.saveState();
-    page.setFillRgb(fill.r, fill.g, fill.b);
-    page.fillRect(x, y, w, h);
+    page.setFillRgb(color.r, color.g, color.b);
+    if (hasRadius) {
+      page.pathRoundedRect(x, y, w, h, radii);
+      page.fillPath();
+    } else {
+      page.fillRect(x, y, w, h);
+    }
     page.restoreState();
   }
-  // Borders — iter 2 only handles uniform-width borders (the source uses 1px borders
-  // with `border-soft` color on cards). Stroke a rectangle inset by half the line width.
+
+  if (grad && grad.stops.length) {
+    paintFill(grad.stops[0].color);
+  } else if (fill && fill.a > 0) {
+    paintFill(fill);
+  }
+
+  // Borders — iter 7 handles uniform 4-side borders with corner radius.
   const bw = parsePx(b.style.borderTopWidth);
   if (bw > 0) {
     const bc = parseColor(b.style.borderTopColor);
     if (bc && bc.a > 0) {
       page.saveState();
       page.setStrokeRgb(bc.r, bc.g, bc.b);
-      page.setLineWidth(bw * CSS_TO_PDF);
-      const inset = (bw * CSS_TO_PDF) / 2;
-      // Use re + S (stroke) — no helper yet, emit raw
-      page._push(`${num(x + inset)} ${num(y + inset)} ${num(w - 2 * inset)} ${num(h - 2 * inset)} re S\n`);
+      const lw = bw * CSS_TO_PDF;
+      page.setLineWidth(lw);
+      const inset = lw / 2;
+      const ix = x + inset, iy = y + inset;
+      const iw = w - 2 * inset, ih = h - 2 * inset;
+      if (hasRadius) {
+        const ir = {
+          tl: Math.max(0, radii.tl - inset),
+          tr: Math.max(0, radii.tr - inset),
+          br: Math.max(0, radii.br - inset),
+          bl: Math.max(0, radii.bl - inset),
+        };
+        page.pathRoundedRect(ix, iy, iw, ih, ir);
+        page.strokePath();
+      } else {
+        page.strokeRect(ix, iy, iw, ih);
+      }
       page.restoreState();
     }
   }
