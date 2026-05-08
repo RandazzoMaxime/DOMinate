@@ -25,12 +25,12 @@ export function paint(doc, fontMap, page, boxes /*, pageHeightCssPx (unused) */)
     if (b.kind === 'image' && b.embedded) paintImage(page, b, pageHeightPdf);
   }
   for (const b of boxes) {
-    if (b.kind === 'svg-rect')    paintSvgRect(page, b, pageHeightPdf);
-    if (b.kind === 'svg-line')    paintSvgLine(page, b, pageHeightPdf);
+    if (b.kind === 'svg-rect')    paintSvgRect(page, b, pageHeightPdf, doc);
+    if (b.kind === 'svg-line')    paintSvgLine(page, b, pageHeightPdf, doc);
     if (b.kind === 'svg-ellipse') paintSvgEllipse(page, b, pageHeightPdf, doc);
   }
   for (const b of boxes) {
-    if (b.kind === 'text') paintText(page, fontMap, b, pageHeightPdf);
+    if (b.kind === 'text') paintText(page, fontMap, b, pageHeightPdf, doc);
     if (b.kind === 'svg-text') paintSvgText(page, fontMap, b, pageHeightPdf);
   }
   for (const b of boxes) {
@@ -38,19 +38,21 @@ export function paint(doc, fontMap, page, boxes /*, pageHeightCssPx (unused) */)
   }
 }
 
-function paintSvgRect(page, b, pageHeightPdf) {
+function paintSvgRect(page, b, pageHeightPdf, doc) {
   const x = b.x * CSS_TO_PDF;
   const y = cssYToPdfY(b.y + b.h, pageHeightPdf);
   const w = b.w * CSS_TO_PDF;
   const h = b.h * CSS_TO_PDF;
   if (b.fill && b.fill.a > 0) {
     page.saveState();
+    applySvgAlpha(page, doc, b, /*fill*/true, /*stroke*/false);
     page.setFillRgb(b.fill.r, b.fill.g, b.fill.b);
     page.fillRect(x, y, w, h);
     page.restoreState();
   }
   if (b.stroke && b.stroke.a > 0 && b.strokeWidth > 0) {
     page.saveState();
+    applySvgAlpha(page, doc, b, /*fill*/false, /*stroke*/true);
     page.setStrokeRgb(b.stroke.r, b.stroke.g, b.stroke.b);
     page.setLineWidth(b.strokeWidth * CSS_TO_PDF);
     page.strokeRect(x, y, w, h);
@@ -58,17 +60,27 @@ function paintSvgRect(page, b, pageHeightPdf) {
   }
 }
 
-function paintSvgLine(page, b, pageHeightPdf) {
+function paintSvgLine(page, b, pageHeightPdf, doc) {
   if (!b.stroke || b.stroke.a === 0) return;
   const x1 = b.x1 * CSS_TO_PDF;
   const y1 = cssYToPdfY(b.y1, pageHeightPdf);
   const x2 = b.x2 * CSS_TO_PDF;
   const y2 = cssYToPdfY(b.y2, pageHeightPdf);
   page.saveState();
+  applySvgAlpha(page, doc, b, /*fill*/false, /*stroke*/true);
   page.setStrokeRgb(b.stroke.r, b.stroke.g, b.stroke.b);
   page.setLineWidth(Math.max(0.1, b.strokeWidth * CSS_TO_PDF));
   page._push(`${num(x1)} ${num(y1)} m ${num(x2)} ${num(y2)} l S\n`);
   page.restoreState();
+}
+
+function applySvgAlpha(page, doc, b, useFill, useStroke) {
+  const ca = useFill ? (b.fillOpacity != null ? b.fillOpacity : 1) * (b.fill ? b.fill.a : 1) : 1;
+  const CA = useStroke ? (b.strokeOpacity != null ? b.strokeOpacity : 1) * (b.stroke ? b.stroke.a : 1) : 1;
+  if (ca < 1 || CA < 1) {
+    const gs = doc.addExtGState({ ca, CA });
+    page.setExtGState(gs);
+  }
 }
 
 function paintSvgEllipse(page, b, pageHeightPdf, doc) {
@@ -153,6 +165,10 @@ function paintBox(doc, page, b, pageHeightPdf) {
 
   function paintFill(color) {
     page.saveState();
+    const opacity = (b.style.opacity != null ? b.style.opacity : 1) * (color.a != null ? color.a : 1);
+    if (opacity < 1) {
+      page.setExtGState(doc.addExtGState({ ca: opacity, CA: opacity }));
+    }
     page.setFillRgb(color.r, color.g, color.b);
     if (hasRadius) {
       page.pathRoundedRect(x, y, w, h, radii);
@@ -207,7 +223,7 @@ function paintBox(doc, page, b, pageHeightPdf) {
   }
 }
 
-function paintText(page, fontMap, b, pageHeightPdf) {
+function paintText(page, fontMap, b, pageHeightPdf, doc) {
   const txt = b.text;
   if (!txt) return;
   const color = parseColor(b.style.color);
@@ -248,6 +264,12 @@ function paintText(page, fontMap, b, pageHeightPdf) {
   else if (b.style.textTransform === 'lowercase') renderText = renderText.toLowerCase();
 
   page.saveState();
+  // Apply CSS opacity (e.g. .header-topline has opacity:0.9 over the green gradient).
+  // For text, alpha applies to fill (text painting is mode 0 = fill).
+  const opacity = (b.style.opacity != null ? b.style.opacity : 1) * (color ? color.a : 1);
+  if (opacity < 1) {
+    page.setExtGState(doc.addExtGState({ ca: opacity, CA: opacity }));
+  }
   if (color) page.setFillRgb(color.r, color.g, color.b);
   page.beginText();
   page.setFont(fontHandle, fontSizeCss * CSS_TO_PDF);
