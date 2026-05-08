@@ -182,15 +182,18 @@ Newest entries at the bottom. One section per accepted iteration.
 
 ---
 
-## Final state at 2026-05-08T05:15Z (session stop)
+## Final state at 2026-05-08T05:15 (session stop)
 
 | Fixture | Diff vs ref | Links | Text | Fonts |
 |---------|-------------|-------|------|-------|
-| source       | **1.435%** | 4/4 ✓ | ok ✓ | ok ✓ |
-| source-flat  | **2.529%** | 3/3 ✓ | ok ✓ | ok ✓ |
+| source       | **1.428%** | 4/4 ✓ | ok ✓ | ok ✓ |
+| source-flat  | **2.533%** | 3/3 ✓ | ok ✓ | ok ✓ |
 | wizard       | **7.719%** | 5/5 ✓ | ok ✓ | ok ✓ |
-| report       | **9.536%** | 2/2 ✓ | ok ✓ | ok ✓ |
-| **overall**  | **5.906%** |  |  |  |
+| report       | **9.481%** | 2/2 ✓ | ok ✓ | ok ✓ |
+| **overall**  | **5.885%** |  |  |  |
+
+Validity tests: 28/28 pass (magic bytes, %%EOF, link annotation count, text
+extraction, FontFile2+Inter signature, size sanity).
 
 **All 4 fixtures pass every functional gate.** Only the visual-diff threshold
 (<0.1%) remains for full PASS. Remaining diff dominated by:
