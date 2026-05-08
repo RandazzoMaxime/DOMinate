@@ -222,8 +222,7 @@ function walk(el, idoc, boxes, parentX, parentY) {
 
   // Skip text inside icon fonts — they map ASCII names ("settings", "polyline") to
   // glyphs via OpenType ligatures. Without the icon font embedded, drawing those names
-  // in our fallback (Helvetica) pollutes the output with stray words. Better to leave
-  // an empty space until the font subsystem can embed the icon font.
+  // in our fallback Inter would pollute the output. Better to leave an empty space.
   const fontFam = (style.fontFamily || '').toLowerCase();
   const isIconFont = /material\s*symbols|material\s*icons|fontawesome|fa-solid|fa-regular|bi-icons|font\s*awesome/i.test(fontFam);
 
