@@ -255,7 +255,22 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
     else if (weight >= 600) fontHandle = altMap.semibold;
     else if (weight >= 500) fontHandle = altMap.medium;
     else                    fontHandle = altMap.regular;
-    fallbacks = [];  // base 14 doesn't need glyph fallbacks
+    // Helvetica/Arial base 14 lacks Greek (Δ), so we still chain to the embedded
+    // Inter primary + Greek subsets as fallbacks. This gives Latin via Helvetica
+    // (close to Arial metrics) AND working Δ via Inter Greek.
+    if (fontMap.embedded) {
+      // Pick Inter primary at the matching weight as the next fallback
+      const interPrimary =
+        weight >= 700 ? fontMap.bold :
+        weight >= 600 ? fontMap.semibold :
+        weight >= 500 ? fontMap.medium : fontMap.regular;
+      const interGreek = weight >= 700 ? fontMap.fallbacks.bold :
+                          weight >= 600 ? fontMap.fallbacks.semibold :
+                          weight >= 500 ? fontMap.fallbacks.medium : fontMap.fallbacks.regular;
+      fallbacks = [interPrimary, ...interGreek];
+    } else {
+      fallbacks = [];
+    }
   } else if (fontMap.embedded) {
     if      (weight >= 700) { fontHandle = fontMap.bold;     fallbacks = fontMap.fallbacks.bold; }
     else if (weight >= 600) { fontHandle = fontMap.semibold; fallbacks = fontMap.fallbacks.semibold; }
@@ -367,18 +382,26 @@ function num(n) {
  * font (the .notdef glyph will render — visually wrong but keeps positioning consistent).
  */
 function splitTextByFont(text, primary, fallbacks) {
-  if (primary.kind !== 'embeddedTrueType') return [{ font: primary, text }];
+  // For each char: if primary supports it, use primary. Else walk fallbacks to find
+  // an embedded font with a glyph for it. As a last resort, keep primary.
+  // For "standard" Type 1 fonts (Helvetica), we accept all WinAnsi-codepoints (≤ 0xFF),
+  // anything else falls back to embedded fonts.
+  function primarySupports(cp) {
+    if (primary.kind === 'embeddedTrueType') return primary.font.unicodeToGid.has(cp);
+    if (primary.kind === 'standard') return cp <= 0xFF;  // WinAnsi range
+    return false;
+  }
   const runs = [];
   let curFont = null;
   let curText = '';
   for (const ch of text) {
     const cp = ch.codePointAt(0);
-    let chosen = primary.font.unicodeToGid.has(cp) ? primary : null;
+    let chosen = primarySupports(cp) ? primary : null;
     if (!chosen) {
       for (const f of fallbacks || []) {
-        if (f && f.kind === 'embeddedTrueType' && f.font.unicodeToGid.has(cp)) {
-          chosen = f; break;
-        }
+        if (!f) continue;
+        if (f.kind === 'embeddedTrueType' && f.font.unicodeToGid.has(cp)) { chosen = f; break; }
+        if (f.kind === 'standard' && cp <= 0xFF) { chosen = f; break; }
       }
     }
     if (!chosen) chosen = primary;
