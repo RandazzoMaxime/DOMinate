@@ -232,8 +232,13 @@ function walk(el, idoc, boxes, parentX, parentY) {
   for (const child of el.childNodes) {
     // Use literal nodeType values (3 = TEXT, 1 = ELEMENT) for the same realm-agnostic reason.
     if (child.nodeType === 3) {
-      const t = child.nodeValue;
-      if (!t || !t.trim()) continue;
+      // Normalize whitespace the way HTML rendering does: collapse all whitespace
+      // runs (including \n) to a single space, then trim. Without this, leading/
+      // trailing newlines in source HTML become .notdef glyphs in the PDF (the
+      // newline char isn't in any font's Unicode cmap).
+      const raw = child.nodeValue;
+      if (!raw || !raw.trim()) continue;
+      const t = raw.replace(/\s+/g, ' ').trim();
       if (isIconFont) continue;
       const range = idoc.createRange();
       range.selectNode(child);
