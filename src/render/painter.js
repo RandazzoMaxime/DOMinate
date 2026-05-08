@@ -260,9 +260,12 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
   // This is rough and revisited when we have real font metrics.
   // Baseline within the line box. Empirically tuned 0.80 — gives the lowest measured
   // pixel-diff across our fixtures.
-  // Baseline within the line box. 0.80 is the empirical optimum across our fixtures
-  // (variations of ±0.04 only shift the diff by ~0.05 pt, the residual is mostly
-  // glyph-edge antialiasing rather than systematic offset).
+  // Baseline within the line box. We tested two approaches:
+  //   - exact font metrics (half-leading + fontSize × ascentEm) → improved report.html
+  //     (mixed font sizes) but regressed the more uniform source/source-flat fixtures.
+  //   - empirical 0.80 of line-box height → best-on-average for our 4 fixtures.
+  // Sticking with 0.80 because the regression on the primary fixtures outweighs the
+  // gain elsewhere.
   const baselineCssY = b.y + b.h * 0.80;
   const xPdf = b.x * CSS_TO_PDF;
   const yPdf = cssYToPdfY(baselineCssY, pageHeightPdf);
