@@ -139,6 +139,47 @@ Newest entries at the bottom. One section per accepted iteration.
 **Files:** reference/wizard.audit.json
 **Diff:** wizard 23.239% → 7.746%  ✓ (-15.5 pts) — biggest single-iter drop after iter 3
 
+## Iteration 20 — dashed/dotted CSS border styles
+
+**Change:** pdf.js setDashPattern (d operator). painter maps border-style:dashed → [2lw 2lw], dotted → [lw lw]. Wizard's drag-zone dashed border now renders correctly.
+**Files:** src/core/pdf.js, src/dom/walker.js, src/render/painter.js
+**Diff:** wizard 7.746% → 7.679%
+
+## Iteration 21 — render <input>/<select>/<textarea> placeholders
+
+**Change:** walker synthesizes a text box for form controls based on (priority order) el.value, el.options[selected].textContent, el.placeholder, or 'mm/dd/yyyy' for date inputs. Wizard now shows 'e.g. ALPHA-TERRAIN-MAPPING-2024', 'Enter contracting entity…', 'mm/dd/yyyy', 'Standard Survey'.
+**Files:** src/dom/walker.js
+**Diff:** wizard slight regression in pixel-diff (+0.06 pt) due to placeholder positioning slight offset, but visual fidelity is much higher (forms are no longer empty boxes).
+
+## Iteration 22 — normalize whitespace runs
+
+**Change:** source HTML often has text nodes like '\n  Cancel  \n'. Browser collapses these but our walker emitted the raw text. Newlines aren't in font cmaps so they showed as .notdef bars at the edges of 'Cancel' and 'NEXT STEP' wizard buttons. Fix: collapse \s+ to a single space and trim.
+**Files:** src/dom/walker.js
+**Diff:** wizard 7.742% → 7.719%
+
+## Iteration 23 — text-decoration: underline
+
+**Change:** painter draws a thin horizontal stroke below the baseline when computed textDecorationLine includes 'underline'. Position: baseline + 10% em below; thickness: max(0.5pt, 5% em).
+**Files:** src/render/painter.js
+**Diff:** report 11.42% → 9.54% (the eyebrow link 'helix.corsica' is underlined; many missing underlines aggregated to 1.9 pt of diff).
+
+## Iteration 24 — Helvetica base-14 alternate for CSS Arial
+
+**Change:** when CSS computed fontFamily starts with 'arial' or 'helvetica', pick base-14 Helvetica instead of embedded Inter. Closer to the reference's actual rendering since source-flat uses Arial.
+**Files:** src/index.js, src/render/painter.js
+**Diff:** source-flat 2.580% → 2.541%
+
+## Iteration 25 — fractional glyph widths (4 decimals)
+
+**Change:** /W array uses 4-decimal precision instead of 2 (negligible diff change but more correct).
+**Files:** src/core/fonts/embed.js
+
+## Iteration 26 — Helvetica + Inter Greek combined fallback
+
+**Change:** when primary is base-14 Helvetica (for Arial fixtures), keep Inter Greek subsets in the fallback chain. splitTextByFont handles 'standard' kind: Helvetica supports cp ≤ 0xFF, anything outside falls through to Inter Greek. Source-flat's ΔX/ΔY/ΔZ/ΔH/Δ3D headers and 'Projet – P001' en-dashes now render correctly.
+**Files:** src/render/painter.js
+**Diff:** source-flat 2.541% → 2.529%
+
 ---
 
 ## Final state at 2026-05-08T05:15Z (session stop)
@@ -146,10 +187,10 @@ Newest entries at the bottom. One section per accepted iteration.
 | Fixture | Diff vs ref | Links | Text | Fonts |
 |---------|-------------|-------|------|-------|
 | source       | **1.435%** | 4/4 ✓ | ok ✓ | ok ✓ |
-| source-flat  | **2.578%** | 3/3 ✓ | ok ✓ | ok ✓ |
-| wizard       | **7.746%** | 5/5 ✓ | ok ✓ | ok ✓ |
-| report       | 11.428%    | 2/2 ✓ | ok ✓ | ok ✓ |
-| **overall**  | **6.274%** |  |  |  |
+| source-flat  | **2.529%** | 3/3 ✓ | ok ✓ | ok ✓ |
+| wizard       | **7.719%** | 5/5 ✓ | ok ✓ | ok ✓ |
+| report       | **9.536%** | 2/2 ✓ | ok ✓ | ok ✓ |
+| **overall**  | **5.906%** |  |  |  |
 
 **All 4 fixtures pass every functional gate.** Only the visual-diff threshold
 (<0.1%) remains for full PASS. Remaining diff dominated by:
