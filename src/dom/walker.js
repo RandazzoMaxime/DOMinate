@@ -50,23 +50,32 @@ export async function layout(html, { width, height }) {
     idoc.write(html);
     idoc.close();
 
-    // Wait for fonts (Inter via Google Fonts) and one frame, but cap the wait at 2 s so
-    // an offline / blocked CDN doesn't hang us forever.
+    // Wait for the iframe's load event (resolves after all <script> and <link> tags have
+    // settled — including Tailwind CDN, Google Fonts, etc.). Capped at 4 s so a slow
+    // network doesn't hang us forever.
+    if (iframe.contentWindow.document.readyState !== 'complete') {
+      await Promise.race([
+        new Promise(r => iframe.addEventListener('load', r, { once: true })),
+        new Promise(r => setTimeout(r, 4000)),
+      ]);
+    }
+
     if (idoc.fonts && idoc.fonts.ready) {
       await Promise.race([
         idoc.fonts.ready,
-        new Promise(r => setTimeout(r, 2000)),
+        new Promise(r => setTimeout(r, 3000)),
       ]);
     }
+    // Two rAFs to ensure post-font-load reflow has settled.
     await new Promise(r => requestAnimationFrame(() => r()));
-    // Second rAF: ensure post-font-load reflow has settled.
     await new Promise(r => requestAnimationFrame(() => r()));
-    console.log('[walker] starting walk, body has', idoc.body.children.length, 'top-level children');
+    // Tailwind-CDN runtime needs an extra tick for its CSSOM mutation to settle.
+    await new Promise(r => setTimeout(r, 100));
 
     const root = idoc.documentElement;
     const boxes = [];
     walk(root, idoc, boxes, 0, 0);
-    console.log('[walker] collected', boxes.length, 'boxes');
+    // (debug logs removed after sanity)
 
     return { boxes, width, height };
   } finally {

@@ -1,0 +1,17 @@
+{
+  "viewport": { "width": 800, "height": 640 },
+  "screenshotScale": 2,
+  "expectedLinks": ["#", "#", "#", "#", "#"],
+  "expectedTextFragments": [
+    "HELIX AERO",
+    "MISSION CONFIGURATION",
+    "Project Definition",
+    "INFO",
+    "Client Logo",
+    "Drag and drop file",
+    "PRO-TIP",
+    "NEXT STEP",
+    "Standard Survey",
+    "v4.2.0"
+  ]
+}

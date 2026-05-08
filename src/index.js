@@ -13,34 +13,45 @@ import { layout } from './dom/walker.js';
 import { paint } from './render/painter.js';
 
 const A4_LANDSCAPE_CSS = { width: 1123, height: 794 };
+const A4_PORTRAIT_CSS  = { width: 794,  height: 1123 };
 
 /**
  * @param {string|HTMLElement} input
  * @param {object} [opts]
+ * @param {{width: number, height: number}} [opts.viewport]  CSS px — explicit override
+ * @param {'A4'} [opts.pageSize]
+ * @param {'portrait'|'landscape'} [opts.orientation]
  * @returns {Promise<Uint8Array>}
  */
 export async function htmlToPdf(input, opts = {}) {
+  // Resolve viewport in CSS pixels. Explicit viewport wins; otherwise pageSize+orientation
+  // map to A4 dimensions. If nothing is provided, default to A4 landscape (the original
+  // reference fixture).
+  let viewport = opts.viewport;
+  if (!viewport) {
+    if (opts.pageSize === 'A4' && opts.orientation === 'landscape') viewport = A4_LANDSCAPE_CSS;
+    else if (opts.pageSize === 'A4' && opts.orientation === 'portrait') viewport = A4_PORTRAIT_CSS;
+    else viewport = A4_LANDSCAPE_CSS;
+  }
+
+  // PDF user units = CSS px × 0.75 (96 DPI → 72 DPI).
   const doc = new PdfDocument({
-    pageSize: opts.pageSize ?? 'A4',
-    orientation: opts.orientation ?? 'portrait',
+    pageWidthPdfUnits:  viewport.width  * 0.75,
+    pageHeightPdfUnits: viewport.height * 0.75,
   });
 
   const html = typeof input === 'string' ? input : input.outerHTML;
-
-  // 1. Lay out the HTML in a hidden iframe at exact A4 landscape CSS px size.
-  const viewport = (opts.orientation === 'landscape')
-    ? A4_LANDSCAPE_CSS
-    : { width: 794, height: 1123 };
   const { boxes } = await layout(html, viewport);
 
-  // 2. Allocate the standard fonts the painter falls back on (until iter 7's font embed).
+  // Standard fonts: Helvetica is the default fallback. The walker will tell us about
+  // monospace / sans-serif through computed style. Iter 7+ replaces these with
+  // embedded Inter / JetBrains Mono.
   const fontMap = {
     regular: doc.addStandardFont('Helvetica'),
     bold:    doc.addStandardFont('Helvetica-Bold'),
     oblique: doc.addStandardFont('Helvetica-Oblique'),
   };
 
-  // 3. Add a single page and paint.
   const page = doc.addPage();
   paint(doc, fontMap, page, boxes);
 

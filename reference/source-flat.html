@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Fiche de contrôle — Flat</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+        :root {
+            --topo-template-primary-color: #2563eb;
+            --topo-template-secondary-color: #1e40af;
+            --topo-template-tertiary-color: #dbeafe;
+            --topo-template-tool-color: #f59e0b;
+            --topo-template-body-text-color: #0f172a;
+            --topo-template-header-text-color: #ffffff;
+            --topo-template-point-id-bg: #2563eb;
+            --topo-template-point-id-text: #ffffff;
+            --topo-template-table-col-bg: #e2e8f0;
+            --topo-template-table-col-text: #1f2937;
+            --topo-template-table-text: #0f172a;
+            --topo-template-card-title-bg: #f8fafc;
+            --topo-template-card-title-text: #475569;
+            --topo-template-table-header-bg: #f8fafc;
+            --topo-template-table-header-text: #475569;
+            --topo-template-footer-bg: #f1f5f9;
+            --topo-template-footer-text: #475569;
+
+            --primary-color: var(--topo-template-primary-color);
+            --primary-strong: color-mix(in srgb, var(--primary-color) 85%, black);
+            --secondary-color: var(--topo-template-secondary-color);
+            --tertiary-color: var(--topo-template-tertiary-color);
+            --table-row-border: var(--table-col-bg);
+            --bg-page: #ffffff;
+            --bg-card: #ffffff;
+            --border-soft: #94a3b8;
+            --text-main: var(--topo-template-body-text-color);
+            --text-header: var(--topo-template-header-text-color);
+            --text-muted: #475569;
+            --point-id-bg: var(--topo-template-point-id-bg);
+            --point-id-text: var(--topo-template-point-id-text);
+            --table-col-bg: var(--topo-template-table-col-bg);
+            --table-col-text: var(--topo-template-table-col-text);
+            --table-text: var(--topo-template-table-text);
+            --card-title-bg: var(--topo-template-card-title-bg);
+            --card-title-text: var(--topo-template-card-title-text);
+            --table-header-bg: var(--topo-template-table-header-bg);
+            --table-header-text: var(--topo-template-table-header-text);
+            --footer-bg: var(--topo-template-footer-bg);
+            --footer-text: var(--topo-template-footer-text);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 9px;
+            line-height: 1.2;
+            color: var(--text-main);
+            background: var(--bg-page);
+        }
+
+        @page { size: A4 landscape; margin: 0; }
+        html { width: 297mm; height: 210mm; }
+
+        .page {
+            width: 297mm;
+            height: 210mm;
+            padding: 1.5mm 3mm;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .page-inner {
+            flex: 1;
+            background: #ffffff;
+            border-radius: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 0.5px solid var(--border-soft);
+        }
+
+        .header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 1.2mm 5mm; background: var(--primary-color); color: var(--text-header); border-bottom: 0.5px solid var(--primary-strong); }
+        .header-left { display: flex; align-items: center; gap: 3mm; }
+        .header-brand { font-weight: bold; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; }
+        .header-ref { font-size: 9px; font-weight: bold; opacity: 0.95; }
+        .header-right { display: flex; align-items: center; gap: 3mm; font-size: 9px; }
+        .header-item { white-space: nowrap; }
+        .header-item-label { opacity: 0.7; font-size: 8px; text-transform: uppercase; letter-spacing: 0.06em; }
+        .header-item-value { font-weight: bold; }
+        .header-sep { width: 1px; height: 10px; background: rgba(255,255,255,0.3); }
+        .header-badge { background: rgba(255,255,255,0.15); border: 0.5px solid rgba(255,255,255,0.3); border-radius: 0; padding: 0.3mm 2mm; font-size: 9px; font-weight: bold; }
+
+        .info-bar { display: flex; align-items: center; gap: 1.5mm; padding: 0.5mm 5mm; background: #f1f5f9; border-bottom: 0.5px solid var(--border-soft); font-size: 8px; color: var(--text-muted); flex-wrap: wrap; }
+        .info-bar-item { display: flex; gap: 1mm; align-items: baseline; }
+        .info-bar-label { text-transform: uppercase; letter-spacing: 0.06em; font-weight: bold; font-size: 7px; }
+        .info-bar-value { color: var(--text-main); font-weight: bold; font-size: 8px; }
+        .info-bar-sep { color: var(--border-soft); font-weight: bold; }
+
+        .MAIN { flex: 1; padding: 2mm 4mm 1.5mm 4mm; background: var(--bg-page); display: flex; flex-direction: column; gap: 1.5mm; }
+
+        .point-id { background: var(--point-id-bg); border-radius: 0; padding: 1mm 2.5mm; display: flex; justify-content: space-between; align-items: center; }
+        .point-id-name { font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--point-id-text); }
+
+        .body-wrap { flex: 1; display: flex; gap: 1.5mm; min-height: 0; }
+        .left-cont, .right-cont { display: flex; flex-direction: column; gap: 1.5mm; min-height: 0; }
+        .left-cont { flex: 5; }
+        .right-cont { flex: 4; }
+
+        .card { background: var(--bg-card); border: 0.5px solid var(--border-soft); border-radius: 0; display: flex; flex-direction: column; overflow: hidden; }
+        .card-header { padding: 0.5mm 1.5mm; border-bottom: 0.5px solid var(--border-soft); background: var(--card-title-bg); display: flex; justify-content: space-between; align-items: center; }
+        .card-title { font-size: 8px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: bold; color: var(--card-title-text); }
+        .card-body { padding: 0; flex: 1; }
+        .cardphoto { height: 90mm !important; max-height: 90mm; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th, td { font-size: 9px; padding: 0.5mm 1mm; border-bottom: 0.5px solid var(--table-row-border); text-align: center; color: var(--table-text); }
+        th { background: var(--table-col-bg); font-weight: bold; border: 0.5px solid var(--border-soft); color: var(--table-col-text); font-size: 8px; }
+        td { border-left: 0.5px solid var(--border-soft); border-right: 0.5px solid var(--border-soft); }
+        tr:last-child td { border-bottom: 0.5px solid var(--border-soft); }
+        .coord-mono { font-family: "JetBrains Mono", Consolas, monospace; font-size: 9px; font-weight: 600; letter-spacing: -0.01em; }
+
+        .photo-container, .map-container { flex: 1; border-radius: 0; background: #e5e7eb; display: flex; align-items: center; justify-content: center; overflow: hidden; min-height: 40mm; height: 100%; border: 0.5px solid var(--border-soft); background-repeat: no-repeat; background-size: cover; background-position: center; }
+        .map-container img { width: 100%; height: 100%; object-fit: cover; }
+
+        .scheme-body { flex: 1; display: flex; justify-content: center; align-items: center; }
+        .scheme-container { max-height: 66mm; height: 100%; width: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .scheme-container img, .scheme-container svg { width: 100%; height: 100%; object-fit: contain; }
+        .scheme-card { flex: 1; display: flex; flex-direction: column; }
+
+        .footer-bar { border-top: 0.5px solid var(--border-soft); background: var(--footer-bg); padding: 0.8mm 5mm; font-size: 8px; display: flex; justify-content: space-between; align-items: center; color: var(--footer-text); }
+        .footer-brand { font-weight: bold; color: var(--footer-text); }
+        .footer-right { display: flex; align-items: center; gap: 2mm; }
+        .footer-page-pill { padding: 0.3mm 1.5mm; border-radius: 0; border: 0.5px solid var(--border-soft); background: linear-gradient(rgba(0,0,0,0.12), rgba(0,0,0,0.12)), var(--footer-bg); color: var(--footer-text); font-weight: bold; font-size: 8px; }
+        .footer-page-pill a { color: var(--footer-text); text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="page-inner">
+            <div class="header">
+                <div class="header-left">
+                    <span class="header-brand">Topo.ninja</span>
+                    <span class="header-ref">P001</span>
+                </div>
+                <div class="header-right">
+                    <span class="header-item"><span class="header-item-label">Date</span> <span class="header-item-value">08/05/2026</span></span>
+                    <div class="header-sep"></div>
+                    <span class="header-item"><span class="header-item-label">Version</span> <span class="header-item-value">1.0</span></span>
+                    <div class="header-sep"></div>
+                    <span class="header-item"><span class="header-item-label">Type</span> <span class="header-item-value">Fiche de contrôle</span></span>
+                    <div class="header-sep"></div>
+                    <div class="header-badge">SCR : EPSG:3942</div>
+                </div>
+            </div>
+
+            <div class="info-bar">
+                <div class="info-bar-item"><span class="info-bar-label">Client</span> <span class="info-bar-value">Client Démo</span></div>
+                <span class="info-bar-sep">|</span>
+                <div class="info-bar-item"><span class="info-bar-label">Référence</span> <span class="info-bar-value">DEMO-2026-001</span></div>
+                <span class="info-bar-sep">|</span>
+                <div class="info-bar-item"><span class="info-bar-label">Site</span> <span class="info-bar-value">Site exemple</span></div>
+                <span class="info-bar-sep">|</span>
+                <div class="info-bar-item"><span class="info-bar-label">Relevé par</span> <span class="info-bar-value">Jean Dupont</span></div>
+                <span class="info-bar-sep">|</span>
+                <div class="info-bar-item"><span class="info-bar-label">Rapport par</span> <span class="info-bar-value">Jean Dupont</span></div>
+                <span class="info-bar-sep">|</span>
+                <div class="info-bar-item"><span class="info-bar-label">Tolérance</span> <span class="info-bar-value">2 cm</span></div>
+                <span class="info-bar-sep">|</span>
+                <div class="info-bar-item"><span class="info-bar-label">Date d'implantation</span> <span class="info-bar-value">15/11/2024</span></div>
+            </div>
+
+            <div class="MAIN">
+                <div class="point-id">
+                    <div class="point-id-name">P001</div>
+                </div>
+
+                <div class="body-wrap">
+                    <div class="left-cont">
+                        <div class="card">
+                            <div class="card-header"><div class="card-title">Points contrôlés</div></div>
+                            <div class="card-body">
+                                <table>
+                                    <colgroup><col style="width:28%"/><col style="width:24%"/><col style="width:24%"/><col style="width:24%"/></colgroup>
+                                    <thead>
+                                        <tr><th>Point</th><th>X</th><th>Y</th><th>Z</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td>Projet – P001</td><td class="coord-mono">2179485.989</td><td class="coord-mono">1208403.395</td><td class="coord-mono">1.419</td></tr>
+                                        <tr><td>Contrôle – C001</td><td class="coord-mono">2179485.991</td><td class="coord-mono">1208403.393</td><td class="coord-mono">0.000</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header"><div class="card-title">Écarts mesurés</div></div>
+                            <div class="card-body">
+                                <table>
+                                    <colgroup><col style="width:20%"/><col style="width:20%"/><col style="width:20%"/><col style="width:20%"/><col style="width:20%"/></colgroup>
+                                    <thead>
+                                        <tr><th>ΔX</th><th>ΔY</th><th>ΔZ</th><th>ΔH (XY)</th><th>Δ3D</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="coord-mono">0.002</td>
+                                            <td class="coord-mono">-0.002</td>
+                                            <td class="coord-mono">-1.419</td>
+                                            <td class="coord-mono">0.003</td>
+                                            <td class="coord-mono">1.419</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="card scheme-card">
+                            <div class="card-header"><div class="card-title">Schéma</div></div>
+                            <div class="card-body scheme-body">
+                                <div class="scheme-container">
+                                    <svg style="width:100%;height:100%;display:block;" xmlns="http://www.w3.org/2000/svg" width="160mm" height="90mm" viewBox="0 0 160 90">
+                                        <rect x="0" y="0" width="160" height="90" fill="#ffffff" />
+                                        <line x1="4" y1="45" x2="156" y2="45" stroke="#cbd5e1" stroke-width="0.6" />
+                                        <line x1="80" y1="4" x2="80" y2="86" stroke="#cbd5e1" stroke-width="0.6" />
+                                        <circle cx="80" cy="45" r="15" fill="none" stroke="black" stroke-width="1" stroke-opacity="0.65" />
+                                        <line x1="80" y1="45" x2="86" y2="51" stroke="#f59e0b" stroke-width="0.45" />
+                                        <circle cx="86" cy="51" r="15" fill="#f59e0b" fill-opacity="0.65" stroke="#f59e0b" stroke-width="1" />
+                                        <circle cx="86" cy="51" r="2" fill="#f59e0b" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="right-cont">
+                        <div class="card cardphoto">
+                            <div class="card-header"><div class="card-title">Photo terrain</div></div>
+                            <div class="card-body"><div class="photo-container"></div></div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header"><div class="card-title">Note technique</div></div>
+                            <div class="card-body">
+                                <div style="font-size:9px; padding: 0.5mm 1mm; line-height:1.2; white-space: pre-wrap; word-wrap: break-word;">Levé effectué selon les normes IGN en vigueur. Tous les points ont été mesurés avec une précision centimétrique. Les données GPS ont été corrigées avec la station de base locale.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-bar">
+                <div class="footer-brand">Topo.ninja</div>
+                <div style="color:var(--footer-text);"><a href="https://topo.ninja">https://topo.ninja</a> &mdash; <a href="mailto:contact@topo.ninja">contact@topo.ninja</a></div>
+                <div class="footer-right">
+                    <div class="footer-page-pill"><a href="#sommaire">Sommaire</a></div>
+                    <div class="footer-page-pill">1 / 1</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -50,36 +50,32 @@ function startServer() {
   });
 }
 
-export async function renderWithLib(htmlPath) {
+export async function renderWithLib(htmlPath, viewport = { width: 1123, height: 794 }) {
   const html = await readFile(htmlPath, 'utf8');
 
   const { server, port } = await startServer();
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({
-      viewport: { width: 1123, height: 794 },
+      viewport: { width: Math.max(viewport.width, 1123), height: Math.max(viewport.height, 794) },
       deviceScaleFactor: 1,
     });
 
     page.on('console', msg => {
       const t = msg.type();
-      if (t === 'error' || t === 'warning' || t === 'log') console.error('[browser]', t, msg.text());
+      if (t === 'error' || t === 'warning') console.error('[browser]', t, msg.text());
     });
     page.on('pageerror', err => console.error('[browser pageerror]', err.message));
 
     await page.goto(`http://127.0.0.1:${port}/demo/run.html`, { waitUntil: 'networkidle' });
 
-    const base64 = await page.evaluate(async (htmlString) => {
+    const base64 = await page.evaluate(async ({ htmlString, vp }) => {
       const { htmlToPdf } = await import('/src/index.js');
-      const bytes = await htmlToPdf(htmlString, {
-        pageSize: 'A4',
-        orientation: 'landscape',
-        margin: 0,
-      });
+      const bytes = await htmlToPdf(htmlString, { viewport: vp, margin: 0 });
       let bin = '';
       for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
       return btoa(bin);
-    }, html);
+    }, { htmlString: html, vp: viewport });
 
     return Uint8Array.from(Buffer.from(base64, 'base64'));
   } finally {
@@ -89,7 +85,7 @@ export async function renderWithLib(htmlPath) {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const out = await renderWithLib(resolve(ROOT, 'reference', 'source.html'));
+  const out = await renderWithLib(resolve(ROOT, 'reference', 'source.html'), { width: 1123, height: 794 });
   const { writeFile, mkdir } = await import('node:fs/promises');
   await mkdir(resolve(ROOT, 'dist'), { recursive: true });
   await writeFile(resolve(ROOT, 'dist', 'output.pdf'), out);

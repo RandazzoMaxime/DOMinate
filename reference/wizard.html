@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>HELIX AERO | Creation Wizard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "tertiary-fixed-dim": "#89d4c9",
+                        "surface-container-highest": "#2f3543",
+                        "surface-container": "#1a1f2d",
+                        "on-secondary-container": "#89dba2",
+                        "on-background": "#dde2f5",
+                        "on-tertiary-fixed-variant": "#005049",
+                        "inverse-on-surface": "#2a303f",
+                        "outline-variant": "#3c4b39",
+                        "on-primary": "#00390a",
+                        "on-tertiary-container": "#036259",
+                        "primary-container": "#05ed49",
+                        "surface-dim": "#0d1320",
+                        "inverse-primary": "#006e1c",
+                        "on-secondary": "#00391c",
+                        "error": "#ffb4ab",
+                        "surface-container-low": "#161b29",
+                        "surface": "#0d1320",
+                        "on-primary-container": "#006519",
+                        "on-secondary-fixed": "#00210e",
+                        "surface-tint": "#00e546",
+                        "primary-fixed": "#70ff77",
+                        "on-error-container": "#ffdad6",
+                        "tertiary-container": "#90dbcf",
+                        "primary": "#a2ff9d",
+                        "surface-container-lowest": "#080e1b",
+                        "inverse-surface": "#dde2f5",
+                        "background": "#0d1320",
+                        "error-container": "#93000a",
+                        "on-tertiary-fixed": "#00201c",
+                        "secondary-fixed-dim": "#86d89f",
+                        "on-tertiary": "#003732",
+                        "primary-fixed-dim": "#00e546",
+                        "outline": "#859580",
+                        "on-surface": "#dde2f5",
+                        "on-error": "#690005",
+                        "tertiary-fixed": "#a5f1e5",
+                        "on-surface-variant": "#baccb4",
+                        "on-primary-fixed-variant": "#005313",
+                        "secondary-fixed": "#a1f5ba",
+                        "surface-variant": "#2f3543",
+                        "surface-container-high": "#242a38",
+                        "surface-bright": "#333948",
+                        "on-secondary-fixed-variant": "#00522c",
+                        "secondary": "#86d89f",
+                        "secondary-container": "#006235",
+                        "tertiary": "#abf8ec",
+                        "on-primary-fixed": "#002204"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #0d1320;
+            color: #dde2f5;
+        }
+    </style>
+</head>
+<body class="font-body selection:bg-primary-container selection:text-on-primary">
+<!-- TopNavBar Implementation -->
+<header class="bg-[#161b29] dark:bg-slate-900 border-b border-white/10 shadow-xl fixed top-0 left-0 right-0 z-50 flex justify-between items-center w-full px-6 h-14">
+<div class="flex items-center gap-8">
+<span class="font-manrope font-black text-xl text-[#05ed49]">HELIX AERO</span>
+<nav class="hidden md:flex items-center gap-6">
+<a class="font-inter uppercase tracking-wider text-xs text-slate-400 hover:text-slate-100 transition-colors" href="#">File</a>
+<a class="font-inter uppercase tracking-wider text-xs text-slate-400 hover:text-slate-100 transition-colors" href="#">Edit</a>
+<a class="font-inter uppercase tracking-wider text-xs text-[#05ed49] border-b-2 border-[#05ed49] pb-1" href="#">View</a>
+<a class="font-inter uppercase tracking-wider text-xs text-slate-400 hover:text-slate-100 transition-colors" href="#">Tools</a>
+<a class="font-inter uppercase tracking-wider text-xs text-slate-400 hover:text-slate-100 transition-colors" href="#">Help</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-slate-400 hover:bg-white/5 transition-colors rounded">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<button class="p-2 text-slate-400 hover:bg-white/5 transition-colors rounded">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</header>
+<main class="min-h-screen pt-14 pb-8 px-6 lg:px-12 flex flex-col items-center justify-start bg-surface-container-lowest">
+<!-- Step Indicator / Wizard Header -->
+<div class="w-full max-w-5xl mt-12 mb-10">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+<div>
+<h1 class="font-headline font-extrabold text-3xl text-on-background tracking-tight">MISSION CONFIGURATION</h1>
+<p class="font-label text-sm uppercase tracking-widest text-on-surface-variant opacity-70">Step 1 of 6: Project Definition</p>
+</div>
+<div class="flex items-center gap-2">
+<span class="h-2 w-12 bg-primary-container rounded-full"></span>
+<span class="h-2 w-8 bg-surface-container-highest rounded-full"></span>
+<span class="h-2 w-8 bg-surface-container-highest rounded-full"></span>
+<span class="h-2 w-8 bg-surface-container-highest rounded-full"></span>
+<span class="h-2 w-8 bg-surface-container-highest rounded-full"></span>
+<span class="h-2 w-8 bg-surface-container-highest rounded-full"></span>
+</div>
+</div>
+<!-- Stepper Component -->
+<div class="grid grid-cols-2 md:grid-cols-6 gap-2 mb-12">
+<div class="bg-surface-container-high border-l-4 border-primary-container p-4 flex items-center gap-3">
+<span class="material-symbols-outlined text-primary-container" style="font-variation-settings: 'FILL' 1;">info</span>
+<span class="font-label font-bold text-xs uppercase tracking-tighter text-primary-container">Info</span>
+</div>
+<div class="bg-surface-container-low p-4 flex items-center gap-3 opacity-50 hover:opacity-100 transition-all cursor-not-allowed">
+<span class="material-symbols-outlined text-on-surface-variant">location_on</span>
+<span class="font-label text-xs uppercase tracking-tighter text-on-surface-variant">Location</span>
+</div>
+<div class="bg-surface-container-low p-4 flex items-center gap-3 opacity-50 hover:opacity-100 transition-all cursor-not-allowed">
+<span class="material-symbols-outlined text-on-surface-variant">explore</span>
+<span class="font-label text-xs uppercase tracking-tighter text-on-surface-variant">CRS</span>
+</div>
+<div class="bg-surface-container-low p-4 flex items-center gap-3 opacity-50 hover:opacity-100 transition-all cursor-not-allowed">
+<span class="material-symbols-outlined text-on-surface-variant">height</span>
+<span class="font-label text-xs uppercase tracking-tighter text-on-surface-variant">Elevation</span>
+</div>
+<div class="bg-surface-container-low p-4 flex items-center gap-3 opacity-50 hover:opacity-100 transition-all cursor-not-allowed">
+<span class="material-symbols-outlined text-on-surface-variant">sensors</span>
+<span class="font-label text-xs uppercase tracking-tighter text-on-surface-variant">Sensor</span>
+</div>
+<div class="bg-surface-container-low p-4 flex items-center gap-3 opacity-50 hover:opacity-100 transition-all cursor-not-allowed">
+<span class="material-symbols-outlined text-on-surface-variant">polyline</span>
+<span class="font-label text-xs uppercase tracking-tighter text-on-surface-variant">Vector</span>
+</div>
+</div>
+<!-- Creation Wizard Form -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+<!-- Main Form Column -->
+<div class="lg:col-span-7 bg-surface-container border border-outline-variant/15 p-8 shadow-2xl relative overflow-hidden">
+<!-- Subtle Glow Effect -->
+<div class="absolute -top-24 -right-24 w-64 h-64 bg-primary/5 blur-3xl rounded-full"></div>
+<form class="space-y-8 relative z-10">
+<div class="space-y-6">
+<div class="relative group">
+<label class="block font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-2 font-bold">Project Name</label>
+<input class="w-full bg-surface-container-highest border-0 border-b-2 border-outline-variant focus:border-primary-container focus:ring-0 text-on-surface font-body p-4 transition-all placeholder:text-on-surface-variant/30" placeholder="e.g. ALPHA-TERRAIN-MAPPING-2024" type="text"/>
+</div>
+<div class="relative group">
+<label class="block font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-2 font-bold">Client Name</label>
+<input class="w-full bg-surface-container-highest border-0 border-b-2 border-outline-variant focus:border-primary-container focus:ring-0 text-on-surface font-body p-4 transition-all placeholder:text-on-surface-variant/30" placeholder="Enter contracting entity..." type="text"/>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="relative group">
+<label class="block font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-2 font-bold">Project Date</label>
+<input class="w-full bg-surface-container-highest border-0 border-b-2 border-outline-variant focus:border-primary-container focus:ring-0 text-on-surface font-body p-4 transition-all" type="date"/>
+</div>
+<div class="relative group">
+<label class="block font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-2 font-bold">Mission Priority</label>
+<select class="w-full bg-surface-container-highest border-0 border-b-2 border-outline-variant focus:border-primary-container focus:ring-0 text-on-surface font-body p-4 transition-all">
+<option>Standard Survey</option>
+<option>High Precision (Lidar)</option>
+<option>Rapid Response</option>
+</select>
+</div>
+</div>
+</div>
+<div class="pt-4 flex items-center justify-between">
+<button class="font-label text-sm text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-2" type="button">
+<span class="material-symbols-outlined text-lg">close</span>
+                                Cancel
+                            </button>
+<button class="bg-primary-container text-on-primary font-manrope font-bold py-4 px-10 rounded-md hover:bg-primary-fixed-dim transition-all shadow-[0_0_20px_rgba(5,237,73,0.3)] flex items-center gap-3" type="button">
+                                NEXT STEP
+                                <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</form>
+</div>
+<!-- Auxiliary Side Column (Logo Upload) -->
+<div class="lg:col-span-5 space-y-6">
+<div class="bg-surface-container-low border border-outline-variant/15 p-8">
+<label class="block font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-6 font-bold">Client Logo / Identity</label>
+<div class="aspect-square w-full border-2 border-dashed border-outline-variant bg-surface-container-highest/30 flex flex-col items-center justify-center p-8 group cursor-pointer hover:border-primary-container/50 transition-all">
+<div class="w-20 h-20 bg-surface-container-high rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-3xl text-primary">cloud_upload</span>
+</div>
+<p class="font-body text-sm text-center text-on-surface mb-2">Drag and drop file</p>
+<p class="font-label text-[10px] uppercase text-on-surface-variant opacity-50">SVG, PNG, or JPG up to 5MB</p>
+</div>
+</div>
+<div class="bg-surface-container-high/40 backdrop-blur-md p-6 border-l-2 border-primary-container/30">
+<div class="flex items-start gap-4">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">lightbulb</span>
+<div>
+<h4 class="font-manrope font-bold text-sm text-primary mb-1">PRO-TIP</h4>
+<p class="font-body text-xs text-on-surface-variant leading-relaxed">Defining your mission accurately here ensures telemetry data aligns with your client's reporting standards. You can edit these details in the 'Summary' tab later.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer Implementation -->
+<footer class="fixed bottom-0 left-0 w-full z-50 flex items-center justify-between px-4 bg-[#080e1b] dark:bg-black h-8 border-t border-white/5 font-inter font-mono text-[10px] uppercase">
+<div class="text-[#05ed49]">HELIX AERO v4.2.0 | Precision Telemetry Active</div>
+<div class="flex items-center gap-6">
+<span class="text-slate-500 hover:text-white transition-colors cursor-default">Coords: 45.523,-122.676</span>
+<span class="text-slate-500 hover:text-white transition-colors cursor-default">DEM: 142m</span>
+<span class="text-[#05ed49] hover:text-white transition-colors cursor-default">SYNC: OK</span>
+</div>
+</footer>
+<!-- Background Map Visual Placeholder -->
+<div class="fixed inset-0 -z-10 opacity-20 pointer-events-none">
+<img class="w-full h-full object-cover" data-alt="abstract technical topographic map with glowing green vector lines on deep black background high tech aerospace aesthetic" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB4IwztyMqHgo-PHWq2-5KsdUHWfxIw0gkMybAMa6rkrSwTl09pGYvFVixVUS9E-2IO13KIvq5ol2Wsz3qOSwFD0eJbMP5Z-dwfzRwuyWJnyX03K8dfhpax31ovOLtrp2M45WnS5Vg6otg3o1ce2vlzLiwOyGqlQLlXezGUIPI-M0_5WdtAwzjoRh0-zHmGdetTA2pyB9TTx1zr9J35qZe9k__TNi4KJB_HuSMbBxd_E6xFYOWCT5w1LFen873YpCeFy8B7t5mKA88"/>
+</div>
+</body></html>

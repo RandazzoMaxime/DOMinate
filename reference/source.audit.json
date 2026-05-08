@@ -1,0 +1,24 @@
+{
+  "viewport": { "width": 1123, "height": 794 },
+  "screenshotScale": 1,
+  "expectedLinks": [
+    "mailto:contact@topo.ninja",
+    "https://topo.ninja",
+    "mailto:contact@topo.ninja",
+    "#sommaire"
+  ],
+  "expectedTextFragments": [
+    "FICHE DE CONTRÔLE",
+    "Topo.ninja",
+    "P001",
+    "Client Démo",
+    "DEMO-2026-001",
+    "Site exemple",
+    "Jean Dupont",
+    "08/05/2026",
+    "EPSG:3942",
+    "2179485.989",
+    "Sommaire",
+    "1 / 1"
+  ]
+}

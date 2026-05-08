@@ -43,11 +43,19 @@ export function cssYToPdfY(cssY, pageHeightPdfUnits) {
  *   const bytes = doc.toBytes();
  */
 export class PdfDocument {
-  constructor({ pageSize = 'A4', orientation = 'portrait', margin = 0 } = {}) {
-    const base = PAGE_SIZES[pageSize] || PAGE_SIZES.A4;
-    this.pageWidth = orientation === 'landscape' ? base.height : base.width;
-    this.pageHeight = orientation === 'landscape' ? base.width : base.height;
-    this.margin = margin;
+  constructor(opts = {}) {
+    if (opts.pageWidthPdfUnits && opts.pageHeightPdfUnits) {
+      // Explicit dimensions (in PDF user units = 1/72 inch)
+      this.pageWidth  = opts.pageWidthPdfUnits;
+      this.pageHeight = opts.pageHeightPdfUnits;
+    } else {
+      // Named page size + orientation
+      const { pageSize = 'A4', orientation = 'portrait' } = opts;
+      const base = PAGE_SIZES[pageSize] || PAGE_SIZES.A4;
+      this.pageWidth  = orientation === 'landscape' ? base.height : base.width;
+      this.pageHeight = orientation === 'landscape' ? base.width  : base.height;
+    }
+    this.margin = opts.margin ?? 0;
 
     /** @type {IndirectObject[]} */
     this.objects = [];
