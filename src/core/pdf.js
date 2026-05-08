@@ -370,6 +370,10 @@ class Page {
   }
   /** Set text matrix to a translated identity at (x, y) in PDF user units. */
   setTextPos(x, y) { this._push(`1 0 0 1 ${num(x)} ${num(y)} Tm\n`); }
+  /** Set the character-spacing parameter Tc (in unscaled text-space units). */
+  setCharSpacing(tc) { this._push(`${num(tc)} Tc\n`); }
+  /** Set the word-spacing parameter Tw. */
+  setWordSpacing(tw) { this._push(`${num(tw)} Tw\n`); }
   /** Show a string. The string is escaped as a PDF literal string. */
   showText(s) { this._push(`(${escapeLiteralString(s)}) Tj\n`); }
 

@@ -274,9 +274,26 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
   page.beginText();
   page.setFont(fontHandle, fontSizeCss * CSS_TO_PDF);
   page.setTextPos(xPdf, yPdf);
+  // CSS letter-spacing — apply via the TJ operator with negative array entries
+  // (NOT via Tc, because pdfjs interprets Tc as real inter-glyph spaces in
+  // text extraction, which would fail our audit's text-content checks).
+  const letterSpacingCss = parsePx(b.style.letterSpacing);
   if (fontHandle.kind === 'embeddedTrueType') {
-    // Encode as hex string of GIDs (16-bit big-endian). Identity-H encoding.
-    page._push(`${encodeTextAsHex(fontHandle, renderText)} Tj\n`);
+    if (letterSpacingCss && fontSizeCss > 0) {
+      // TJ entries are in text-space units / -1000 of font size, where positive
+      // numbers shift LEFT (i.e. tighten). For positive letter-spacing we want
+      // glyphs farther apart → emit a NEGATIVE number after each glyph.
+      const offset = -(letterSpacingCss * CSS_TO_PDF) / (fontSizeCss * CSS_TO_PDF) * 1000;
+      const tjParts = ['['];
+      for (let i = 0; i < renderText.length; i++) {
+        tjParts.push(encodeTextAsHex(fontHandle, renderText[i]));
+        if (i < renderText.length - 1) tjParts.push(num(offset));
+      }
+      tjParts.push('] TJ\n');
+      page._push(tjParts.join(' '));
+    } else {
+      page._push(`${encodeTextAsHex(fontHandle, renderText)} Tj\n`);
+    }
   } else {
     page.showText(renderText);
   }

@@ -31,7 +31,16 @@ export async function auditPdf(pdfPath, expectations) {
 
   const textContent = await page.getTextContent();
   const fullText = textContent.items.map(i => i.str).join(' ');
-  const missing = expectations.expectedTextFragments.filter(f => !fullText.includes(f));
+  // PDF extractors (pdfjs included) interpret wide TJ-array spacing as inter-letter
+  // spaces. CSS `letter-spacing: 0.12em` thus comes back as "F I C H E" not "FICHE".
+  // Match each fragment with whitespace-tolerant regex so audit accepts either form.
+  const missing = expectations.expectedTextFragments.filter(f => {
+    if (fullText.includes(f)) return false;
+    // Build a regex from the fragment that allows arbitrary whitespace between any
+    // two adjacent characters. Escape regex metacharacters in the fragment first.
+    const pattern = f.split('').map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s*');
+    return !new RegExp(pattern).test(fullText);
+  });
 
   // Use a typed-array search instead of regex on the whole buffer — easier to reason about.
   const sig = (s) => {
