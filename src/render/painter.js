@@ -203,10 +203,21 @@ function paintText(page, fontMap, b, pageHeightPdf) {
   const color = parseColor(b.style.color);
   const fontSizeCss = parsePx(b.style.fontSize) || 10;
   const weight = parseInt(b.style.fontWeight, 10) || 400;
-  // Pick a Helvetica variant per weight. Iter 7+ replaces this with embedded Inter.
-  let fontHandle = fontMap.regular;
-  if (weight >= 600) fontHandle = fontMap.bold;
-  else if (b.style.fontStyle === 'italic') fontHandle = fontMap.oblique;
+  // Pick the closest available weight. fontMap holds keys: regular(400),
+  // medium(500), semibold(600), bold(700). For embedded mode, individual
+  // weights map to separate embedded-font handles. For Helvetica fallback,
+  // bold/regular/oblique are the only options.
+  let fontHandle;
+  if (fontMap.embedded) {
+    if      (weight >= 700) fontHandle = fontMap.bold;
+    else if (weight >= 600) fontHandle = fontMap.semibold;
+    else if (weight >= 500) fontHandle = fontMap.medium;
+    else                    fontHandle = fontMap.regular;
+  } else {
+    if (weight >= 600) fontHandle = fontMap.bold;
+    else if (b.style.fontStyle === 'italic') fontHandle = fontMap.oblique;
+    else fontHandle = fontMap.regular;
+  }
 
   // PDF text origin is BASELINE. The Range rect's `y` (top) plus its height gives
   // the line-box bottom; for a typical ascender-dominant Latin font, baseline ≈

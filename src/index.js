@@ -16,15 +16,22 @@ import { embedTrueTypeFont } from './core/fonts/embed.js';
 const A4_LANDSCAPE_CSS = { width: 1123, height: 794 };
 const A4_PORTRAIT_CSS  = { width: 794,  height: 1123 };
 
-// One-shot fetch of the bundled Inter TTF. Cached across calls.
-let _interFontBytesPromise = null;
+// One-shot fetch of bundled Inter weights. Cached across calls.
+let _interFontPromise = null;
 async function loadInter() {
-  if (!_interFontBytesPromise) {
-    _interFontBytesPromise = fetch('/assets/fonts/Inter-Variable.ttf')
-      .then(r => r.ok ? r.arrayBuffer() : null)
-      .catch(() => null);
+  if (!_interFontPromise) {
+    _interFontPromise = (async () => {
+      const fetchOne = (url) => fetch(url).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null);
+      const [w400, w500, w600, w700] = await Promise.all([
+        fetchOne('/assets/fonts/Inter-400.ttf'),
+        fetchOne('/assets/fonts/Inter-500.ttf'),
+        fetchOne('/assets/fonts/Inter-600.ttf'),
+        fetchOne('/assets/fonts/Inter-700.ttf'),
+      ]);
+      return { 400: w400, 500: w500, 600: w600, 700: w700 };
+    })();
   }
-  return _interFontBytesPromise;
+  return _interFontPromise;
 }
 
 /**
@@ -55,17 +62,17 @@ export async function htmlToPdf(input, opts = {}) {
   const html = typeof input === 'string' ? input : input.outerHTML;
   const { boxes } = await layout(html, viewport);
 
-  // Try to embed Inter TTF. If the fetch fails (e.g. file missing in this build),
-  // fall back to Helvetica standard fonts.
-  const interBytes = await loadInter();
-  /** @type {{regular, bold, oblique}} */
+  // Embed Inter weights (400/500/600/700) when bundled. Falls back to Helvetica.
+  const inters = await loadInter();
+  /** @type {{regular, bold, oblique, semibold, medium, embedded}} */
   let fontMap;
-  if (interBytes) {
-    const inter = await embedTrueTypeFont(doc, interBytes, 'Inter');
+  if (inters && inters[400]) {
+    const r400 = await embedTrueTypeFont(doc, inters[400], 'Inter-Regular');
+    const r500 = inters[500] ? await embedTrueTypeFont(doc, inters[500], 'Inter-Medium')   : r400;
+    const r600 = inters[600] ? await embedTrueTypeFont(doc, inters[600], 'Inter-SemiBold') : r400;
+    const r700 = inters[700] ? await embedTrueTypeFont(doc, inters[700], 'Inter-Bold')     : r600;
     fontMap = {
-      regular: inter,
-      bold:    inter,    // single variable font instance (we don't yet expose multi-weight)
-      oblique: inter,
+      regular: r400, medium: r500, semibold: r600, bold: r700, oblique: r400,
       embedded: true,
     };
   } else {
