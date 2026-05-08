@@ -6,7 +6,7 @@
     "mailto:info@helix.corsica"
   ],
   "expectedTextFragments": [
-    "HTML → PDF CLIENT",
+    "HTML / PDF CLIENT",
     "Rapport d'avancement",
     "convergence vector-fidelity",
     "diff < 0.1",

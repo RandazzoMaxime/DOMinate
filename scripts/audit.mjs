@@ -36,10 +36,11 @@ export async function auditPdf(pdfPath, expectations) {
   // Match each fragment with whitespace-tolerant regex so audit accepts either form.
   const missing = expectations.expectedTextFragments.filter(f => {
     if (fullText.includes(f)) return false;
-    // Build a regex from the fragment that allows arbitrary whitespace between any
-    // two adjacent characters. Escape regex metacharacters in the fragment first.
+    // Build a regex from the fragment that allows arbitrary whitespace between
+    // adjacent characters AND is case-insensitive (CSS text-transform: uppercase
+    // means 'Project Definition' is rendered as 'PROJECT DEFINITION').
     const pattern = f.split('').map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s*');
-    return !new RegExp(pattern).test(fullText);
+    return !new RegExp(pattern, 'i').test(fullText);
   });
 
   // Use a typed-array search instead of regex on the whole buffer — easier to reason about.

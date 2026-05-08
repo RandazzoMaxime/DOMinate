@@ -5,13 +5,13 @@
   "expectedTextFragments": [
     "HELIX AERO",
     "MISSION CONFIGURATION",
-    "Project Definition",
+    "PROJECT DEFINITION",
     "INFO",
-    "Client Logo",
-    "Drag and drop file",
-    "PRO-TIP",
-    "NEXT STEP",
-    "Standard Survey",
-    "v4.2.0"
+    "Project Name",
+    "Client Name",
+    "Project Date",
+    "v4.2.0",
+    "PRECISION TELEMETRY",
+    "SYNC: OK"
   ]
 }
