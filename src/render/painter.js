@@ -17,9 +17,12 @@ import { encodeTextAsHex } from '../core/fonts/embed.js';
 export function paint(doc, fontMap, page, boxes /*, pageHeightCssPx (unused) */) {
   const pageHeightPdf = page.height;  // PDF user units
 
-  // Draw boxes first (background/border), then SVG shapes, then text on top, then links.
+  // Draw boxes first (background/border), then images, then SVG shapes, then text, then links.
   for (const b of boxes) {
     if (b.kind === 'box') paintBox(doc, page, b, pageHeightPdf);
+  }
+  for (const b of boxes) {
+    if (b.kind === 'image' && b.embedded) paintImage(page, b, pageHeightPdf);
   }
   for (const b of boxes) {
     if (b.kind === 'svg-rect')    paintSvgRect(page, b, pageHeightPdf);
@@ -223,6 +226,11 @@ function paintText(page, fontMap, b, pageHeightPdf) {
   // the line-box bottom; for a typical ascender-dominant Latin font, baseline ≈
   // line-top + line-height × 0.78. We approximate with: baselineCssY = y + h × 0.78.
   // This is rough and revisited when we have real font metrics.
+  // Baseline within the line box. Using an empirical 0.78 of line-height — gives
+  // the lowest measured diff across our fixtures; the proper formula
+  // (half-leading + fontSize × ascentRatio) was tested and gave fractionally worse
+  // results, presumably because Range.getClientRects() returns a tighter bound than
+  // the full line box on Chromium.
   const baselineCssY = b.y + b.h * 0.78;
   const xPdf = b.x * CSS_TO_PDF;
   const yPdf = cssYToPdfY(baselineCssY, pageHeightPdf);
@@ -245,6 +253,14 @@ function paintText(page, fontMap, b, pageHeightPdf) {
   }
   page.endText();
   page.restoreState();
+}
+
+function paintImage(page, b, pageHeightPdf) {
+  const x = b.x * CSS_TO_PDF;
+  const y = cssYToPdfY(b.y + b.h, pageHeightPdf);
+  const w = b.w * CSS_TO_PDF;
+  const h = b.h * CSS_TO_PDF;
+  page.drawImage(b.embedded, x, y, w, h);
 }
 
 function paintLink(page, b, pageHeightPdf) {

@@ -231,6 +231,8 @@ class Page {
     this.fontsUsed = new Set();
     /** shading handles used on this page (Resources /Shading dict) */
     this.shadingsUsed = new Set();
+    /** image XObjects used on this page (Resources /XObject dict) */
+    this.xobjectsUsed = new Set();
     /** link annotations to be added to /Annots */
     this.annots = [];
   }
@@ -308,6 +310,18 @@ class Page {
   clipPath() { this._push('W n\n'); }
 
   /**
+   * Draw an Image XObject scaled to (x, y, w, h) in PDF user units (origin bottom-left).
+   * Uses cm to translate+scale, then Do. The image's intrinsic dimensions are 1×1 unit.
+   */
+  drawImage(image, x, y, w, h) {
+    this.xobjectsUsed.add(image);
+    this._push('q\n');
+    this._push(`${num(w)} 0 0 ${num(h)} ${num(x)} ${num(y)} cm\n`);
+    this._push(`/${image.alias} Do\n`);
+    this._push('Q\n');
+  }
+
+  /**
    * Fill an axis-aligned rectangle with a shading (e.g. linear gradient). The shading
    * is painted within the rect's clip; pixels outside aren't touched.
    */
@@ -354,6 +368,9 @@ class Page {
     // Build /Resources/Shading dict
     const shadingDict = {};
     for (const s of this.shadingsUsed) shadingDict[s.alias] = s.objRef;
+    // Build /Resources/XObject dict
+    const xobjectDict = {};
+    for (const x of this.xobjectsUsed) xobjectDict[x.alias] = x.objRef;
 
     // Build annotations
     const annotRefs = [];
@@ -374,6 +391,7 @@ class Page {
       ProcSet: [name('PDF'), name('Text'), name('ImageC')],
     };
     if (Object.keys(shadingDict).length) resources.Shading = shadingDict;
+    if (Object.keys(xobjectDict).length) resources.XObject = xobjectDict;
 
     const pageDict = {
       Type: name('Page'),

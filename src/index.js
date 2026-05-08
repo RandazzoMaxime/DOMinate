@@ -12,6 +12,7 @@ import { PdfDocument } from './core/pdf.js';
 import { layout } from './dom/walker.js';
 import { paint } from './render/painter.js';
 import { embedTrueTypeFont } from './core/fonts/embed.js';
+import { embedJpeg } from './core/images/jpeg.js';
 
 const A4_LANDSCAPE_CSS = { width: 1123, height: 794 };
 const A4_PORTRAIT_CSS  = { width: 794,  height: 1123 };
@@ -82,6 +83,21 @@ export async function htmlToPdf(input, opts = {}) {
       oblique: doc.addStandardFont('Helvetica-Oblique'),
       embedded: false,
     };
+  }
+
+  // Pre-fetch image boxes and embed each one. We attach the embedded XObject handle
+  // directly onto the box so the (sync) painter can just `drawImage`.
+  for (const b of boxes) {
+    if (b.kind !== 'image' || !b.src) continue;
+    try {
+      const r = await fetch(b.src, { mode: 'cors' });
+      if (!r.ok) continue;
+      const u8 = new Uint8Array(await r.arrayBuffer());
+      // Detect JPEG via SOI marker; skip other formats for now (PNG decode needs more work).
+      if (u8[0] === 0xFF && u8[1] === 0xD8) {
+        b.embedded = embedJpeg(doc, u8);
+      }
+    } catch { /* offline or CORS — skip */ }
   }
 
   const page = doc.addPage();

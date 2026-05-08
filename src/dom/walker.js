@@ -153,6 +153,16 @@ function walk(el, idoc, boxes, parentX, parentY) {
     return;  // skip generic recursion for SVG children
   }
 
+  // <img> elements: record the rect + URL. The painter fetches and embeds.
+  if (el.tagName === 'IMG' && rect.width > 0 && rect.height > 0) {
+    boxes.push({
+      kind: 'image',
+      x: rect.left, y: rect.top, w: rect.width, h: rect.height,
+      style, tag: 'img', el,
+      src: el.currentSrc || el.src || '',
+    });
+  }
+
   // Hyperlinks → record the element rect as a link box (the actual link annotation
   // is emitted later by the painter); the link target uses `el.href`.
   if (el.tagName === 'A' && el.hasAttribute('href')) {
