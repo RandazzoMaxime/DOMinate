@@ -43,7 +43,7 @@ function nodeCanvasFactory(CanvasCtor) {
   };
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const r = await rasterize(
     resolve(ROOT, 'dist', 'output.pdf'),

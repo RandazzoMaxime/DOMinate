@@ -84,7 +84,7 @@ export async function renderWithLib(htmlPath, viewport = { width: 1123, height: 
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const out = await renderWithLib(resolve(ROOT, 'reference', 'source.html'), { width: 1123, height: 794 });
   const { writeFile, mkdir } = await import('node:fs/promises');
   await mkdir(resolve(ROOT, 'dist'), { recursive: true });

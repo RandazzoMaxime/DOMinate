@@ -45,7 +45,7 @@ function padTo(png, w, h) {
   return out;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const r = await diffPngs(
     resolve(ROOT, 'reference', 'source.png'),

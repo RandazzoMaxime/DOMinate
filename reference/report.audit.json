@@ -1,0 +1,23 @@
+{
+  "viewport": { "width": 1123, "height": 794 },
+  "screenshotScale": 1,
+  "expectedLinks": [
+    "https://topo.ninja",
+    "mailto:info@helix.corsica"
+  ],
+  "expectedTextFragments": [
+    "HTML → PDF CLIENT",
+    "Rapport d'avancement",
+    "convergence vector-fidelity",
+    "diff < 0.1",
+    "Avancement global",
+    "FIXTURES",
+    "Architecture",
+    "browser-as-layout-engine",
+    "Inter",
+    "CIDFontType2",
+    "FontFile2",
+    "FlateDecode",
+    "ToUnicode"
+  ]
+}
