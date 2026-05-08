@@ -11,9 +11,21 @@
 import { PdfDocument } from './core/pdf.js';
 import { layout } from './dom/walker.js';
 import { paint } from './render/painter.js';
+import { embedTrueTypeFont } from './core/fonts/embed.js';
 
 const A4_LANDSCAPE_CSS = { width: 1123, height: 794 };
 const A4_PORTRAIT_CSS  = { width: 794,  height: 1123 };
+
+// One-shot fetch of the bundled Inter TTF. Cached across calls.
+let _interFontBytesPromise = null;
+async function loadInter() {
+  if (!_interFontBytesPromise) {
+    _interFontBytesPromise = fetch('/assets/fonts/Inter-Variable.ttf')
+      .then(r => r.ok ? r.arrayBuffer() : null)
+      .catch(() => null);
+  }
+  return _interFontBytesPromise;
+}
 
 /**
  * @param {string|HTMLElement} input
@@ -43,14 +55,27 @@ export async function htmlToPdf(input, opts = {}) {
   const html = typeof input === 'string' ? input : input.outerHTML;
   const { boxes } = await layout(html, viewport);
 
-  // Standard fonts: Helvetica is the default fallback. The walker will tell us about
-  // monospace / sans-serif through computed style. Iter 7+ replaces these with
-  // embedded Inter / JetBrains Mono.
-  const fontMap = {
-    regular: doc.addStandardFont('Helvetica'),
-    bold:    doc.addStandardFont('Helvetica-Bold'),
-    oblique: doc.addStandardFont('Helvetica-Oblique'),
-  };
+  // Try to embed Inter TTF. If the fetch fails (e.g. file missing in this build),
+  // fall back to Helvetica standard fonts.
+  const interBytes = await loadInter();
+  /** @type {{regular, bold, oblique}} */
+  let fontMap;
+  if (interBytes) {
+    const inter = await embedTrueTypeFont(doc, interBytes, 'Inter');
+    fontMap = {
+      regular: inter,
+      bold:    inter,    // single variable font instance (we don't yet expose multi-weight)
+      oblique: inter,
+      embedded: true,
+    };
+  } else {
+    fontMap = {
+      regular: doc.addStandardFont('Helvetica'),
+      bold:    doc.addStandardFont('Helvetica-Bold'),
+      oblique: doc.addStandardFont('Helvetica-Oblique'),
+      embedded: false,
+    };
+  }
 
   const page = doc.addPage();
   paint(doc, fontMap, page, boxes);

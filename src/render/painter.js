@@ -5,6 +5,7 @@
 
 import { CSS_TO_PDF, cssYToPdfY } from '../core/pdf.js';
 import { parseColor, parsePx } from '../dom/utils.js';
+import { encodeTextAsHex } from '../core/fonts/embed.js';
 
 /**
  * @param {import('../core/pdf.js').PdfDocument} doc
@@ -107,7 +108,11 @@ function paintSvgText(page, fontMap, b, pageHeightPdf) {
   page.beginText();
   page.setFont(fontMap.regular, b.textSizeCss * CSS_TO_PDF);
   page.setTextPos(xPdf, yPdf);
-  page.showText(b.text);
+  if (fontMap.regular.kind === 'embeddedTrueType') {
+    page._push(`${encodeTextAsHex(fontMap.regular, b.text)} Tj\n`);
+  } else {
+    page.showText(b.text);
+  }
   page.endText();
   page.restoreState();
 }
@@ -221,7 +226,12 @@ function paintText(page, fontMap, b, pageHeightPdf) {
   page.beginText();
   page.setFont(fontHandle, fontSizeCss * CSS_TO_PDF);
   page.setTextPos(xPdf, yPdf);
-  page.showText(renderText);
+  if (fontHandle.kind === 'embeddedTrueType') {
+    // Encode as hex string of GIDs (16-bit big-endian). Identity-H encoding.
+    page._push(`${encodeTextAsHex(fontHandle, renderText)} Tj\n`);
+  } else {
+    page.showText(renderText);
+  }
   page.endText();
   page.restoreState();
 }
