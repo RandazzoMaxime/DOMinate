@@ -311,6 +311,17 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
     }
   }
   page.endText();
+
+  // text-decoration: underline → draw a thin line below the baseline.
+  if ((b.style.textDecoration || '').includes('underline')) {
+    const lineY = yPdf - fontSizeCss * CSS_TO_PDF * 0.10;
+    const lineW = Math.max(0.5, fontSizeCss * CSS_TO_PDF * 0.05);
+    if (color) page.setStrokeRgb(color.r, color.g, color.b);
+    page.setLineWidth(lineW);
+    const underlineEnd = xPdf + b.w * CSS_TO_PDF;
+    page._push(`${num(xPdf)} ${num(lineY)} m ${num(underlineEnd)} ${num(lineY)} l S\n`);
+  }
+
   page.restoreState();
 }
 
