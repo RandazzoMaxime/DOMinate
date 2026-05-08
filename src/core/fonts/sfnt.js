@@ -62,6 +62,15 @@ export function parseSfnt(input) {
   const descent = hhea.getInt16(6, false);
   const numHMetrics = hhea.getUint16(34, false);
 
+  // post (optional, but Inter has it) — underline position + thickness in font units
+  let underlinePosition = -100;   // sensible defaults
+  let underlineThickness = 50;
+  try {
+    const post = readTable('post');
+    underlinePosition = post.getInt16(8, false);
+    underlineThickness = post.getInt16(10, false);
+  } catch { /* missing post table — keep defaults */ }
+
   // maxp
   const maxp = readTable('maxp');
   const numGlyphs = maxp.getUint16(4, false);
@@ -114,6 +123,7 @@ export function parseSfnt(input) {
   return {
     bytes, isOtf, unitsPerEm, ascent, descent, bbox: [xMin, yMin, xMax, yMax],
     numGlyphs, widths, unicodeToGid,
+    underlinePosition, underlineThickness,
   };
 }
 

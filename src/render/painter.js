@@ -344,10 +344,20 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
   }
   page.endText();
 
-  // text-decoration: underline → draw a thin line below the baseline.
+  // text-decoration: underline → draw a line at the font's intrinsic underline position
+  // (post.underlinePosition / unitsPerEm × fontSize) with the font's intrinsic thickness.
   if ((b.style.textDecoration || '').includes('underline')) {
-    const lineY = yPdf - fontSizeCss * CSS_TO_PDF * 0.10;
-    const lineW = Math.max(0.5, fontSizeCss * CSS_TO_PDF * 0.05);
+    let underlineOffsetEm = 0.10;  // fallback: 10% em below baseline
+    let underlineThicknessEm = 0.05;
+    if (fontHandle.kind === 'embeddedTrueType' && fontHandle.font.unitsPerEm) {
+      const upe = fontHandle.font.unitsPerEm;
+      // post.underlinePosition is the TOP of the underline rect, measured in font units
+      // BELOW the baseline (negative number). Most fonts have ~-100/1000.
+      underlineOffsetEm = -(fontHandle.font.underlinePosition || -100) / upe;
+      underlineThicknessEm = (fontHandle.font.underlineThickness || 50) / upe;
+    }
+    const lineY = yPdf - fontSizeCss * CSS_TO_PDF * underlineOffsetEm;
+    const lineW = Math.max(0.5, fontSizeCss * CSS_TO_PDF * underlineThicknessEm);
     if (color) page.setStrokeRgb(color.r, color.g, color.b);
     page.setLineWidth(lineW);
     const underlineEnd = xPdf + b.w * CSS_TO_PDF;
