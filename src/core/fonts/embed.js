@@ -47,15 +47,15 @@ export async function embedTrueTypeFont(doc, fontBytes, baseFontName) {
     FontFile2: fontFile,
   });
 
-  // Build a /W array. PDF allows fractional widths — keep two decimals to preserve
-  // glyph-advance precision (rounding to integers introduces 0.5/1000 em error per
-  // character, ~0.005 px at 11 px which accumulates over long strings).
+  // Build a /W array. PDF allows fractional widths — keep four decimals to preserve
+  // glyph-advance precision. Inter's average glyph advance is ~600 in 1000-unit em;
+  // sub-pixel fidelity at 11 px font requires ~0.0005 unit precision (= 4 decimals).
   const widthsArr = [];
   let runStart = -1;
   let runWidths = [];
   for (let g = 0; g < parsed.numGlyphs; g++) {
     const w = parsed.widths[g] * scale;
-    const wRounded = Math.round(w * 100) / 100;
+    const wRounded = Math.round(w * 10000) / 10000;
     if (runStart < 0) { runStart = g; runWidths = [wRounded]; }
     else runWidths.push(wRounded);
   }
