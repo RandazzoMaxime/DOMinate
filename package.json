@@ -6,11 +6,12 @@
   "private": true,
   "scripts": {
     "loop": "node scripts/loop.mjs",
+    "test": "node scripts/test-validity.mjs",
+    "report": "node scripts/render-report.mjs",
     "render": "node scripts/render-with-lib.mjs",
     "rasterize": "node scripts/pdf-to-png.mjs",
     "diff": "node scripts/diff.mjs",
-    "demo": "node scripts/serve-demo.mjs",
-    "screenshot-reference": "node scripts/screenshot-reference.mjs"
+    "demo": "node scripts/serve-demo.mjs"
   },
   "devDependencies": {
     "playwright": "^1.49.0",
