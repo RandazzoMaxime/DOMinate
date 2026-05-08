@@ -195,6 +195,7 @@ function paintBox(doc, page, b, pageHeightPdf) {
   }
 
   // Borders — iter 7 handles uniform 4-side borders with corner radius.
+  // iter 20 adds dashed/dotted styles via the `d` (dash pattern) operator.
   const bw = parsePx(b.style.borderTopWidth);
   if (bw > 0) {
     const bc = parseColor(b.style.borderTopColor);
@@ -203,6 +204,16 @@ function paintBox(doc, page, b, pageHeightPdf) {
       page.setStrokeRgb(bc.r, bc.g, bc.b);
       const lw = bw * CSS_TO_PDF;
       page.setLineWidth(lw);
+      // Dash pattern matching CSS approximations (Chromium):
+      //   solid  → no dash
+      //   dashed → ~2× line width on, ~2× off
+      //   dotted → ~1× on, ~1× off (rounded by line cap)
+      const style = b.style.borderTopStyle;
+      if (style === 'dashed') {
+        page.setDashPattern([lw * 2, lw * 2], 0);
+      } else if (style === 'dotted') {
+        page.setDashPattern([lw, lw], 0);
+      }
       const inset = lw / 2;
       const ix = x + inset, iy = y + inset;
       const iw = w - 2 * inset, ih = h - 2 * inset;

@@ -265,6 +265,10 @@ class Page {
   setStrokeRgb(r, g, b) { this._push(`${num(r)} ${num(g)} ${num(b)} RG\n`); }
   /** Set line width (PDF user units). */
   setLineWidth(w) { this._push(`${num(w)} w\n`); }
+  /** Set the line dash pattern. dashArray = [on off] in user units, phase = offset. */
+  setDashPattern(dashArray, phase = 0) {
+    this._push(`[${dashArray.map(num).join(' ')}] ${num(phase)} d\n`);
+  }
   /**
    * Fill an axis-aligned rectangle. Coordinates are in PDF user units, origin bottom-left.
    * @param {number} x lower-left X
