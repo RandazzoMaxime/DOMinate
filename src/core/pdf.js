@@ -81,11 +81,31 @@ export class PdfDocument {
   }
 
   /**
+   * Add a 2-stop axial (linear) gradient shading. Coordinates are in PDF user units.
+   * Returns a handle: { alias: 'Sh1', objRef }
+   */
+  addAxialShading({ x0, y0, x1, y1, c0, c1 }) {
+    const alias = 'Sh' + (this._shadingCounter = (this._shadingCounter || 0) + 1);
+    const fn = this._allocObject({
+      FunctionType: 2,
+      Domain: [0, 1],
+      C0: [c0.r, c0.g, c0.b],
+      C1: [c1.r, c1.g, c1.b],
+      N: 1,
+    });
+    const shading = this._allocObject({
+      ShadingType: 2,
+      ColorSpace: name('DeviceRGB'),
+      Coords: [x0, y0, x1, y1],
+      Domain: [0, 1],
+      Function: fn,
+      Extend: [true, true],
+    });
+    return { alias, objRef: shading, kind: 'axialShading' };
+  }
+
+  /**
    * Add one of the 14 PDF standard Type 1 fonts. No embedding needed.
-   * Recognized BaseFonts: Helvetica, Helvetica-Bold, Helvetica-Oblique, Helvetica-BoldOblique,
-   * Times-Roman, Times-Bold, Times-Italic, Times-BoldItalic, Courier, Courier-Bold,
-   * Courier-Oblique, Courier-BoldOblique, Symbol, ZapfDingbats.
-   *
    * Returns a font handle: { alias: 'F1', baseFont: 'Helvetica', objRef }
    */
   addStandardFont(baseFont) {
@@ -209,6 +229,8 @@ class Page {
     this.contentParts = [];
     /** font handles used on this page (so we know which to put in /Resources/Font) */
     this.fontsUsed = new Set();
+    /** shading handles used on this page (Resources /Shading dict) */
+    this.shadingsUsed = new Set();
     /** link annotations to be added to /Annots */
     this.annots = [];
   }
@@ -285,6 +307,23 @@ class Page {
   /** Set current path as clipping path (non-zero), then no-op end so subsequent ops are clipped. */
   clipPath() { this._push('W n\n'); }
 
+  /**
+   * Fill an axis-aligned rectangle with a shading (e.g. linear gradient). The shading
+   * is painted within the rect's clip; pixels outside aren't touched.
+   */
+  fillRectShading(shading, x, y, w, h, radii = null) {
+    this.shadingsUsed.add(shading);
+    this._push('q\n');
+    if (radii) {
+      this.pathRoundedRect(x, y, w, h, radii);
+    } else {
+      this._push(`${num(x)} ${num(y)} ${num(w)} ${num(h)} re\n`);
+    }
+    this._push('W n\n');
+    this._push(`/${shading.alias} sh\n`);
+    this._push('Q\n');
+  }
+
   // ── text ──────────────────────────────────────────────────────────────────
   beginText() { this._push('BT\n'); }
   endText() { this._push('ET\n'); }
@@ -312,6 +351,9 @@ class Page {
     // Build /Resources/Font dict
     const fontDict = {};
     for (const f of this.fontsUsed) fontDict[f.alias] = f.objRef;
+    // Build /Resources/Shading dict
+    const shadingDict = {};
+    for (const s of this.shadingsUsed) shadingDict[s.alias] = s.objRef;
 
     // Build annotations
     const annotRefs = [];
@@ -327,11 +369,17 @@ class Page {
       annotRefs.push(annotObj);
     }
 
+    const resources = {
+      Font: fontDict,
+      ProcSet: [name('PDF'), name('Text'), name('ImageC')],
+    };
+    if (Object.keys(shadingDict).length) resources.Shading = shadingDict;
+
     const pageDict = {
       Type: name('Page'),
       Parent: pagesObjRef,
       MediaBox: [0, 0, this.width, this.height],
-      Resources: { Font: fontDict, ProcSet: [name('PDF'), name('Text'), name('ImageC')] },
+      Resources: resources,
       Contents: contentObj,
     };
     if (annotRefs.length) pageDict.Annots = annotRefs;

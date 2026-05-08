@@ -12,43 +12,43 @@ import { parseColor, parsePx } from '../dom/walker.js';
  * @param {Array} boxes  — same flat box list the walker uses
  */
 export function walkSvg(svg, boxes, idoc) {
-  // The transform from internal SVG (viewBox) coordinates to CSS px:
-  //   getCTM gives us "from local user space to viewport pixels" — that's exactly what
-  //   we want, since the iframe's viewport IS our CSS-px coordinate space.
   const svgRect = svg.getBoundingClientRect();
-  const ctm = svg.getScreenCTM ? svg.getScreenCTM() : null;
-
-  // We'll fall back to a viewBox-based affine if getScreenCTM isn't available.
   const fallback = computeViewBoxAffine(svg, svgRect);
 
-  function transform(x, y) {
+  visit(svg);
+
+  function ctmFor(el) {
+    return el.getScreenCTM ? el.getScreenCTM() : null;
+  }
+
+  function transformPt(el, x, y) {
+    // Each SVG element's getScreenCTM() returns the cumulative transform from its
+    // local user space to the screen (= iframe viewport in CSS px). This implicitly
+    // includes parent <g transform=...> chains.
+    const ctm = ctmFor(el);
     if (ctm) {
-      // ctm maps (x,y) in local user space to (x',y') in screen-pixel space relative to the iframe viewport.
       return {
         x: ctm.a * x + ctm.c * y + ctm.e,
         y: ctm.b * x + ctm.d * y + ctm.f,
       };
     }
-    return {
-      x: fallback.tx + fallback.sx * x,
-      y: fallback.ty + fallback.sy * y,
-    };
+    return { x: fallback.tx + fallback.sx * x, y: fallback.ty + fallback.sy * y };
   }
 
-  function transformLength(len) {
-    // Approximate scalar transform — for uniform scaling this is exact, otherwise use sx as proxy.
+  function scaleLen(el, len) {
+    const ctm = ctmFor(el);
     if (ctm) return Math.abs(ctm.a) * len;
     return Math.abs(fallback.sx) * len;
   }
-
-  visit(svg);
 
   function visit(el) {
     for (const child of el.childNodes) {
       if (child.nodeType !== 1) continue;
       const tag = (child.tagName || '').toLowerCase();
-      if (tag === 'g') { visit(child); continue; }
+      if (tag === 'g' || tag === 'defs' || tag === 'clippath') { visit(child); continue; }
       const cs = idoc.defaultView.getComputedStyle(child);
+      const transform = (x, y) => transformPt(child, x, y);
+      const transformLength = (len) => scaleLen(child, len);
       const fill = computedFill(child, cs);
       const stroke = computedStroke(child, cs);
       const sw = parseFloat(cs.strokeWidth || child.getAttribute('stroke-width') || '0') || 0;

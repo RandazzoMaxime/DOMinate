@@ -18,7 +18,7 @@ export function paint(doc, fontMap, page, boxes /*, pageHeightCssPx (unused) */)
 
   // Draw boxes first (background/border), then SVG shapes, then text on top, then links.
   for (const b of boxes) {
-    if (b.kind === 'box') paintBox(page, b, pageHeightPdf);
+    if (b.kind === 'box') paintBox(doc, page, b, pageHeightPdf);
   }
   for (const b of boxes) {
     if (b.kind === 'svg-rect')    paintSvgRect(page, b, pageHeightPdf);
@@ -112,7 +112,7 @@ function paintSvgText(page, fontMap, b, pageHeightPdf) {
   page.restoreState();
 }
 
-function paintBox(page, b, pageHeightPdf) {
+function paintBox(doc, page, b, pageHeightPdf) {
   const fill = parseColor(b.style.backgroundColor);
   const x = b.x * CSS_TO_PDF;
   const y = cssYToPdfY(b.y + b.h, pageHeightPdf);  // bottom-left in PDF user units
@@ -148,7 +148,16 @@ function paintBox(page, b, pageHeightPdf) {
     page.restoreState();
   }
 
-  if (grad && grad.stops.length) {
+  if (grad && grad.stops.length >= 2) {
+    // Compute the gradient line endpoints in PDF coords from the CSS angle and the box.
+    const line = gradientLine(grad.angleDeg, x, y, w, h);
+    const c0 = grad.stops[0].color;
+    const c1 = grad.stops[grad.stops.length - 1].color;
+    const shading = doc.addAxialShading({
+      x0: line.x0, y0: line.y0, x1: line.x1, y1: line.y1, c0, c1,
+    });
+    page.fillRectShading(shading, x, y, w, h, hasRadius ? radii : null);
+  } else if (grad && grad.stops.length === 1) {
     paintFill(grad.stops[0].color);
   } else if (fill && fill.a > 0) {
     paintFill(fill);
@@ -228,6 +237,51 @@ function paintLink(page, b, pageHeightPdf) {
 function num(n) {
   if (Number.isInteger(n)) return String(n);
   return n.toFixed(5).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+/**
+ * For a CSS linear-gradient with the given angle (CSS spec: 0deg = "to top", clockwise)
+ * applied to a rectangle (x, y, w, h) in PDF coords (origin bottom-left), return the
+ * start and end points of the gradient line.
+ *
+ * The CSS spec says the gradient line passes through the center of the gradient box,
+ * its endpoints positioned so that the boundary perpendicular through the start point
+ * touches the corner from which color "starts", and the boundary through the end point
+ * touches the opposite corner.
+ *
+ * Approximation here: pick the two extreme corners along the gradient direction.
+ */
+function gradientLine(angleDeg, x, y, w, h) {
+  // CSS spec: 0deg points up, increasing angles rotate clockwise.
+  // In PDF coords (Y increases UP), "up" is +Y. So 0deg direction = (0, +1) in PDF coords.
+  // 90deg = "to right" = (+1, 0). 180deg = "to bottom" = (0, -1). 270deg = "to left" = (-1, 0).
+  // For 135deg = 90 + 45, halfway between right and bottom = (sin(45), -cos(45)) approximately.
+  // Direction vector: (sin(rad), cos(rad)) with rad = angleDeg * π / 180 yields (0,1) at 0,
+  // (1,0) at 90, (0,-1) at 180. ✓
+  const rad = angleDeg * Math.PI / 180;
+  const dx = Math.sin(rad);
+  const dy = Math.cos(rad);
+
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  // Project each corner onto the direction and take min/max.
+  const corners = [
+    { px: x,     py: y },
+    { px: x + w, py: y },
+    { px: x + w, py: y + h },
+    { px: x,     py: y + h },
+  ];
+  let minProj = Infinity, maxProj = -Infinity;
+  for (const c of corners) {
+    const t = (c.px - cx) * dx + (c.py - cy) * dy;
+    if (t < minProj) minProj = t;
+    if (t > maxProj) maxProj = t;
+  }
+  // Start at center + minProj * direction, end at center + maxProj * direction.
+  return {
+    x0: cx + minProj * dx, y0: cy + minProj * dy,
+    x1: cx + maxProj * dx, y1: cy + maxProj * dy,
+  };
 }
 
 /**
