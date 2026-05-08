@@ -17,19 +17,26 @@ import { embedJpeg } from './core/images/jpeg.js';
 const A4_LANDSCAPE_CSS = { width: 1123, height: 794 };
 const A4_PORTRAIT_CSS  = { width: 794,  height: 1123 };
 
-// One-shot fetch of bundled Inter weights. Cached across calls.
+// One-shot fetch of bundled Inter weights (Latin + Greek subsets). Cached.
 let _interFontPromise = null;
 async function loadInter() {
   if (!_interFontPromise) {
     _interFontPromise = (async () => {
       const fetchOne = (url) => fetch(url).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null);
-      const [w400, w500, w600, w700] = await Promise.all([
+      const [w400, w500, w600, w700, w400g, w500g, w600g, w700g] = await Promise.all([
         fetchOne('/assets/fonts/Inter-400.ttf'),
         fetchOne('/assets/fonts/Inter-500.ttf'),
         fetchOne('/assets/fonts/Inter-600.ttf'),
         fetchOne('/assets/fonts/Inter-700.ttf'),
+        fetchOne('/assets/fonts/Inter-400-greek.ttf'),
+        fetchOne('/assets/fonts/Inter-500-greek.ttf'),
+        fetchOne('/assets/fonts/Inter-600-greek.ttf'),
+        fetchOne('/assets/fonts/Inter-700-greek.ttf'),
       ]);
-      return { 400: w400, 500: w500, 600: w600, 700: w700 };
+      return {
+        latin: { 400: w400, 500: w500, 600: w600, 700: w700 },
+        greek: { 400: w400g, 500: w500g, 600: w600g, 700: w700g },
+      };
     })();
   }
   return _interFontPromise;
@@ -63,17 +70,34 @@ export async function htmlToPdf(input, opts = {}) {
   const html = typeof input === 'string' ? input : input.outerHTML;
   const { boxes } = await layout(html, viewport);
 
-  // Embed Inter weights (400/500/600/700) when bundled. Falls back to Helvetica.
+  // Embed Inter weights (Latin + Greek subsets) when bundled. Falls back to Helvetica.
   const inters = await loadInter();
-  /** @type {{regular, bold, oblique, semibold, medium, embedded}} */
+  /** @type {*} */
   let fontMap;
-  if (inters && inters[400]) {
-    const r400 = await embedTrueTypeFont(doc, inters[400], 'Inter-Regular');
-    const r500 = inters[500] ? await embedTrueTypeFont(doc, inters[500], 'Inter-Medium')   : r400;
-    const r600 = inters[600] ? await embedTrueTypeFont(doc, inters[600], 'Inter-SemiBold') : r400;
-    const r700 = inters[700] ? await embedTrueTypeFont(doc, inters[700], 'Inter-Bold')     : r600;
+  if (inters && inters.latin && inters.latin[400]) {
+    const embed = (b, name) => b ? embedTrueTypeFont(doc, b, name) : null;
+    const [r400, r500, r600, r700] = await Promise.all([
+      embed(inters.latin[400], 'Inter-Regular'),
+      embed(inters.latin[500], 'Inter-Medium'),
+      embed(inters.latin[600], 'Inter-SemiBold'),
+      embed(inters.latin[700], 'Inter-Bold'),
+    ]);
+    const [g400, g500, g600, g700] = await Promise.all([
+      embed(inters.greek[400], 'Inter-Regular-Greek'),
+      embed(inters.greek[500], 'Inter-Medium-Greek'),
+      embed(inters.greek[600], 'Inter-SemiBold-Greek'),
+      embed(inters.greek[700], 'Inter-Bold-Greek'),
+    ]);
     fontMap = {
-      regular: r400, medium: r500, semibold: r600, bold: r700, oblique: r400,
+      regular:    r400, medium: r500 || r400, semibold: r600 || r400, bold: r700 || r600 || r400,
+      oblique:    r400,
+      // Per-weight fallbacks for chars missing from Latin (Δ etc.)
+      fallbacks: {
+        regular:  [g400].filter(Boolean),
+        medium:   [g500 || g400].filter(Boolean),
+        semibold: [g600 || g400].filter(Boolean),
+        bold:     [g700 || g600 || g400].filter(Boolean),
+      },
       embedded: true,
     };
   } else {
@@ -81,6 +105,7 @@ export async function htmlToPdf(input, opts = {}) {
       regular: doc.addStandardFont('Helvetica'),
       bold:    doc.addStandardFont('Helvetica-Bold'),
       oblique: doc.addStandardFont('Helvetica-Oblique'),
+      fallbacks: { regular: [], bold: [], medium: [], semibold: [] },
       embedded: false,
     };
   }

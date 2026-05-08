@@ -229,20 +229,18 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
   const color = parseColor(b.style.color);
   const fontSizeCss = parsePx(b.style.fontSize) || 10;
   const weight = parseInt(b.style.fontWeight, 10) || 400;
-  // Pick the closest available weight. fontMap holds keys: regular(400),
-  // medium(500), semibold(600), bold(700). For embedded mode, individual
-  // weights map to separate embedded-font handles. For Helvetica fallback,
-  // bold/regular/oblique are the only options.
-  let fontHandle;
+  // Pick the closest available weight + the matching fallback chain.
+  let fontHandle, fallbacks;
   if (fontMap.embedded) {
-    if      (weight >= 700) fontHandle = fontMap.bold;
-    else if (weight >= 600) fontHandle = fontMap.semibold;
-    else if (weight >= 500) fontHandle = fontMap.medium;
-    else                    fontHandle = fontMap.regular;
+    if      (weight >= 700) { fontHandle = fontMap.bold;     fallbacks = fontMap.fallbacks.bold; }
+    else if (weight >= 600) { fontHandle = fontMap.semibold; fallbacks = fontMap.fallbacks.semibold; }
+    else if (weight >= 500) { fontHandle = fontMap.medium;   fallbacks = fontMap.fallbacks.medium; }
+    else                    { fontHandle = fontMap.regular;  fallbacks = fontMap.fallbacks.regular; }
   } else {
     if (weight >= 600) fontHandle = fontMap.bold;
     else if (b.style.fontStyle === 'italic') fontHandle = fontMap.oblique;
     else fontHandle = fontMap.regular;
+    fallbacks = [];
   }
 
   // PDF text origin is BASELINE. The Range rect's `y` (top) plus its height gives
@@ -271,31 +269,32 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
     page.setExtGState(doc.addExtGState({ ca: opacity, CA: opacity }));
   }
   if (color) page.setFillRgb(color.r, color.g, color.b);
-  page.beginText();
-  page.setFont(fontHandle, fontSizeCss * CSS_TO_PDF);
   page.setTextPos(xPdf, yPdf);
-  // CSS letter-spacing — apply via the TJ operator with negative array entries
-  // (NOT via Tc, because pdfjs interprets Tc as real inter-glyph spaces in
-  // text extraction, which would fail our audit's text-content checks).
+  // Split renderText into runs of consecutive chars supported by the same font, falling
+  // back along the fallbacks chain when the primary font lacks a glyph (e.g. Δ in our
+  // Latin Inter is in the Greek subset).
+  const runs = splitTextByFont(renderText, fontHandle, fallbacks);
   const letterSpacingCss = parsePx(b.style.letterSpacing);
-  if (fontHandle.kind === 'embeddedTrueType') {
-    if (letterSpacingCss && fontSizeCss > 0) {
-      // TJ entries are in text-space units / -1000 of font size, where positive
-      // numbers shift LEFT (i.e. tighten). For positive letter-spacing we want
-      // glyphs farther apart → emit a NEGATIVE number after each glyph.
-      const offset = -(letterSpacingCss * CSS_TO_PDF) / (fontSizeCss * CSS_TO_PDF) * 1000;
-      const tjParts = ['['];
-      for (let i = 0; i < renderText.length; i++) {
-        tjParts.push(encodeTextAsHex(fontHandle, renderText[i]));
-        if (i < renderText.length - 1) tjParts.push(num(offset));
+  page.beginText();
+  page.setTextPos(xPdf, yPdf);
+  for (const run of runs) {
+    page.setFont(run.font, fontSizeCss * CSS_TO_PDF);
+    if (run.font.kind === 'embeddedTrueType') {
+      if (letterSpacingCss && fontSizeCss > 0 && run.text.length > 1) {
+        const offset = -(letterSpacingCss * CSS_TO_PDF) / (fontSizeCss * CSS_TO_PDF) * 1000;
+        const tjParts = ['['];
+        for (let i = 0; i < run.text.length; i++) {
+          tjParts.push(encodeTextAsHex(run.font, run.text[i]));
+          if (i < run.text.length - 1) tjParts.push(num(offset));
+        }
+        tjParts.push('] TJ\n');
+        page._push(tjParts.join(' '));
+      } else {
+        page._push(`${encodeTextAsHex(run.font, run.text)} Tj\n`);
       }
-      tjParts.push('] TJ\n');
-      page._push(tjParts.join(' '));
     } else {
-      page._push(`${encodeTextAsHex(fontHandle, renderText)} Tj\n`);
+      page.showText(run.text);
     }
-  } else {
-    page.showText(renderText);
   }
   page.endText();
   page.restoreState();
@@ -320,6 +319,40 @@ function paintLink(page, b, pageHeightPdf) {
 function num(n) {
   if (Number.isInteger(n)) return String(n);
   return n.toFixed(5).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+/**
+ * Split a string into runs, each rendered with the font from this list that supports
+ * the most consecutive characters. The primary font is tried first, then each fallback
+ * in order. If no font has a glyph for a character, it's still emitted with the primary
+ * font (the .notdef glyph will render — visually wrong but keeps positioning consistent).
+ */
+function splitTextByFont(text, primary, fallbacks) {
+  if (primary.kind !== 'embeddedTrueType') return [{ font: primary, text }];
+  const runs = [];
+  let curFont = null;
+  let curText = '';
+  for (const ch of text) {
+    const cp = ch.codePointAt(0);
+    let chosen = primary.font.unicodeToGid.has(cp) ? primary : null;
+    if (!chosen) {
+      for (const f of fallbacks || []) {
+        if (f && f.kind === 'embeddedTrueType' && f.font.unicodeToGid.has(cp)) {
+          chosen = f; break;
+        }
+      }
+    }
+    if (!chosen) chosen = primary;
+    if (curFont !== chosen) {
+      if (curFont) runs.push({ font: curFont, text: curText });
+      curFont = chosen;
+      curText = ch;
+    } else {
+      curText += ch;
+    }
+  }
+  if (curFont) runs.push({ font: curFont, text: curText });
+  return runs;
 }
 
 /**
