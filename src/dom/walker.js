@@ -84,7 +84,8 @@ export async function layout(html, { width, height }) {
 }
 
 import { walkSvg } from '../render/svg.js';
-export { parseColor, parsePx } from './utils.js';
+import { parseColor, parsePx } from './utils.js';
+export { parseColor, parsePx };
 
 const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'LINK', 'META', 'TITLE', 'HEAD', 'NOSCRIPT']);
 
@@ -155,6 +156,47 @@ function walk(el, idoc, boxes, parentX, parentY) {
   if (el.tagName.toLowerCase() === 'svg') {
     walkSvg(el, boxes, idoc);
     return;  // skip generic recursion for SVG children
+  }
+
+  // <input>/<select>/<textarea>: surface the placeholder or current value text so the
+  // walker emits a synthesized text run inside the form control's box. Without this,
+  // form fields look blank in the PDF (which is wrong — the reference screenshot shows
+  // placeholder text or the selected option).
+  if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+    let displayText = '';
+    let displayColor = cs.color;
+    if (el.value) {
+      displayText = el.value;
+    } else if (el.tagName === 'SELECT' && el.options.length > 0) {
+      displayText = el.options[el.selectedIndex >= 0 ? el.selectedIndex : 0].textContent;
+    } else if (el.placeholder) {
+      displayText = el.placeholder;
+      // Tailwind's `placeholder:text-on-surface-variant/30` pushes opacity → use placeholder's
+      // visible computed color (an approximation; the iframe may have CSS that styles
+      // ::placeholder pseudo with an alpha.)
+      displayColor = cs.color;
+    } else if (el.tagName === 'INPUT' && el.type === 'date') {
+      displayText = 'mm/dd/yyyy';
+    }
+    if (displayText) {
+      // Use input's own padding to position the text. Since CSS centers vertically with
+      // line-height equal to control height, baseline ~ center + font-size/3.
+      const padTop = parsePx(cs.paddingTop);
+      const padLeft = parsePx(cs.paddingLeft);
+      const fontSize = parsePx(cs.fontSize) || 14;
+      const lineH = parsePx(cs.lineHeight) || rect.height;
+      boxes.push({
+        kind: 'text',
+        x: rect.left + padLeft,
+        y: rect.top + padTop,
+        w: rect.width - padLeft * 2,
+        h: lineH,
+        style: { ...style, color: displayColor, opacity: el.value ? style.opacity : Math.min(style.opacity, 0.5) },
+        tag: el.tagName.toLowerCase(),
+        el,
+        text: displayText,
+      });
+    }
   }
 
   // <img> elements: record the rect + URL. The painter fetches and embeds.
