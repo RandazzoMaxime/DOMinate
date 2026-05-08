@@ -1,6 +1,6 @@
 {
-  "viewport": { "width": 800, "height": 640 },
-  "screenshotScale": 2,
+  "viewport": { "width": 1600, "height": 1280 },
+  "screenshotScale": 1,
   "expectedLinks": ["#", "#", "#", "#", "#"],
   "expectedTextFragments": [
     "HELIX AERO",
