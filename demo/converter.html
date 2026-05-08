@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>HTML → PDF Converter</title>
+<style>
+  :root {
+    --green: #289e22;
+    --green-strong: #1f7a1c;
+    --slate-50: #f8fafc;
+    --slate-100: #f1f5f9;
+    --slate-200: #e2e8f0;
+    --slate-300: #cbd5e1;
+    --slate-500: #64748b;
+    --slate-700: #334155;
+    --slate-900: #0f172a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: linear-gradient(180deg, var(--slate-50), #ffffff 200px);
+    color: var(--slate-900);
+    min-height: 100vh;
+    padding: 32px 24px;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: var(--slate-500); font-size: 13px; margin-bottom: 24px; }
+
+  /* Drop zone */
+  .dropzone {
+    border: 2px dashed var(--slate-300);
+    border-radius: 12px;
+    padding: 48px 24px;
+    text-align: center;
+    background: #fff;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    margin-bottom: 16px;
+  }
+  .dropzone:hover, .dropzone.drag {
+    border-color: var(--green);
+    background: #f0fdf4;
+  }
+  .dropzone-icon {
+    width: 56px; height: 56px;
+    margin: 0 auto 12px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--slate-100); border-radius: 50%;
+    color: var(--green-strong);
+    font-size: 28px;
+  }
+  .dropzone-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .dropzone-hint { font-size: 13px; color: var(--slate-500); }
+  .dropzone .pick { color: var(--green-strong); text-decoration: underline; }
+
+  /* File card (after drop) */
+  .file-card {
+    background: #fff;
+    border: 1px solid var(--slate-200);
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 16px;
+  }
+  .file-icon {
+    width: 36px; height: 36px;
+    background: #fef3c7; color: #92400e;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .file-info { flex: 1; min-width: 0; }
+  .file-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-meta { font-size: 12px; color: var(--slate-500); }
+  .file-clear {
+    color: var(--slate-500); cursor: pointer; padding: 4px 8px;
+    border: 1px solid var(--slate-200); border-radius: 4px;
+    background: transparent; font-size: 12px;
+  }
+  .file-clear:hover { background: var(--slate-100); }
+
+  /* Options row */
+  .options {
+    display: flex; gap: 16px; align-items: center;
+    background: #fff;
+    border: 1px solid var(--slate-200);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .options label { font-size: 12px; color: var(--slate-700); display: flex; align-items: center; gap: 6px; }
+  .options select, .options input {
+    padding: 6px 10px;
+    border: 1px solid var(--slate-300);
+    border-radius: 6px;
+    font: inherit;
+    font-size: 13px;
+    background: #fff;
+  }
+  .options input[type=number] { width: 80px; }
+
+  /* Action row */
+  .actions {
+    display: flex; gap: 12px; align-items: center;
+    margin-bottom: 16px;
+  }
+  button.primary {
+    padding: 12px 24px;
+    background: var(--green);
+    color: #fff;
+    border: 0;
+    border-radius: 8px;
+    font: inherit;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  button.primary:hover { background: var(--green-strong); }
+  button.primary:disabled { background: var(--slate-300); cursor: not-allowed; }
+  button.secondary {
+    padding: 12px 18px;
+    background: #fff;
+    color: var(--slate-900);
+    border: 1px solid var(--slate-300);
+    border-radius: 8px;
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button.secondary:hover { background: var(--slate-100); }
+  .status {
+    font-size: 13px;
+    color: var(--slate-500);
+    flex: 1;
+  }
+  .status.ok { color: var(--green-strong); font-weight: 600; }
+  .status.error { color: #b91c1c; font-weight: 600; }
+
+  /* Preview */
+  .preview {
+    background: #fff;
+    border: 1px solid var(--slate-200);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .preview-header {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--slate-200);
+    background: var(--slate-50);
+    font-size: 12px;
+    color: var(--slate-500);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .preview iframe {
+    width: 100%;
+    height: 70vh;
+    border: 0;
+    background: #fff;
+    display: block;
+  }
+  .preview-empty {
+    padding: 60px 24px;
+    text-align: center;
+    color: var(--slate-500);
+    font-size: 13px;
+  }
+
+  .footer-note {
+    margin-top: 16px;
+    font-size: 11px;
+    color: var(--slate-500);
+    text-align: center;
+  }
+  .footer-note code {
+    background: var(--slate-100);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>HTML → PDF Converter</h1>
+    <p class="subtitle">100% client-side · zero server · vector-fidelity output (real text, real links, embedded fonts)</p>
+
+    <input type="file" id="fileInput" accept=".html,.htm,text/html" hidden>
+
+    <div class="dropzone" id="dropzone">
+      <div class="dropzone-icon">▾</div>
+      <div class="dropzone-title">Glissez-déposez un fichier <code>.html</code> ici</div>
+      <div class="dropzone-hint">ou <span class="pick">cliquez pour sélectionner</span></div>
+    </div>
+
+    <div class="file-card" id="fileCard" hidden>
+      <div class="file-icon">HTML</div>
+      <div class="file-info">
+        <div class="file-name" id="fileName"></div>
+        <div class="file-meta" id="fileMeta"></div>
+      </div>
+      <button class="file-clear" id="fileClear">×  Effacer</button>
+    </div>
+
+    <div class="options">
+      <label>Format
+        <select id="format">
+          <option value="A4-landscape">A4 paysage (1123×794)</option>
+          <option value="A4-portrait">A4 portrait (794×1123)</option>
+          <option value="Letter-landscape">Letter paysage (1056×816)</option>
+          <option value="Letter-portrait">Letter portrait (816×1056)</option>
+          <option value="custom">Personnalisé</option>
+        </select>
+      </label>
+      <label id="customW" hidden>Largeur (px)
+        <input type="number" id="widthInput" value="1123" min="100" max="4000">
+      </label>
+      <label id="customH" hidden>Hauteur (px)
+        <input type="number" id="heightInput" value="794" min="100" max="4000">
+      </label>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="convert" disabled>Convertir → PDF</button>
+      <button class="secondary" id="download" disabled>↓ Télécharger</button>
+      <span class="status" id="status">Choisis un fichier HTML pour commencer.</span>
+    </div>
+
+    <div class="preview">
+      <div class="preview-header">
+        <span>Aperçu PDF</span>
+        <span id="previewMeta"></span>
+      </div>
+      <div class="preview-empty" id="previewEmpty">Aucun PDF généré pour l'instant.</div>
+      <iframe id="previewFrame" hidden></iframe>
+    </div>
+
+    <p class="footer-note">
+      Lib from-scratch — pas de jsPDF / pdf-lib / html2canvas / serveur backend. Voir <code>CONSTRAINTS.md</code>.
+    </p>
+  </div>
+
+<script type="module">
+  import { htmlToPdf } from '../src/index.js';
+
+  const $ = id => document.getElementById(id);
+  let currentHtml = null;
+  let currentName = null;
+  let currentPdf = null;
+
+  // --- file selection (drag-drop + click) ---
+  const dropzone = $('dropzone');
+  const fileInput = $('fileInput');
+
+  function pickFile() { fileInput.click(); }
+  dropzone.addEventListener('click', pickFile);
+  fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+  ['dragenter', 'dragover'].forEach(ev =>
+    dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('drag'); }));
+  ['dragleave', 'drop'].forEach(ev =>
+    dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('drag'); }));
+  dropzone.addEventListener('drop', e => {
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+
+  $('fileClear').addEventListener('click', e => {
+    e.stopPropagation();
+    currentHtml = currentName = currentPdf = null;
+    fileInput.value = '';
+    $('fileCard').hidden = true;
+    $('convert').disabled = true;
+    $('download').disabled = true;
+    $('status').textContent = 'Choisis un fichier HTML pour commencer.';
+    $('status').className = 'status';
+    $('previewFrame').hidden = true;
+    $('previewFrame').src = 'about:blank';
+    $('previewEmpty').hidden = false;
+    $('previewMeta').textContent = '';
+  });
+
+  async function handleFile(file) {
+    if (!file.name.match(/\.(html?|htm)$/i)) {
+      $('status').textContent = 'Le fichier doit être un .html ou .htm';
+      $('status').className = 'status error';
+      return;
+    }
+    currentHtml = await file.text();
+    currentName = file.name.replace(/\.html?$/i, '');
+    $('fileName').textContent = file.name;
+    $('fileMeta').textContent = `${(file.size / 1024).toFixed(1)} KB · ${currentHtml.length.toLocaleString()} chars`;
+    $('fileCard').hidden = false;
+    $('convert').disabled = false;
+    $('status').textContent = 'Prêt à convertir.';
+    $('status').className = 'status';
+  }
+
+  // --- format options ---
+  const FORMATS = {
+    'A4-landscape':     { width: 1123, height: 794  },
+    'A4-portrait':      { width: 794,  height: 1123 },
+    'Letter-landscape': { width: 1056, height: 816  },
+    'Letter-portrait':  { width: 816,  height: 1056 },
+  };
+  $('format').addEventListener('change', e => {
+    const v = e.target.value;
+    if (v === 'custom') {
+      $('customW').hidden = false;
+      $('customH').hidden = false;
+    } else {
+      $('customW').hidden = true;
+      $('customH').hidden = true;
+      $('widthInput').value = FORMATS[v].width;
+      $('heightInput').value = FORMATS[v].height;
+    }
+  });
+
+  function getViewport() {
+    const v = $('format').value;
+    if (v === 'custom') {
+      return { width: parseInt($('widthInput').value, 10) || 1123, height: parseInt($('heightInput').value, 10) || 794 };
+    }
+    return FORMATS[v];
+  }
+
+  // --- conversion ---
+  $('convert').addEventListener('click', async () => {
+    if (!currentHtml) return;
+    $('status').textContent = 'Conversion en cours…';
+    $('status').className = 'status';
+    $('convert').disabled = true;
+    $('download').disabled = true;
+    const t0 = performance.now();
+    const vp = getViewport();
+    try {
+      const bytes = await htmlToPdf(currentHtml, { viewport: vp });
+      const dt = performance.now() - t0;
+      currentPdf = bytes;
+
+      // Show preview
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      $('previewFrame').src = url;
+      $('previewFrame').hidden = false;
+      $('previewEmpty').hidden = true;
+
+      $('status').textContent = `${(bytes.byteLength / 1024).toFixed(1)} KB · ${dt.toFixed(0)} ms · ${vp.width}×${vp.height}`;
+      $('status').className = 'status ok';
+      $('previewMeta').textContent = `${(bytes.byteLength / 1024).toFixed(1)} KB`;
+      $('convert').disabled = false;
+      $('download').disabled = false;
+    } catch (err) {
+      console.error(err);
+      $('status').textContent = 'Erreur : ' + err.message;
+      $('status').className = 'status error';
+      $('convert').disabled = false;
+    }
+  });
+
+  // --- download ---
+  $('download').addEventListener('click', () => {
+    if (!currentPdf) return;
+    const blob = new Blob([currentPdf], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (currentName || 'output') + '.pdf';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  });
+</script>
+</body>
+</html>
