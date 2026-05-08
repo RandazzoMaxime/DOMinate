@@ -245,7 +245,10 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
   // try in order, so the first available wins; with our embedded Inter, an Arial
   // request should still pick Arial-like rendering).
   const fontFam = (b.style.fontFamily || '').toLowerCase();
-  const altKey = /^['"]?(arial|helvetica)\b/.test(fontFam) ? (fontFam.match(/^['"]?(arial|helvetica)/i)[1].toLowerCase()) : null;
+  const altKey = (() => {
+    const m = /^['"]?(arial|helvetica|jetbrains mono|consolas|monospace)\b/i.exec(fontFam);
+    return m ? m[1].toLowerCase() : null;
+  })();
   const altMap = altKey && fontMap.alternates ? fontMap.alternates[altKey] : null;
 
   // Pick the closest available weight + the matching fallback chain.

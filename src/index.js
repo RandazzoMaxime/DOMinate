@@ -33,10 +33,12 @@ async function loadInter() {
         fetchOne('/assets/fonts/Inter-600-greek.ttf'),
         fetchOne('/assets/fonts/Inter-700-greek.ttf'),
       ]);
-      return {
-        latin: { 400: w400, 500: w500, 600: w600, 700: w700 },
-        greek: { 400: w400g, 500: w500g, 600: w600g, 700: w700g },
-      };
+      const jbMono = await fetchOne('/assets/fonts/JetBrainsMono-Regular.ttf');
+    return {
+      latin: { 400: w400, 500: w500, 600: w600, 700: w700 },
+      greek: { 400: w400g, 500: w500g, 600: w600g, 700: w700g },
+      jbMono,
+    };
     })();
   }
   return _interFontPromise;
@@ -92,6 +94,10 @@ export async function htmlToPdf(input, opts = {}) {
     // reference rendering (which falls back to Arial when no @font-face Inter is set).
     const helv = doc.addStandardFont('Helvetica');
     const helvBold = doc.addStandardFont('Helvetica-Bold');
+    // Monospace alternate (for font-family: 'JetBrains Mono', monospace, etc).
+    const jbMonoFont = inters.jbMono ? await embedTrueTypeFont(doc, inters.jbMono, 'JetBrainsMono-Regular') : null;
+    const courier = doc.addStandardFont('Courier');
+    const courierBold = doc.addStandardFont('Courier-Bold');
     fontMap = {
       regular:    r400, medium: r500 || r400, semibold: r600 || r400, bold: r700 || r600 || r400,
       oblique:    r400,
@@ -105,8 +111,13 @@ export async function htmlToPdf(input, opts = {}) {
       // Alternate font families. Painter uses these when computed fontFamily starts
       // with the matching name.
       alternates: {
-        helvetica:      { regular: helv, bold: helvBold, semibold: helvBold, medium: helv },
-        arial:          { regular: helv, bold: helvBold, semibold: helvBold, medium: helv },
+        helvetica:        { regular: helv,           bold: helvBold,    semibold: helvBold,    medium: helv },
+        arial:            { regular: helv,           bold: helvBold,    semibold: helvBold,    medium: helv },
+        'jetbrains mono': jbMonoFont
+          ? { regular: jbMonoFont, bold: jbMonoFont, semibold: jbMonoFont, medium: jbMonoFont }
+          : { regular: courier,    bold: courierBold, semibold: courierBold, medium: courier },
+        consolas:         { regular: jbMonoFont || courier, bold: jbMonoFont || courierBold, semibold: jbMonoFont || courierBold, medium: jbMonoFont || courier },
+        monospace:        { regular: jbMonoFont || courier, bold: jbMonoFont || courierBold, semibold: jbMonoFont || courierBold, medium: jbMonoFont || courier },
       },
       embedded: true,
     };
