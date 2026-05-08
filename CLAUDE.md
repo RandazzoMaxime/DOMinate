@@ -60,6 +60,27 @@ If `npm run loop` errors (not just iterates), fix the error first — that is th
 
 This order is a suggestion, not a contract. The loop's real target is `npm run loop ✓ PASS`.
 
+## Architectural decision (iter 2): browser-as-layout-engine
+
+The lib uses the **host browser's native layout engine** (`getBoundingClientRect` +
+`getComputedStyle` on a hidden, properly-sized iframe) to determine where each
+element renders. It does **not** reimplement CSS layout from scratch.
+
+Why this is consistent with "from scratch":
+- The browser's DOM/CSS engine is a runtime primitive available in every modern
+  browser, exactly like `DOMParser`, `fetch`, or `CompressionStream`. Using it is
+  not the same as depending on an npm package.
+- The lib still produces **vector PDFs with real text, real links, real path
+  geometry**. Layout query is not the same as rasterization.
+- This is the only way to plausibly hit "Playwright-quality" client-side: when the
+  host browser is Chromium, our positions match Playwright's `page.pdf()` exactly,
+  because they come from the same engine.
+- It avoids the futile project of reimplementing Blink/Gecko/WebKit from scratch.
+
+The original `SPEC.md` describes a hand-rolled layout engine (`src/css/`, `src/layout/`).
+That is now reframed as "implement only what is needed BEYOND what the browser
+gives us" — typically just font handling, PDF encoding, and PDF-specific concerns.
+
 ## Hard constraints (CONSTRAINTS.md, summarized)
 
 In `src/`:

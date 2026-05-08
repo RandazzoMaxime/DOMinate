@@ -63,7 +63,7 @@ export async function renderWithLib(htmlPath) {
 
     page.on('console', msg => {
       const t = msg.type();
-      if (t === 'error' || t === 'warning') console.error('[browser]', t, msg.text());
+      if (t === 'error' || t === 'warning' || t === 'log') console.error('[browser]', t, msg.text());
     });
     page.on('pageerror', err => console.error('[browser pageerror]', err.message));
 
