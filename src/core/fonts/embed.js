@@ -47,15 +47,17 @@ export async function embedTrueTypeFont(doc, fontBytes, baseFontName) {
     FontFile2: fontFile,
   });
 
-  // Build a /W array compactly: [first [w1 w2 ... wn] ...]. We split into runs of
-  // contiguous CIDs sharing similar widths via the format-1 array shape.
+  // Build a /W array. PDF allows fractional widths — keep two decimals to preserve
+  // glyph-advance precision (rounding to integers introduces 0.5/1000 em error per
+  // character, ~0.005 px at 11 px which accumulates over long strings).
   const widthsArr = [];
   let runStart = -1;
   let runWidths = [];
   for (let g = 0; g < parsed.numGlyphs; g++) {
-    const w = Math.round(parsed.widths[g] * scale);
-    if (runStart < 0) { runStart = g; runWidths = [w]; }
-    else runWidths.push(w);
+    const w = parsed.widths[g] * scale;
+    const wRounded = Math.round(w * 100) / 100;
+    if (runStart < 0) { runStart = g; runWidths = [wRounded]; }
+    else runWidths.push(wRounded);
   }
   if (runStart >= 0) widthsArr.push(runStart, runWidths);
 
