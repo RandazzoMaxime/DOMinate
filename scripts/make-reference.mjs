@@ -58,7 +58,11 @@ async function main() {
   if (!stems.length) { console.error('usage: make-reference.mjs <stem> [--viewport WxH]'); process.exit(1); }
 
   const { server, port } = await startServer();
-  const browser = await chromium.launch();
+  // --disable-lcd-text: capture with grayscale anti-aliasing. ClearType-style RGB
+  // subpixel fringes are a display artifact (R/G/B-asymmetric edge pixels), not part
+  // of the page's geometric rendering — and the loop's pdfjs rasterizer is grayscale,
+  // so LCD fringes in the ground truth would only add irreducible noise.
+  const browser = await chromium.launch({ args: ['--disable-lcd-text'] });
   try {
     for (const stem of stems) {
       const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
