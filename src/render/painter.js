@@ -382,6 +382,19 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
   }
   page.endText();
 
+  // Decoration runs extend across the inter-word gap when the walker bridged them.
+  const decoEndPdf = (b.decoR != null ? b.decoR : b.x + b.w) * CSS_TO_PDF;
+
+  // text-decoration: line-through → stroke midway up the x-height (~0.38 em above
+  // baseline measured against Chromium's rendering).
+  if ((b.style.textDecoration || '').includes('line-through')) {
+    const lineY = yPdf + fontSizeCss * CSS_TO_PDF * 0.38;
+    const lineW = Math.max(0.5, fontSizeCss * CSS_TO_PDF * 0.049);
+    if (color) page.setStrokeRgb(color.r, color.g, color.b);
+    page.setLineWidth(lineW);
+    page._push(`${num(xPdf)} ${num(lineY)} m ${num(decoEndPdf)} ${num(lineY)} l S\n`);
+  }
+
   // text-decoration: underline → draw a line at the font's intrinsic underline position
   // (post.underlinePosition / unitsPerEm × fontSize) with the font's intrinsic thickness.
   if ((b.style.textDecoration || '').includes('underline')) {
@@ -398,8 +411,7 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
     const lineW = Math.max(0.5, fontSizeCss * CSS_TO_PDF * underlineThicknessEm);
     if (color) page.setStrokeRgb(color.r, color.g, color.b);
     page.setLineWidth(lineW);
-    const underlineEnd = xPdf + b.w * CSS_TO_PDF;
-    page._push(`${num(xPdf)} ${num(lineY)} m ${num(underlineEnd)} ${num(lineY)} l S\n`);
+    page._push(`${num(xPdf)} ${num(lineY)} m ${num(decoEndPdf)} ${num(lineY)} l S\n`);
   }
 
   page.restoreState();

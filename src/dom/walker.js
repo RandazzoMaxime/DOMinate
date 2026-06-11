@@ -346,13 +346,20 @@ function pushWordBoxes(node, idoc, boxes, style, el) {
   }
 
   let word = null;  // { text, left, right, top, bottom }
+  let lastBox = null;
   const flush = () => {
     if (word && word.text) {
-      boxes.push({
+      const bb = {
         kind: 'text',
         x: word.left, y: word.top, w: word.right - word.left, h: word.bottom - word.top,
         style, tag, el, text: word.text,
-      });
+      };
+      // Bridge text-decoration across the inter-word gap: Chromium underlines/strikes
+      // the spaces too, but we emit one box per word. decoR extends the previous
+      // word's decoration up to this word's start when both sit on the same line.
+      if (lastBox && Math.abs(lastBox.y - bb.y) < 2 && bb.x > lastBox.x) lastBox.decoR = bb.x;
+      lastBox = bb;
+      boxes.push(bb);
     }
     word = null;
   };
@@ -393,7 +400,7 @@ function pushListMarker(el, cs, rect, boxes, style, firstText) {
   const type = cs.listStyleType;
   const fontSize = parsePx(cs.fontSize) || 12;
   const contentLeft = rect.left + parsePx(cs.borderLeftWidth) + parsePx(cs.paddingLeft);
-  const gap = 7;  // Blink kCMarkerPaddingPx
+  const gap = 10;  // measured against Chromium 96dpi rendering (7px padding + bullet side bearing)
 
   // Vertical anchor: the first line's baseline (same 0.80 formula the painter uses),
   // falling back to the li's own top + line-height.
@@ -406,7 +413,7 @@ function pushListMarker(el, cs, rect, boxes, style, firstText) {
     // above the baseline (~ x-height middle).
     const d = fontSize * 0.32;
     const cx = contentLeft - gap - d / 2;
-    const cy = baseline - fontSize * 0.31;
+    const cy = baseline - fontSize * 0.39;
     boxes.push({
       kind: 'bullet', shape: type,
       x: cx - d / 2, y: cy - d / 2, w: d, h: d,
