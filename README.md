@@ -14,23 +14,25 @@ The PDF contains real selectable text, real clickable hyperlinks, embedded
 fonts, vector geometry — no canvas rasterization, no third-party PDF
 generators. See **CONSTRAINTS.md** for the no-dependency rules.
 
-## Status (session 2026-06-11/12 — 12 fixtures)
+## Status (session 2026-06-11/12, closed 03:30 — 12 fixtures)
 
 | Fixture | Diff vs Chromium | What it exercises |
 |---------|------------------|-------------------|
-| `torture-svg` | **0.503%** | SVG paths M/L/H/V/C/S/Q/T/A/Z, polygons, dasharray, linecaps, rotated groups |
-| `wizard` | **0.677%** | Tailwind dark theme, forms, gradients (icon font excluded) |
-| `source` | **0.952%** | rounded cards, tables, flexbox, SVG scheme, links |
-| `torture-transform` | **0.959%** | rotate/scale/translate/skew/matrix3d, nested, transform-origin |
-| `torture-table` | **1.052%** | border-collapse, row/col spans, zebra, separate+spacing |
-| `torture-effects` | **1.153%** | text-shadow, inset box-shadow, outline+offset, groove/ridge/inset/outset |
-| `torture-image` | **1.157%** | PNG decode+alpha SMask, JPEG, object-fit, css backgrounds |
-| `source-flat` | **1.327%** | flat business design, Arial/Helvetica mapping |
-| `torture-box` | **1.405%** | per-side borders, multi-stop/radial gradients, box-shadows, z-index, overflow |
-| `torture-text` | **1.994%** | justify, lists/markers, code blocks, sub/sup, decorations |
-| `torture-flow` | **2.171%** | floats, CSS columns, text-indent, vertical-align, word-break, ellipsis |
-| `report` | **4.629%** | dense 10-11px text, italics, inline code (AA-dominated) |
-| **overall** | **1.418%** | all functional gates green, 77/77 validity checks |
+| `torture-image` | **0.125%** | PNG decode+alpha SMask, JPEG, object-fit, css backgrounds, tiling |
+| `torture-svg` | **0.235%** | SVG paths M/L/H/V/C/S/Q/T/A/Z, polygons, dasharray, linecaps, rotated groups |
+| `torture-transform` | **0.493%** | rotate/scale/translate/skew/matrix3d, nested, transform-origin |
+| `torture-table` | **0.534%** | border-collapse, row/col spans, zebra, separate+spacing |
+| `wizard` | **0.582%** | Tailwind dark theme, forms, gradients, Material Symbols icons, Manrope |
+| `torture-box` | **0.678%** | per-side borders, multi-stop/radial gradients, box-shadows, z-index, overflow |
+| `torture-effects` | **0.803%** | text-shadow, inset box-shadow, outline+offset, groove/ridge/inset/outset |
+| `source` | **0.825%** | rounded cards, tables, flexbox, SVG scheme, links (LCD-AA reference kept) |
+| `torture-text` | **0.905%** | justify, lists/markers, code blocks, sub/sup, decorations |
+| `torture-flow` | **0.916%** | floats, CSS columns, text-indent, vertical-align, word-break, ellipsis |
+| `source-flat` | **1.018%** | flat business design, Arial/Helvetica mapping |
+| `report` | **2.242%** | dense 10-11px text, italics, inline code (glyph-AA dominated) |
+| **overall** | **0.760%** | all functional gates green, 84/84 validity checks, byte-stable across runs |
+
+Session start was 5.885% over 4 fixtures; session end is 0.760% over 12.
 
 The strict exit criterion is < 0.1% per fixture; the remaining diff is dominated
 by per-glyph anti-aliasing differences between Chromium's text rasterizer and
@@ -65,8 +67,12 @@ effects are structurally exact; the PDFs are visually correct in real viewers.
   fill-rule, per-element getScreenCTM transforms, text
 - **Interactive**: link annotations, form-control placeholder/value rendering
 
-Known gaps: icon fonts via GSUB ligatures (Material Symbols), `::before/::after`
-pseudo-elements, WOFF2, multi-page pagination, bidi/RTL shaping.
+- **Icon fonts**: Material Symbols glyph names resolved through the font's GSUB
+  ligature table (LookupType 4 + Extension), GIDs emitted directly via Identity-H
+
+Known gaps: `::before/::after` pseudo-elements, WOFF2, variable-font axis
+instancing (icons render at the default wght/FILL/opsz), multi-page pagination,
+bidi/RTL shaping, column-rule.
 
 ## Running
 

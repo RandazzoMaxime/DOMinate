@@ -265,3 +265,38 @@ Baseline at session start: 4 fixtures, overall 5.885%, all gates green.
 - **iter 45** — 3D border dark factor 0.46 (sampled: #4f9d69 -> #244930 in Chromium).
 
 ## State at 01:45 — 12 fixtures, overall 1.418%, two consecutive runs byte-identical
+
+## Iterations 46-52 (01:45-02:45)
+
+- **iter 46/47** — integer-pixel BASELINE snapping (Chromium rounds glyph baselines to
+  device px, keeps sub-pixel x): overall 1.418 -> 1.266%. X-snapping and decoration-line
+  snapping tested and reverted (both regress).
+- **iter 48/49** — root-cause of the "AA floor": reference captures contained ClearType
+  LCD subpixel fringes (R/G/B-asymmetric edge pixels) that the grayscale pdfjs rasterizer
+  can never produce. make-reference now uses --disable-lcd-text; 11 references regenerated
+  (source.png untouched per rule book). Overall 1.266 -> 0.862%.
+- **iter 50** — icon fonts: GSUB ligature parser (LookupType 4 + Extension 7), Material
+  Symbols embedded lazily, glyph names -> GIDs -> direct Identity-H emission. Manrope
+  700/800 added (wizard headlines silently fell back to Inter). Wizard 0.640 -> 0.582%.
+- **iter 51** — background positioning area is the PADDING box: 1px-border tile pane had
+  every tile phase-shifted by 1px. torture-image 0.995 -> 0.329%.
+- **iter 52** — percentage + elliptical border-radius (50% circles, "48px 22px" cards)
+  with the CSS overlap-scaling rule; image 0.329 -> 0.125%, box -> 0.678%, flow -> 0.916%.
+- Explorations reverted with notes: hairline glyph stroke, 2x supersampled rasterization
+  (regresses under both LCD and grayscale ground truths), decoration-line snapping.
+
+## FINAL STATE (03:00)
+
+| Fixture | Diff | | Fixture | Diff |
+|---|---|---|---|---|
+| torture-image | 0.125% | | torture-effects | 0.803% |
+| torture-svg | 0.235% | | source | 0.825% |
+| torture-transform | 0.493% | | torture-text | 0.905% |
+| torture-table | 0.534% | | torture-flow | 0.916% |
+| wizard | 0.582% | | source-flat | 1.018% |
+| torture-box | 0.678% | | report | 2.242% |
+
+**overall 0.760%** (session start: 5.885% on 4 fixtures) — all functional gates green,
+validity suite 84/84, two consecutive loop runs byte-identical. Remaining diff is
+glyph-level anti-aliasing between Skia and pdfjs plus the LCD fringes retained in the
+protected source.png reference.
