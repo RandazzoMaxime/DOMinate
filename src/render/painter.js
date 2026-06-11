@@ -1055,6 +1055,13 @@ function paintIconRun(page, fontMap, b, pageHeightPdf, doc) {
   if (alpha < 1) page.setExtGState(doc.addExtGState({ ca: alpha, CA: alpha }));
   if (color) page.setFillRgb(color.r, color.g, color.b);
   page.beginText();
+  // The static TTF renders at the variable font's default wght; Chromium's
+  // rendering of the page tends heavier. Fatten outlines with a fill+stroke.
+  if (color) {
+    page.setStrokeRgb(color.r, color.g, color.b);
+    page.setLineWidth(fontSizeCss * CSS_TO_PDF * 0.07);
+    page._push('2 Tr\n');
+  }
   page.setFont(icons, fontSizeCss * CSS_TO_PDF);
   page.setTextPos(b.x * CSS_TO_PDF, cssYToPdfY(baselineCssY, pageHeightPdf));
   let hex = '<';
