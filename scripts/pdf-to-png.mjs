@@ -20,6 +20,9 @@ export async function rasterize(pdfPath, pngPath, { dpi = 96 } = {}) {
   const pdf = await loadingTask.promise;
   const page = await pdf.getPage(1);
 
+  // NOTE: 2x supersampling + high-quality downsample was explored twice (against
+  // LCD refs in May, against grayscale refs in June) and regressed both times —
+  // pdfjs's direct 1x AA is closer to Skia's glyph rasterization than a box filter.
   const scale = dpi / 72; // pdfjs default is 72 DPI
   const viewport = page.getViewport({ scale });
   const canvas = new Canvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
