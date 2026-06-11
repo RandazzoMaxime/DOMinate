@@ -916,8 +916,16 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
     if (sh.blur <= 1) {
       drawTextRuns(sx0, sy0, sh.color, sa);
     } else {
-      const r = sh.blur * CSS_TO_PDF * 0.45;
-      for (const [ox, oy, a] of [[0, 0, 0.55], [r, 0, 0.18], [-r, 0, 0.18], [0, r, 0.18], [0, -r, 0.18]]) {
+      // 9-pass disc approximation of the gaussian: a strong center plus axis and
+      // diagonal taps — tight enough that the ghosts fuse at 96 dpi.
+      const r1 = sh.blur * CSS_TO_PDF * 0.38;
+      const r2 = r1 * 0.7071;
+      const passes = [
+        [0, 0, 0.50],
+        [r1, 0, 0.14], [-r1, 0, 0.14], [0, r1, 0.14], [0, -r1, 0.14],
+        [r2, r2, 0.08], [-r2, r2, 0.08], [r2, -r2, 0.08], [-r2, -r2, 0.08],
+      ];
+      for (const [ox, oy, a] of passes) {
         drawTextRuns(sx0 + ox, sy0 + oy, sh.color, sa * a);
       }
     }
