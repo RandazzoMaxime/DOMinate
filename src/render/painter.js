@@ -30,10 +30,12 @@ export function paint(doc, fontMap, page, boxes /*, pageHeightCssPx (unused) */)
     if (clipped) {
       page.saveState();
       for (const c of b.clips) {
-        const cx = c.x * CSS_TO_PDF;
-        const cy = cssYToPdfY(c.y + c.h, pageHeightPdf);
-        const cw = c.w * CSS_TO_PDF;
-        const ch = c.h * CSS_TO_PDF;
+        const csx = Math.round(c.x), csy = Math.round(c.y);
+        const csw = Math.round(c.x + c.w) - csx, csh = Math.round(c.y + c.h) - csy;
+        const cx = csx * CSS_TO_PDF;
+        const cy = cssYToPdfY(csy + csh, pageHeightPdf);
+        const cw = csw * CSS_TO_PDF;
+        const ch = csh * CSS_TO_PDF;
         const r = c.radii || {};
         if ((r.tl || 0) + (r.tr || 0) + (r.br || 0) + (r.bl || 0) > 0) {
           page.pathRoundedRect(cx, cy, cw, ch, {
@@ -179,10 +181,16 @@ function paintSvgText(page, fontMap, b, pageHeightPdf) {
 
 function paintBox(doc, page, b, pageHeightPdf) {
   const fill = parseColor(b.style.backgroundColor);
-  const x = b.x * CSS_TO_PDF;
-  const y = cssYToPdfY(b.y + b.h, pageHeightPdf);  // bottom-left in PDF user units
-  const w = b.w * CSS_TO_PDF;
-  const h = b.h * CSS_TO_PDF;
+  // Snap box edges to the CSS pixel grid — Chromium paints backgrounds/borders
+  // snapped to device pixels, and our raster target is exactly 96 dpi, so integer
+  // CSS px == integer device px. This kills 1px seams between adjacent fills and
+  // matches Chromium's hard box edges.
+  const sx = Math.round(b.x), sy = Math.round(b.y);
+  const sw = Math.round(b.x + b.w) - sx, sh = Math.round(b.y + b.h) - sy;
+  const x = sx * CSS_TO_PDF;
+  const y = cssYToPdfY(sy + sh, pageHeightPdf);  // bottom-left in PDF user units
+  const w = sw * CSS_TO_PDF;
+  const h = sh * CSS_TO_PDF;
 
   // Per-corner border-radius (CSS px → PDF user units).
   // CSS shorthand maps to: top-left, top-right, bottom-right, bottom-left.
@@ -234,6 +242,15 @@ function paintBox(doc, page, b, pageHeightPdf) {
 
   // Borders — iter 7 handles uniform 4-side borders with corner radius.
   // iter 20 adds dashed/dotted styles via the `d` (dash pattern) operator.
+  // Standalone boxes get pixel-snapped border bands (Chromium paints the border as a
+  // crisp band just inside the snapped edge). border-collapse table cells instead
+  // center the shared border on the unsnapped grid line, like Chromium's collapsed
+  // border painting — snapping those desyncs adjacent cells.
+  const collapsed = b.style.borderCollapse === 'collapse';
+  const ubx = collapsed ? b.x * CSS_TO_PDF : x;
+  const uby = collapsed ? cssYToPdfY(b.y + b.h, pageHeightPdf) : y;
+  const ubw = collapsed ? b.w * CSS_TO_PDF : w;
+  const ubh = collapsed ? b.h * CSS_TO_PDF : h;
   const bw = parsePx(b.style.borderTopWidth);
   if (bw > 0) {
     const bc = parseColor(b.style.borderTopColor);
@@ -252,9 +269,9 @@ function paintBox(doc, page, b, pageHeightPdf) {
       } else if (style === 'dotted') {
         page.setDashPattern([lw, lw], 0);
       }
-      const inset = lw / 2;
-      const ix = x + inset, iy = y + inset;
-      const iw = w - 2 * inset, ih = h - 2 * inset;
+      const inset = collapsed ? 0 : lw / 2;
+      const ix = ubx + inset, iy = uby + inset;
+      const iw = ubw - 2 * inset, ih = ubh - 2 * inset;
       if (hasRadius) {
         const ir = {
           tl: Math.max(0, radii.tl - inset),
