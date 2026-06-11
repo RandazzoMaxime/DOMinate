@@ -849,9 +849,11 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
   // the rects), the baseline is exact: center the metric box in the rect, then go
   // down by the ascent. Fallback: the empirical 0.80 of rect height (≈ Inter's
   // ascent/(ascent+descent)).
-  const baselineCssY = b.metrics
+  const baselineCssY = Math.round(b.metrics
     ? b.y + (b.h - b.metrics.boxH) / 2 + b.metrics.ascent
-    : b.y + b.h * 0.80;
+    : b.y + b.h * 0.80);
+  // Chromium at 96 dpi rounds glyph BASELINES to whole device pixels but keeps
+  // sub-pixel horizontal positioning — mirror exactly that.
   const xPdf = b.x * CSS_TO_PDF;
   const yPdf = cssYToPdfY(baselineCssY, pageHeightPdf);
 
