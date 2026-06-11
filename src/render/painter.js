@@ -559,10 +559,11 @@ function paintBorders(doc, page, b, radii, hasRadius, x, y, w, h, pageHeightPdf)
       page.setFillRgb(e.color.r, e.color.g, e.color.b);
       for (const [bx, by, bw2, bh2] of side.bands) page.fillRect(bx, by, bw2, bh2);
     } else if (e.style === 'groove' || e.style === 'ridge' || e.style === 'inset' || e.style === 'outset') {
-      // Two-tone 3D borders: Chromium darkens the border-color to ~2/3 on the
-      // "shadowed" sides. inset/outset shade whole sides; groove/ridge split each
-      // band into an outer and inner half with opposite shading.
-      const dark = { r: e.color.r * 2 / 3, g: e.color.g * 2 / 3, b: e.color.b * 2 / 3 };
+      // Two-tone 3D borders: Chromium darkens the border-color to ~0.46 on the
+      // "shadowed" sides (sampled from the reference raster: #4f9d69 -> #244930).
+      // inset/outset shade whole sides; groove/ridge split each band into an outer
+      // and inner half with opposite shading.
+      const dark = { r: e.color.r * 0.46, g: e.color.g * 0.46, b: e.color.b * 0.46 };
       const lite = e.color;
       let cOuter, cInner;
       if (e.style === 'inset')       cOuter = cInner = side.tl ? dark : lite;
