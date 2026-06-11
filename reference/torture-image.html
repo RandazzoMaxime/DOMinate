@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Torture — images, object-fit, backgrounds</title>
+<style>
+  @font-face { font-family: 'Inter'; font-weight: 400; src: url('/assets/fonts/Inter-400.ttf') format('truetype'); }
+  @font-face { font-family: 'Inter'; font-weight: 600; src: url('/assets/fonts/Inter-600.ttf') format('truetype'); }
+  @font-face { font-family: 'Inter'; font-weight: 700; src: url('/assets/fonts/Inter-700.ttf') format('truetype'); }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1123px; height: 794px; overflow: hidden; }
+  body { font-family: 'Inter', sans-serif; background: #f7f8fa; color: #222a36; padding: 26px 38px; }
+  h1 { font-size: 24px; font-weight: 700; }
+  .sub { font-size: 12px; color: #76808f; margin-bottom: 18px; }
+  .row { display: flex; gap: 24px; margin-bottom: 20px; align-items: flex-start; }
+  figure { background: #ffffff; border: 1px solid #dde2ea; border-radius: 6px; padding: 10px; }
+  figcaption { font-size: 11px; color: #5a6475; margin-top: 6px; }
+
+  .natural img { display: block; }
+  .halfsize img { display: block; width: 160px; height: 100px; }
+  .avatar img { display: block; width: 96px; height: 96px; border-radius: 50%; }
+
+  .fitbox img { display: block; width: 150px; height: 110px; background: #1c2330; }
+  .fitbox .cover    { object-fit: cover; }
+  .fitbox .contain  { object-fit: contain; }
+
+  .bgcover {
+    width: 270px; height: 150px; border-radius: 10px;
+    background-image: url('/assets/img/photo.jpg');
+    background-size: cover; background-position: 50% 50%; background-repeat: no-repeat;
+  }
+  .bgtile {
+    width: 270px; height: 150px; border: 1px solid #c4cdd9;
+    background-image: url('/assets/img/tile.png');
+    background-repeat: repeat;
+  }
+  .badge-on-stripe {
+    width: 200px; height: 150px; border-radius: 8px;
+    background: linear-gradient(135deg, #0b3954, #087e8b);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .badge-on-stripe img { display: block; width: 96px; height: 96px; }
+
+  .footer { font-size: 12px; color: #5a6475; }
+  .footer a { color: #1b6ca8; }
+</style>
+</head>
+<body>
+  <h1>Raster Image Bench</h1>
+  <div class="sub">JPEG passthrough, PNG decode + alpha SMask, object-fit, css backgrounds — fixture 09</div>
+
+  <div class="row">
+    <figure class="natural">
+      <img src="/assets/img/photo.jpg" width="320" height="200" alt="synthetic landscape">
+      <figcaption>JPEG at intrinsic 320×200</figcaption>
+    </figure>
+    <figure class="halfsize">
+      <img src="/assets/img/photo.jpg" alt="downscaled landscape">
+      <figcaption>Same JPEG at 160×100</figcaption>
+    </figure>
+    <figure class="avatar">
+      <img src="/assets/img/photo.jpg" alt="round crop">
+      <figcaption>border-radius 50%</figcaption>
+    </figure>
+    <figure class="fitbox">
+      <img class="cover" src="/assets/img/photo.jpg" alt="cover crop">
+      <figcaption>object-fit: cover 150×110</figcaption>
+    </figure>
+    <figure class="fitbox">
+      <img class="contain" src="/assets/img/photo.jpg" alt="contain letterbox">
+      <figcaption>object-fit: contain</figcaption>
+    </figure>
+  </div>
+
+  <div class="row">
+    <figure>
+      <div class="bgcover"></div>
+      <figcaption>background-size: cover, centered, rounded</figcaption>
+    </figure>
+    <figure>
+      <div class="bgtile"></div>
+      <figcaption>background-repeat with a 24px checker tile</figcaption>
+    </figure>
+    <figure>
+      <div class="badge-on-stripe"><img src="/assets/img/badge.png" alt="alpha badge"></div>
+      <figcaption>PNG alpha over a gradient</figcaption>
+    </figure>
+  </div>
+
+  <p class="footer">Assets are deterministic synthetics — see <a href="https://helix.corsica/image-bench">the bench notes</a>.</p>
+</body>
+</html>

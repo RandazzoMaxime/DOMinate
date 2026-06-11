@@ -187,6 +187,10 @@ function walk(el, idoc, boxes, ctx) {
     overflow: cs.overflow,
     whiteSpace: cs.whiteSpace,
     borderCollapse: cs.borderCollapse,
+    objectFit: cs.objectFit,
+    backgroundSize: cs.backgroundSize,
+    backgroundPosition: cs.backgroundPosition,
+    backgroundRepeat: cs.backgroundRepeat,
   };
 
   // Push the element's own background/border box (skip default transparent/empty).

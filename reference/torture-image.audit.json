@@ -1,0 +1,19 @@
+{
+  "viewport": {
+    "width": 1123,
+    "height": 794
+  },
+  "screenshotScale": 1,
+  "expectedLinks": [
+    "https://helix.corsica/image-bench"
+  ],
+  "expectedTextFragments": [
+    "Raster Image Bench",
+    "JPEG at intrinsic 320×200",
+    "Same JPEG at 160×100",
+    "border-radius 50%",
+    "object-fit: cover 150×110",
+    "object-fit: contain",
+    "PNG alpha over a gradient"
+  ]
+}

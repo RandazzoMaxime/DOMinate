@@ -240,6 +240,11 @@ function paintBox(doc, page, b, pageHeightPdf) {
     paintFill(fill);
   }
 
+  // background-image: url(...) — prefetched + embedded by index.js.
+  if (b.bgEmbedded) {
+    paintBackgroundImage(page, b, sx, sy, sw, sh, radii, hasRadius, pageHeightPdf);
+  }
+
   // Borders — iter 7 handles uniform 4-side borders with corner radius.
   // iter 20 adds dashed/dotted styles via the `d` (dash pattern) operator.
   // Standalone boxes get pixel-snapped border bands (Chromium paints the border as a
@@ -468,11 +473,118 @@ function paintBullet(page, b, pageHeightPdf) {
 }
 
 function paintImage(page, b, pageHeightPdf) {
-  const x = b.x * CSS_TO_PDF;
-  const y = cssYToPdfY(b.y + b.h, pageHeightPdf);
-  const w = b.w * CSS_TO_PDF;
-  const h = b.h * CSS_TO_PDF;
-  page.drawImage(b.embedded, x, y, w, h);
+  // Snap the destination box to the CSS pixel grid (same rationale as paintBox).
+  const sx = Math.round(b.x), sy = Math.round(b.y);
+  const sw = Math.round(b.x + b.w) - sx, sh = Math.round(b.y + b.h) - sy;
+  if (sw <= 0 || sh <= 0) return;
+
+  const radii = {
+    tl: parsePx(b.style.borderTopLeftRadius),
+    tr: parsePx(b.style.borderTopRightRadius),
+    br: parsePx(b.style.borderBottomRightRadius),
+    bl: parsePx(b.style.borderBottomLeftRadius),
+  };
+  const hasRadius = radii.tl + radii.tr + radii.br + radii.bl > 0;
+
+  // object-fit geometry in CSS px.
+  const iw = b.embedded.width || sw, ih = b.embedded.height || sh;
+  const fit = b.style.objectFit || 'fill';
+  let dx = sx, dy = sy, dw = sw, dh = sh;
+  let needsClip = hasRadius;
+  if (fit === 'cover' || fit === 'contain' || fit === 'none' || fit === 'scale-down') {
+    let scale;
+    if (fit === 'cover') scale = Math.max(sw / iw, sh / ih);
+    else if (fit === 'contain') scale = Math.min(sw / iw, sh / ih);
+    else if (fit === 'none') scale = 1;
+    else scale = Math.min(1, Math.min(sw / iw, sh / ih));  // scale-down
+    dw = iw * scale; dh = ih * scale;
+    dx = sx + (sw - dw) / 2; dy = sy + (sh - dh) / 2;
+    if (dw > sw + 0.01 || dh > sh + 0.01) needsClip = true;
+  }
+
+  page.saveState();
+  if (needsClip) {
+    const cx = sx * CSS_TO_PDF, cy = cssYToPdfY(sy + sh, pageHeightPdf);
+    const cw = sw * CSS_TO_PDF, ch = sh * CSS_TO_PDF;
+    if (hasRadius) {
+      page.pathRoundedRect(cx, cy, cw, ch, {
+        tl: radii.tl * CSS_TO_PDF, tr: radii.tr * CSS_TO_PDF,
+        br: radii.br * CSS_TO_PDF, bl: radii.bl * CSS_TO_PDF,
+      });
+    } else {
+      page._push(`${num(cx)} ${num(cy)} ${num(cw)} ${num(ch)} re\n`);
+    }
+    page.clipPath();
+  }
+  page.drawImage(b.embedded, dx * CSS_TO_PDF, cssYToPdfY(dy + dh, pageHeightPdf), dw * CSS_TO_PDF, dh * CSS_TO_PDF);
+  page.restoreState();
+}
+
+/**
+ * CSS background-image: url(...) painting — single layer, supports background-size
+ * cover/contain/auto/"Wpx Hpx", percentage or px background-position, and tiling
+ * for repeat (capped). Clipped to the (rounded) border box.
+ */
+function paintBackgroundImage(page, b, sx, sy, sw, sh, radii, hasRadius, pageHeightPdf) {
+  const img = b.bgEmbedded;
+  const iw = img.width || sw, ih = img.height || sh;
+
+  // background-size
+  let dw = iw, dh = ih;
+  const size = (b.style.backgroundSize || 'auto').trim();
+  if (size === 'cover') {
+    const s = Math.max(sw / iw, sh / ih); dw = iw * s; dh = ih * s;
+  } else if (size === 'contain') {
+    const s = Math.min(sw / iw, sh / ih); dw = iw * s; dh = ih * s;
+  } else if (size !== 'auto') {
+    const parts = size.split(/\s+/);
+    const parseSize = (tok, ref, auto) => {
+      if (!tok || tok === 'auto') return auto;
+      if (tok.endsWith('%')) return parseFloat(tok) / 100 * ref;
+      return parseFloat(tok);
+    };
+    dw = parseSize(parts[0], sw, iw);
+    dh = parseSize(parts[1], sh, dw * (ih / iw));
+  }
+
+  // background-position (computed style is "X% Y%" or px values)
+  const pos = (b.style.backgroundPosition || '0% 0%').split(/\s+/);
+  const posOf = (tok, span, dspan) => {
+    if (!tok) return 0;
+    if (tok.endsWith('%')) return (parseFloat(tok) / 100) * (span - dspan);
+    return parseFloat(tok);
+  };
+  const ox = sx + posOf(pos[0], sw, dw);
+  const oy = sy + posOf(pos[1], sh, dh);
+
+  const repeat = b.style.backgroundRepeat || 'repeat';
+  const tiles = [];
+  if (repeat === 'no-repeat') {
+    tiles.push([ox, oy]);
+  } else {
+    const repX = repeat === 'repeat' || repeat === 'repeat-x';
+    const repY = repeat === 'repeat' || repeat === 'repeat-y';
+    const x0 = repX ? ox - Math.ceil((ox - sx) / dw) * dw : ox;
+    const y0 = repY ? oy - Math.ceil((oy - sy) / dh) * dh : oy;
+    for (let ty = y0; ty < sy + sh && tiles.length < 400; ty += dh) {
+      for (let tx = x0; tx < sx + sw && tiles.length < 400; tx += dw) {
+        tiles.push([tx, ty]);
+        if (!repX) break;
+      }
+      if (!repY) break;
+    }
+  }
+
+  page.saveState();
+  const cx = sx * CSS_TO_PDF, cy = cssYToPdfY(sy + sh, pageHeightPdf);
+  const cw = sw * CSS_TO_PDF, ch = sh * CSS_TO_PDF;
+  if (hasRadius) page.pathRoundedRect(cx, cy, cw, ch, radii);
+  else page._push(`${num(cx)} ${num(cy)} ${num(cw)} ${num(ch)} re\n`);
+  page.clipPath();
+  for (const [tx, ty] of tiles) {
+    page.drawImage(img, tx * CSS_TO_PDF, cssYToPdfY(ty + dh, pageHeightPdf), dw * CSS_TO_PDF, dh * CSS_TO_PDF);
+  }
+  page.restoreState();
 }
 
 function paintLink(page, b, pageHeightPdf) {

@@ -13,6 +13,7 @@ import { layout } from './dom/walker.js';
 import { paint } from './render/painter.js';
 import { embedTrueTypeFont } from './core/fonts/embed.js';
 import { embedJpeg } from './core/images/jpeg.js';
+import { embedPng } from './core/images/png.js';
 
 const A4_LANDSCAPE_CSS = { width: 1123, height: 794 };
 const A4_PORTRAIT_CSS  = { width: 794,  height: 1123 };
@@ -132,18 +133,30 @@ export async function htmlToPdf(input, opts = {}) {
   }
 
   // Pre-fetch image boxes and embed each one. We attach the embedded XObject handle
-  // directly onto the box so the (sync) painter can just `drawImage`.
-  for (const b of boxes) {
-    if (b.kind !== 'image' || !b.src) continue;
+  // directly onto the box so the (sync) painter can just `drawImage`. Also resolves
+  // CSS background-image: url(...) on plain boxes.
+  const imageCache = new Map();  // url → embedded handle (or null after a failure)
+  const fetchAndEmbed = async (url) => {
+    if (imageCache.has(url)) return imageCache.get(url);
+    let handle = null;
     try {
-      const r = await fetch(b.src, { mode: 'cors' });
-      if (!r.ok) continue;
-      const u8 = new Uint8Array(await r.arrayBuffer());
-      // Detect JPEG via SOI marker; skip other formats for now (PNG decode needs more work).
-      if (u8[0] === 0xFF && u8[1] === 0xD8) {
-        b.embedded = embedJpeg(doc, u8);
+      const r = await fetch(url, { mode: 'cors' });
+      if (r.ok) {
+        const u8 = new Uint8Array(await r.arrayBuffer());
+        if (u8[0] === 0xFF && u8[1] === 0xD8) handle = embedJpeg(doc, u8);
+        else if (u8[0] === 0x89 && u8[1] === 0x50) handle = await embedPng(doc, u8);
       }
-    } catch { /* offline or CORS — skip */ }
+    } catch { /* offline, CORS, or unsupported encoding — skip */ }
+    imageCache.set(url, handle);
+    return handle;
+  };
+  for (const b of boxes) {
+    if (b.kind === 'image' && b.src) {
+      b.embedded = await fetchAndEmbed(b.src);
+    } else if (b.kind === 'box' && b.style.backgroundImage && b.style.backgroundImage.startsWith('url(')) {
+      const m = /^url\(["']?([^"')]+)["']?\)$/.exec(b.style.backgroundImage.trim());
+      if (m) b.bgEmbedded = await fetchAndEmbed(m[1]);
+    }
   }
 
   const page = doc.addPage();
