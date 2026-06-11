@@ -334,6 +334,31 @@ function walk(el, idoc, boxes, ctx) {
 }
 
 /**
+ * Measure the used font's bounding-box metrics with the iframe's own canvas — the
+ * same engine that laid out the text, so rect.top + these metrics give Chromium's
+ * exact baseline. Cached per (style, weight, size, family).
+ */
+function fontMetricsFor(idoc, style) {
+  const key = `${style.fontStyle}|${style.fontWeight}|${style.fontSize}|${style.fontFamily}`;
+  let cache = idoc.__pdfFontMetrics;
+  if (!cache) cache = idoc.__pdfFontMetrics = new Map();
+  let m = cache.get(key);
+  if (m !== undefined) return m;
+  try {
+    let ctx = idoc.__pdfMeasureCtx;
+    if (!ctx) ctx = idoc.__pdfMeasureCtx = idoc.createElement('canvas').getContext('2d');
+    const fs = style.fontStyle && style.fontStyle !== 'normal' ? style.fontStyle + ' ' : '';
+    ctx.font = `${fs}${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    const tm = ctx.measureText('Hg');
+    if (tm.fontBoundingBoxAscent > 0) {
+      m = { ascent: tm.fontBoundingBoxAscent, boxH: tm.fontBoundingBoxAscent + tm.fontBoundingBoxDescent };
+    } else m = null;
+  } catch { m = null; }
+  cache.set(key, m);
+  return m;
+}
+
+/**
  * Per-character Range measurement of one text node → word-level render boxes.
  * Whitespace characters (collapsed or not) are never emitted as glyphs; their advance
  * is implicit in the following word's x position.
@@ -351,6 +376,7 @@ function pushWordBoxes(node, idoc, boxes, style, el) {
     return;
   }
 
+  const metrics = fontMetricsFor(idoc, style);
   let word = null;  // { text, left, right, top, bottom }
   let lastBox = null;
   const flush = () => {
@@ -358,7 +384,7 @@ function pushWordBoxes(node, idoc, boxes, style, el) {
       const bb = {
         kind: 'text',
         x: word.left, y: word.top, w: word.right - word.left, h: word.bottom - word.top,
-        style, tag, el, text: word.text,
+        style, tag, el, text: word.text, metrics,
       };
       // Bridge text-decoration across the inter-word gap: Chromium underlines/strikes
       // the spaces too, but we emit one box per word. decoR extends the previous
