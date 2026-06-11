@@ -366,6 +366,7 @@ function walk(el, idoc, boxes, ctx) {
   const isListItem = cs.display === 'list-item' && cs.listStyleType !== 'none'
     && cs.listStylePosition !== 'inside';
   const liMarkerFixupIndex = isListItem ? boxes.length : -1;
+  const textStartIndex = boxes.length;
 
   // Text-bearing leaves: walk this element's direct text-node children. For each text
   // node we measure EVERY character's client rect (Range), group consecutive characters
@@ -400,6 +401,50 @@ function walk(el, idoc, boxes, ctx) {
       boxes[i].sortKey = key(5);
       boxes[i].clips = clipsForChildren;
       boxes[i].tfms = tfms;
+    }
+  }
+
+  // text-overflow: ellipsis — Chromium hides the partially-clipped tail entirely
+  // and draws "…" after the last visible character. We trim/drop the word boxes
+  // emitted for this element and synthesize the ellipsis box.
+  if (cs.textOverflow === 'ellipsis' && ov !== 'visible' && ov !== ''
+      && cs.whiteSpace === 'nowrap' && el.scrollWidth > el.clientWidth + 1) {
+    const contentRight = rect.left + el.clientLeft + el.clientWidth;
+    let ellW = (parsePx(cs.fontSize) || 12) * 0.7;
+    try {
+      let mctx = idoc.__pdfMeasureCtx;
+      if (!mctx) mctx = idoc.__pdfMeasureCtx = idoc.createElement('canvas').getContext('2d');
+      mctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      const tw = mctx.measureText('…').width;
+      if (tw > 0) ellW = tw;
+    } catch { /* keep estimate */ }
+    const limit = contentRight - ellW;
+    let lastKept = null;
+    let dropped = false;
+    for (let i = textStartIndex; i < boxes.length; i++) {
+      const tb = boxes[i];
+      if (tb.kind !== 'text') continue;
+      if (tb.x + tb.w <= limit) { if (!lastKept || tb.x > lastKept.x) lastKept = tb; continue; }
+      if (tb.x >= limit) { boxes.splice(i, 1); i--; dropped = true; continue; }
+      // Straddling word: trim at approximate character granularity.
+      const avg = tb.w / tb.text.length;
+      const keep = Math.max(0, Math.floor((limit - tb.x) / avg));
+      dropped = true;
+      if (keep === 0) { boxes.splice(i, 1); i--; continue; }
+      tb.text = tb.text.slice(0, keep);
+      tb.w = keep * avg;
+      lastKept = tb;
+    }
+    if (dropped) {
+      const anchor = lastKept || { x: rect.left + el.clientLeft, y: rect.top, h: rect.height, metrics: undefined };
+      boxes.push({
+        kind: 'text',
+        x: lastKept ? lastKept.x + lastKept.w : anchor.x,
+        y: anchor.y, w: ellW, h: anchor.h,
+        style, tag: 'ellipsis', el, text: '…',
+        metrics: anchor.metrics,
+        sortKey: key(5), clips: clipsForChildren, tfms,
+      });
     }
   }
 

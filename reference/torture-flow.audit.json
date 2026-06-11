@@ -1,0 +1,20 @@
+{
+  "viewport": {
+    "width": 1123,
+    "height": 794
+  },
+  "screenshotScale": 1,
+  "expectedLinks": [
+    "https://helix.corsica/flow-bench"
+  ],
+  "expectedTextFragments": [
+    "Document Flow Bench",
+    "Floats with wrapped prose",
+    "Indented paragraphs",
+    "Inline-block chips",
+    "Ellipsis truncation",
+    "Three CSS columns",
+    "vertical-align in cells",
+    "word-break: break-all"
+  ]
+}

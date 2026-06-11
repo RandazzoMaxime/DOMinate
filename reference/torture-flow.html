@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Torture — floats, columns, flow</title>
+<style>
+  @font-face { font-family: 'Inter'; font-weight: 400; src: url('/assets/fonts/Inter-400.ttf') format('truetype'); }
+  @font-face { font-family: 'Inter'; font-weight: 600; src: url('/assets/fonts/Inter-600.ttf') format('truetype'); }
+  @font-face { font-family: 'Inter'; font-weight: 700; src: url('/assets/fonts/Inter-700.ttf') format('truetype'); }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1123px; height: 794px; overflow: hidden; }
+  body { font-family: 'Inter', sans-serif; background: #ffffff; color: #232936; padding: 28px 40px; }
+  h1 { font-size: 24px; font-weight: 700; }
+  .sub { font-size: 12px; color: #76808f; margin-bottom: 20px; }
+  h2 { font-size: 13px; font-weight: 600; color: #36415a; margin: 14px 0 6px; }
+  p { font-size: 11.5px; line-height: 1.55; }
+
+  .two { display: flex; gap: 36px; }
+  .half { flex: 1; min-width: 0; }
+
+  .floatbox {
+    float: left; width: 120px; height: 90px; margin: 4px 12px 6px 0;
+    background: #1b6ca8; color: #fff; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+  }
+  .floatright {
+    float: right; width: 90px; height: 70px; margin: 4px 0 6px 12px;
+    background: #c44536; color: #fff; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 600;
+  }
+  .clear { clear: both; }
+
+  .cols {
+    column-count: 3; column-gap: 22px;
+    font-size: 11px; line-height: 1.5; margin-top: 6px;
+  }
+  .cols p { margin-bottom: 8px; }
+
+  .indent p { text-indent: 28px; }
+
+  .chips { margin-top: 6px; }
+  .chip {
+    display: inline-block; padding: 4px 10px; margin: 0 6px 6px 0;
+    background: #eef1f6; border: 1px solid #d2d9e4; border-radius: 12px;
+    font-size: 10.5px; color: #45506b;
+  }
+
+  table.va { border-collapse: collapse; width: 100%; margin-top: 6px; font-size: 11px; }
+  table.va td { border: 1px solid #cfd6e2; height: 64px; padding: 6px 10px; width: 33%; }
+  td.vt { vertical-align: top; }
+  td.vm { vertical-align: middle; }
+  td.vb { vertical-align: bottom; }
+
+  .breaker {
+    width: 200px; font-size: 11px; line-height: 1.45;
+    border: 1px dashed #9fb3cc; padding: 8px; margin-top: 6px;
+    word-break: break-all;
+  }
+
+  .ellip {
+    width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    border: 1px solid #d2d9e4; border-radius: 4px; padding: 6px 10px;
+    font-size: 11.5px; margin-top: 6px;
+  }
+
+  .footer { margin-top: 16px; font-size: 11px; color: #76808f; }
+  .footer a { color: #0b6e4f; }
+</style>
+</head>
+<body>
+  <h1>Document Flow Bench</h1>
+  <div class="sub">floats · css columns · text-indent · vertical-align · word-break · ellipsis — fixture 12</div>
+
+  <div class="two">
+    <div class="half">
+      <h2>Floats with wrapped prose</h2>
+      <div class="floatbox">FLOAT LEFT</div>
+      <div class="floatright">RIGHT</div>
+      <p>Text flows around both floating boxes exactly the way the engine shaped each line. The left float pushes these lines rightward while the round red float carves the right margin, and once both floats end the prose returns to the full column width like nothing happened. Surveyors would call this a constrained traverse: every line box adapts its start and width to the obstacles, and the renderer must follow those measured line fragments faithfully rather than reflowing anything itself.</p>
+      <div class="clear"></div>
+
+      <h2>Indented paragraphs</h2>
+      <div class="indent">
+        <p>First lines carry a 28px indent in classic print style.</p>
+        <p>Each subsequent paragraph repeats the same first-line shift.</p>
+      </div>
+
+      <h2>Inline-block chips</h2>
+      <div class="chips">
+        <span class="chip">GNSS</span><span class="chip">total station</span><span class="chip">levelling</span><span class="chip">photogrammetry</span><span class="chip">LiDAR</span><span class="chip">bathymetry</span><span class="chip">network adjust</span>
+      </div>
+
+      <h2>Ellipsis truncation</h2>
+      <div class="ellip">This single line is far too long to fit inside the 240px pill and must be cut.</div>
+      <div class="ellip">Short enough.</div>
+    </div>
+
+    <div class="half">
+      <h2>Three CSS columns</h2>
+      <div class="cols">
+        <p>Multi-column layout splits this block into three balanced columns. Each line fragment is measured where the engine actually placed it, so column breaks land precisely.</p>
+        <p>The second paragraph continues across the column boxes, wrapping mid-sentence from one column to the next without any seam in the rendered output.</p>
+        <p>A final short paragraph pads the third column to keep the balance interesting.</p>
+      </div>
+
+      <h2>vertical-align in cells</h2>
+      <table class="va">
+        <tr>
+          <td class="vt">top aligned</td>
+          <td class="vm">middle aligned</td>
+          <td class="vb">bottom aligned</td>
+        </tr>
+      </table>
+
+      <h2>word-break: break-all</h2>
+      <div class="breaker">Unbreakable_tokens_like_EPSG2154_LAMBERT93_RGF93GRS80 are chopped wherever the 200px box runs out of room.</div>
+    </div>
+  </div>
+
+  <p class="footer">Flow coverage sheet — notes at <a href="https://helix.corsica/flow-bench">helix.corsica/flow-bench</a>.</p>
+</body>
+</html>
