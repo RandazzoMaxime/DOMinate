@@ -32,6 +32,7 @@ export function paint(doc, fontMap, page, boxes /*, pageHeightCssPx (unused) */)
   for (const b of boxes) {
     if (b.kind === 'text') paintText(page, fontMap, b, pageHeightPdf, doc);
     if (b.kind === 'svg-text') paintSvgText(page, fontMap, b, pageHeightPdf);
+    if (b.kind === 'bullet') paintBullet(page, b, pageHeightPdf);
   }
   for (const b of boxes) {
     if (b.kind === 'link') paintLink(page, b, pageHeightPdf);
@@ -364,6 +365,39 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
     page._push(`${num(xPdf)} ${num(lineY)} m ${num(underlineEnd)} ${num(lineY)} l S\n`);
   }
 
+  page.restoreState();
+}
+
+/** List marker bullets: disc = filled circle, circle = stroked circle, square = filled square. */
+function paintBullet(page, b, pageHeightPdf) {
+  const color = parseColor(b.color) || { r: 0, g: 0, b: 0, a: 1 };
+  const x = b.x * CSS_TO_PDF;
+  const y = cssYToPdfY(b.y + b.h, pageHeightPdf);
+  const w = b.w * CSS_TO_PDF;
+  const h = b.h * CSS_TO_PDF;
+  page.saveState();
+  if (b.shape === 'square') {
+    page.setFillRgb(color.r, color.g, color.b);
+    page.fillRect(x, y, w, h);
+  } else {
+    const cx = x + w / 2, cy = y + h / 2, rx = w / 2, ry = h / 2;
+    const k = 0.5522847498;
+    const ops = [];
+    ops.push(`${num(cx + rx)} ${num(cy)} m`);
+    ops.push(`${num(cx + rx)} ${num(cy + ry * k)} ${num(cx + rx * k)} ${num(cy + ry)} ${num(cx)} ${num(cy + ry)} c`);
+    ops.push(`${num(cx - rx * k)} ${num(cy + ry)} ${num(cx - rx)} ${num(cy + ry * k)} ${num(cx - rx)} ${num(cy)} c`);
+    ops.push(`${num(cx - rx)} ${num(cy - ry * k)} ${num(cx - rx * k)} ${num(cy - ry)} ${num(cx)} ${num(cy - ry)} c`);
+    ops.push(`${num(cx + rx * k)} ${num(cy - ry)} ${num(cx + rx)} ${num(cy - ry * k)} ${num(cx + rx)} ${num(cy)} c`);
+    page._push(ops.join('\n') + '\n');
+    if (b.shape === 'circle') {
+      page.setStrokeRgb(color.r, color.g, color.b);
+      page.setLineWidth(Math.max(0.6, b.w * CSS_TO_PDF * 0.12));
+      page._push('S\n');
+    } else {
+      page.setFillRgb(color.r, color.g, color.b);
+      page._push('f\n');
+    }
+  }
   page.restoreState();
 }
 

@@ -136,6 +136,7 @@ function walk(el, idoc, boxes, parentX, parentY) {
     textDecoration: cs.textDecorationLine,
     lineHeight: cs.lineHeight,
     overflow: cs.overflow,
+    whiteSpace: cs.whiteSpace,
   };
 
   // Push the element's own background/border box (skip default transparent/empty).
@@ -226,68 +227,159 @@ function walk(el, idoc, boxes, parentX, parentY) {
   const fontFam = (style.fontFamily || '').toLowerCase();
   const isIconFont = /material\s*symbols|material\s*icons|fontawesome|fa-solid|fa-regular|bi-icons|font\s*awesome/i.test(fontFam);
 
-  // Text-bearing leaves: walk this element's direct text-node children and use Range
-  // to get the actual rendered rectangles for each text run.
+  // List markers (::marker). Chromium gives no geometry for marker boxes, so we
+  // synthesize them: Blink places outside markers with a 7px gap between the marker's
+  // inline-end and the li's content box. Disc/circle/square are drawn as shapes
+  // (diameter ≈ ascent/3 like Blink); decimal markers are "N." text right-aligned.
+  const isListItem = cs.display === 'list-item' && cs.listStyleType !== 'none'
+    && cs.listStylePosition !== 'inside';
+  const liMarkerFixupIndex = isListItem ? boxes.length : -1;
+
+  // Text-bearing leaves: walk this element's direct text-node children. For each text
+  // node we measure EVERY character's client rect (Range), group consecutive characters
+  // into words, words into lines. Each word becomes one render box at its exact
+  // rendered position — this makes justify, white-space:pre, multi-line wrapping and
+  // letter-spacing land precisely where Chromium put them.
   for (const child of el.childNodes) {
     // Use literal nodeType values (3 = TEXT, 1 = ELEMENT) for the same realm-agnostic reason.
     if (child.nodeType === 3) {
-      // Normalize whitespace the way HTML rendering does: collapse all whitespace
-      // runs (including \n) to a single space, then trim. Without this, leading/
-      // trailing newlines in source HTML become .notdef glyphs in the PDF (the
-      // newline char isn't in any font's Unicode cmap).
       const raw = child.nodeValue;
       if (!raw || !raw.trim()) continue;
-      const t = raw.replace(/\s+/g, ' ').trim();
       if (isIconFont) continue;
-      const range = idoc.createRange();
-      range.selectNode(child);
-      const rects = range.getClientRects();
-      // For multi-line text we get one rect per line; for single-line, one rect.
-      // We split the string proportionally by rect width so each rect carries the right portion.
-      const rectsArr = Array.from(rects);
-      if (rectsArr.length === 1) {
-        const r = rectsArr[0];
-        boxes.push({
-          kind: 'text',
-          x: r.left, y: r.top, w: r.width, h: r.height,
-          style, tag: el.tagName.toLowerCase(), el,
-          text: t,
-        });
-      } else if (rectsArr.length > 1) {
-        // Multi-line: chunk the string by its width slices.
-        const totalW = rectsArr.reduce((s, r) => s + r.width, 0) || 1;
-        let cursor = 0;
-        for (const r of rectsArr) {
-          const take = Math.max(1, Math.round(t.length * (r.width / totalW)));
-          const slice = t.slice(cursor, cursor + take);
-          cursor += take;
-          if (slice.trim()) {
-            boxes.push({
-              kind: 'text',
-              x: r.left, y: r.top, w: r.width, h: r.height,
-              style, tag: el.tagName.toLowerCase(), el,
-              text: slice,
-            });
-          }
-        }
-        // Tail (rounding leftover)
-        if (cursor < t.length) {
-          const last = rectsArr[rectsArr.length - 1];
-          const tail = t.slice(cursor);
-          if (tail.trim()) {
-            boxes.push({
-              kind: 'text',
-              x: last.left, y: last.top, w: last.width, h: last.height,
-              style, tag: el.tagName.toLowerCase(), el,
-              text: tail,
-            });
-          }
-        }
-      }
+      pushWordBoxes(child, idoc, boxes, style, el);
     } else if (child.nodeType === 1) {
       walk(child, idoc, boxes, parentX, parentY);
     }
   }
+
+  // After children are walked we know where the li's first text line sits; synthesize
+  // the marker aligned to that first line.
+  if (isListItem) {
+    const firstText = boxes.slice(liMarkerFixupIndex).find(b => b.kind === 'text');
+    pushListMarker(el, cs, rect, boxes, style, firstText);
+  }
+}
+
+/**
+ * Per-character Range measurement of one text node → word-level render boxes.
+ * Whitespace characters (collapsed or not) are never emitted as glyphs; their advance
+ * is implicit in the following word's x position.
+ */
+function pushWordBoxes(node, idoc, boxes, style, el) {
+  const raw = node.nodeValue;
+  const tag = el.tagName.toLowerCase();
+  const range = idoc.createRange();
+
+  // Guard: gigantic text nodes fall back to whole-node measurement (perf).
+  if (raw.length > 20000) {
+    range.selectNode(node);
+    const r = range.getBoundingClientRect();
+    boxes.push({ kind: 'text', x: r.left, y: r.top, w: r.width, h: r.height, style, tag, el, text: raw.replace(/\s+/g, ' ').trim() });
+    return;
+  }
+
+  let word = null;  // { text, left, right, top, bottom }
+  const flush = () => {
+    if (word && word.text) {
+      boxes.push({
+        kind: 'text',
+        x: word.left, y: word.top, w: word.right - word.left, h: word.bottom - word.top,
+        style, tag, el, text: word.text,
+      });
+    }
+    word = null;
+  };
+
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (/\s/.test(ch)) { flush(); continue; }   // any whitespace separates words
+    range.setStart(node, i);
+    range.setEnd(node, i + 1);
+    const rects = range.getClientRects();
+    if (!rects.length) { flush(); continue; }
+    const r = rects[0];
+    if (r.width === 0 && r.height === 0) { flush(); continue; }
+    // New line if the char's top differs from the current word's top.
+    if (word && Math.abs(r.top - word.top) > 2) flush();
+    if (!word) {
+      word = { text: ch, left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+    } else {
+      word.text += ch;
+      word.right = Math.max(word.right, r.right);
+      word.left = Math.min(word.left, r.left);
+      word.bottom = Math.max(word.bottom, r.bottom);
+    }
+  }
+  flush();
+}
+
+/**
+ * Synthesize a list marker box for an li with list-style-position: outside.
+ * @param {Element} el  the li
+ * @param {CSSStyleDeclaration} cs
+ * @param {DOMRect} rect  li border-box rect
+ * @param {Array} boxes
+ * @param {Object} style  captured style of the li
+ * @param {Object|undefined} firstText  first text box inside the li (for baseline alignment)
+ */
+function pushListMarker(el, cs, rect, boxes, style, firstText) {
+  const type = cs.listStyleType;
+  const fontSize = parsePx(cs.fontSize) || 12;
+  const contentLeft = rect.left + parsePx(cs.borderLeftWidth) + parsePx(cs.paddingLeft);
+  const gap = 7;  // Blink kCMarkerPaddingPx
+
+  // Vertical anchor: the first line's baseline (same 0.80 formula the painter uses),
+  // falling back to the li's own top + line-height.
+  const lineTop = firstText ? firstText.y : rect.top;
+  const lineH = firstText ? firstText.h : (parsePx(cs.lineHeight) || fontSize * 1.4);
+  const baseline = lineTop + lineH * 0.80;
+
+  if (type === 'disc' || type === 'circle' || type === 'square') {
+    // Blink sizes bullets at ascent/3 (≈ 0.32 em for Inter), vertically centered a bit
+    // above the baseline (~ x-height middle).
+    const d = fontSize * 0.32;
+    const cx = contentLeft - gap - d / 2;
+    const cy = baseline - fontSize * 0.31;
+    boxes.push({
+      kind: 'bullet', shape: type,
+      x: cx - d / 2, y: cy - d / 2, w: d, h: d,
+      color: cs.color, style, tag: 'li::marker', el,
+    });
+  } else {
+    // Counter-based markers: decimal, lower-alpha, lower-roman (common subset).
+    let index = 1;
+    const parent = el.parentElement;
+    if (parent) {
+      const start = parseInt(parent.getAttribute && parent.getAttribute('start'), 10);
+      index = isNaN(start) ? 1 : start;
+      for (const sib of parent.children) {
+        if (sib === el) break;
+        if (sib.tagName === 'LI') index++;
+      }
+    }
+    let label;
+    if (type === 'lower-alpha' || type === 'lower-latin') label = String.fromCharCode(96 + ((index - 1) % 26) + 1) + '.';
+    else if (type === 'upper-alpha' || type === 'upper-latin') label = String.fromCharCode(64 + ((index - 1) % 26) + 1) + '.';
+    else if (type === 'lower-roman') label = toRoman(index).toLowerCase() + '.';
+    else if (type === 'upper-roman') label = toRoman(index) + '.';
+    else label = index + '.';
+    // Right-align the label so it ends `gap` px before the content box. Width is
+    // estimated from the font size (the painter draws left-to-right from x; we shift
+    // x by an approximate label advance: digits ≈ 0.6 em each, '.' ≈ 0.28 em).
+    const w = fontSize * (0.6 * (label.length - 1) + 0.28);
+    boxes.push({
+      kind: 'text',
+      x: contentLeft - gap - w, y: lineTop, w, h: lineH,
+      style, tag: 'li::marker', el, text: label,
+    });
+  }
+}
+
+function toRoman(n) {
+  const table = [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];
+  let out = '';
+  for (const [v, s] of table) { while (n >= v) { out += s; n -= v; } }
+  return out;
 }
 
 // parseColor / parsePx are re-exported from ./utils.js at the top of this file.
