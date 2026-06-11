@@ -94,7 +94,7 @@ export async function layout(html, { width, height }) {
 
     const root = idoc.documentElement;
     const boxes = [];
-    walk(root, idoc, boxes, { prefix: [], seq: { n: 0 }, clips: [] });
+    walk(root, idoc, boxes, { prefix: [], seq: { n: 0 }, clips: [], tfms: [] });
     // (debug logs removed after sanity)
 
     return { boxes, width, height };
@@ -142,6 +142,26 @@ function walk(el, idoc, boxes, ctx) {
   const cs = idoc.defaultView.getComputedStyle(el);
   if (cs.display === 'none' || cs.visibility === 'hidden') return;
 
+  // ── CSS transform: measure the subtree UNTRANSFORMED, paint with a PDF cm ──
+  // Transforms never affect layout, so disabling one only changes this element's
+  // own rendering: every descendant rect we measure afterwards is in the local
+  // (untransformed) space, which is exactly what the painter needs to replay the
+  // matrix around transform-origin. Restored after the subtree walk.
+  let tfmEntry = null;
+  let savedInlineTransform = null;
+  const transformStr = cs.transform;
+  if (transformStr && transformStr !== 'none' && el.style) {
+    const m = parseCssMatrix(transformStr);
+    if (m) {
+      const originStr = cs.transformOrigin || '0px 0px';
+      savedInlineTransform = el.style.getPropertyValue('transform');
+      el.style.setProperty('transform', 'none', 'important');
+      const urect = el.getBoundingClientRect();  // untransformed now
+      const op = originStr.split(/\s+/).map(parseFloat);
+      tfmEntry = { m, ox: urect.left + (op[0] || 0), oy: urect.top + (op[1] || 0) };
+    }
+  }
+
   const rect = el.getBoundingClientRect();
   // We treat the iframe's own scrolling root as the coordinate origin (rect is relative
   // to the iframe viewport). The walker doesn't currently handle scrolled content.
@@ -151,7 +171,7 @@ function walk(el, idoc, boxes, ctx) {
   const zRaw = cs.zIndex;
   const isCtx = (positioned && zRaw !== 'auto')
     || parseFloat(cs.opacity || '1') < 1
-    || (cs.transform && cs.transform !== 'none');
+    || (transformStr && transformStr !== 'none');
   let myPrefix = ctx.prefix;
   if (isCtx) {
     const z = zRaw === 'auto' ? 0 : (parseInt(zRaw, 10) || 0);
@@ -183,7 +203,14 @@ function walk(el, idoc, boxes, ctx) {
     }];
   }
   const clipsForChildren = childClips.length ? childClips : undefined;
-  const childCtx = { prefix: myPrefix, seq: ctx.seq, clips: childClips };
+  const myTfms = tfmEntry ? [...(ctx.tfms || []), tfmEntry] : (ctx.tfms || []);
+  const tfms = myTfms.length ? myTfms : undefined;
+  const childCtx = { prefix: myPrefix, seq: ctx.seq, clips: childClips, tfms: myTfms };
+  const restoreTransform = () => {
+    if (!tfmEntry) return;
+    if (savedInlineTransform) el.style.setProperty('transform', savedInlineTransform);
+    else el.style.removeProperty('transform');
+  };
 
   const style = {
     backgroundColor: cs.backgroundColor,
@@ -237,7 +264,7 @@ function walk(el, idoc, boxes, ctx) {
       kind: 'box',
       x: rect.left, y: rect.top, w: rect.width, h: rect.height,
       style, tag: el.tagName.toLowerCase(), el,
-      sortKey: key(bgPhase), clips: clipsForSelf,
+      sortKey: key(bgPhase), clips: clipsForSelf, tfms,
     });
   }
 
@@ -249,7 +276,9 @@ function walk(el, idoc, boxes, ctx) {
     for (let i = before; i < boxes.length; i++) {
       boxes[i].sortKey = key(5);
       boxes[i].clips = clipsForChildren;
+      boxes[i].tfms = tfms;
     }
+    restoreTransform();
     return;  // skip generic recursion for SVG children
   }
 
@@ -290,7 +319,7 @@ function walk(el, idoc, boxes, ctx) {
         tag: el.tagName.toLowerCase(),
         el,
         text: displayText,
-        sortKey: key(5), clips: clipsForChildren,
+        sortKey: key(5), clips: clipsForChildren, tfms,
       });
     }
   }
@@ -302,7 +331,7 @@ function walk(el, idoc, boxes, ctx) {
       x: rect.left, y: rect.top, w: rect.width, h: rect.height,
       style, tag: 'img', el,
       src: el.currentSrc || el.src || '',
-      sortKey: key(5), clips: clipsForSelf,
+      sortKey: key(5), clips: clipsForSelf, tfms,
     });
   }
 
@@ -347,6 +376,7 @@ function walk(el, idoc, boxes, ctx) {
       for (let i = before; i < boxes.length; i++) {
         boxes[i].sortKey = key(5);
         boxes[i].clips = clipsForChildren;
+        boxes[i].tfms = tfms;
       }
     } else if (child.nodeType === 1) {
       walk(child, idoc, boxes, childCtx);
@@ -358,12 +388,31 @@ function walk(el, idoc, boxes, ctx) {
   if (isListItem) {
     const firstText = boxes.slice(liMarkerFixupIndex).find(b => b.kind === 'text');
     const before = boxes.length;
-    pushListMarker(el, cs, rect, boxes, style, firstText);
+    pushListMarker(el, cs, rect, boxes, style, firstText, idoc);
     for (let i = before; i < boxes.length; i++) {
       boxes[i].sortKey = key(5);
       boxes[i].clips = clipsForChildren;
+      boxes[i].tfms = tfms;
     }
   }
+
+  restoreTransform();
+}
+
+/** Parse "matrix(a,b,c,d,e,f)" / "matrix3d(...)" into [a,b,c,d,e,f] (2D part). */
+function parseCssMatrix(s) {
+  let m = /^matrix\(([^)]+)\)$/.exec(s);
+  if (m) {
+    const v = m[1].split(',').map(parseFloat);
+    return v.length === 6 && v.every(isFinite) ? v : null;
+  }
+  m = /^matrix3d\(([^)]+)\)$/.exec(s);
+  if (m) {
+    const v = m[1].split(',').map(parseFloat);
+    if (v.length !== 16 || !v.every(isFinite)) return null;
+    return [v[0], v[1], v[4], v[5], v[12], v[13]];
+  }
+  return null;
 }
 
 /**
@@ -512,7 +561,7 @@ function pushWordBoxes(node, idoc, boxes, style, el) {
  * @param {Object} style  captured style of the li
  * @param {Object|undefined} firstText  first text box inside the li (for baseline alignment)
  */
-function pushListMarker(el, cs, rect, boxes, style, firstText) {
+function pushListMarker(el, cs, rect, boxes, style, firstText, idoc) {
   const type = cs.listStyleType;
   const fontSize = parsePx(cs.fontSize) || 12;
   const contentLeft = rect.left + parsePx(cs.borderLeftWidth) + parsePx(cs.paddingLeft);
@@ -553,13 +602,21 @@ function pushListMarker(el, cs, rect, boxes, style, firstText) {
     else if (type === 'lower-roman') label = toRoman(index).toLowerCase() + '.';
     else if (type === 'upper-roman') label = toRoman(index) + '.';
     else label = index + '.';
-    // Right-align the label so it ends `gap` px before the content box. Width is
-    // estimated from the font size (the painter draws left-to-right from x; we shift
-    // x by an approximate label advance: digits ≈ 0.6 em each, '.' ≈ 0.28 em).
-    const w = fontSize * (0.6 * (label.length - 1) + 0.28);
+    // Right-align the label so it ends 7px before the content box (Blink's
+    // kCMarkerPaddingPx — text markers sit closer than the disc's optical gap).
+    // Measure the label's real advance with the iframe's canvas; fall back to a
+    // digit-width estimate if measurement is unavailable.
+    let w = fontSize * (0.6 * (label.length - 1) + 0.28);
+    try {
+      let ctx = idoc.__pdfMeasureCtx;
+      if (!ctx) ctx = idoc.__pdfMeasureCtx = idoc.createElement('canvas').getContext('2d');
+      ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      const tw = ctx.measureText(label).width;
+      if (tw > 0) w = tw;
+    } catch { /* keep estimate */ }
     boxes.push({
       kind: 'text',
-      x: contentLeft - gap - w, y: lineTop, w, h: lineH,
+      x: contentLeft - 7 - w, y: lineTop, w, h: lineH,
       style, tag: 'li::marker', el, text: label,
     });
   }

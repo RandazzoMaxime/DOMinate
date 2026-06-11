@@ -1,0 +1,21 @@
+{
+  "viewport": {
+    "width": 1123,
+    "height": 794
+  },
+  "screenshotScale": 1,
+  "expectedLinks": [
+    "https://helix.corsica/transform-bench"
+  ],
+  "expectedTextFragments": [
+    "Transform Bench",
+    "rotate(−6°)",
+    "rotate(4°)",
+    "scale(1.18)",
+    "translate(−24, 18)",
+    "combined",
+    "origin top-left",
+    "skewX(−12°)",
+    "Nested matrices"
+  ]
+}

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Torture — CSS transforms</title>
+<style>
+  @font-face { font-family: 'Inter'; font-weight: 400; src: url('/assets/fonts/Inter-400.ttf') format('truetype'); }
+  @font-face { font-family: 'Inter'; font-weight: 600; src: url('/assets/fonts/Inter-600.ttf') format('truetype'); }
+  @font-face { font-family: 'Inter'; font-weight: 700; src: url('/assets/fonts/Inter-700.ttf') format('truetype'); }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1123px; height: 794px; overflow: hidden; }
+  body { font-family: 'Inter', sans-serif; background: #f2f4f7; color: #222a36; padding: 30px 40px; }
+  h1 { font-size: 24px; font-weight: 700; }
+  .sub { font-size: 12px; color: #76808f; margin-bottom: 26px; }
+
+  .stage { position: relative; height: 620px; }
+
+  .card {
+    position: absolute; width: 230px; min-height: 130px; background: #ffffff;
+    border: 1px solid #d6dce6; border-radius: 8px; padding: 14px;
+  }
+  .card h2 { font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #36415a; }
+  .card p { font-size: 11px; line-height: 1.5; color: #5a6475; }
+
+  .t-rot-left   { left: 0;   top: 0;   transform: rotate(-6deg); background: #fff8ec; }
+  .t-rot-right  { left: 280; top: 0;   left: 280px; transform: rotate(4deg); }
+  .t-scale      { left: 560px; top: 10px; transform: scale(1.18); background: #eef6ff; }
+  .t-translate  { left: 860px; top: 0;  transform: translate(-24px, 18px); }
+  .t-combo      { left: 30px;  top: 230px; transform: rotate(8deg) scale(0.92) translate(10px, -6px); background: #f3ecff; }
+  .t-origin     { left: 320px; top: 240px; transform: rotate(-10deg); transform-origin: top left; }
+  .t-skew       { left: 620px; top: 250px; transform: skewX(-12deg); background: #eafaf0; }
+
+  .nested-outer {
+    position: absolute; left: 880px; top: 250px; width: 200px; height: 170px;
+    background: #1c2330; border-radius: 10px; padding: 16px;
+    transform: rotate(7deg);
+  }
+  .nested-outer h2 { color: #d9e2f2; font-size: 13px; margin-bottom: 8px; }
+  .nested-inner {
+    background: #ee6c4d; color: #ffffff; border-radius: 6px;
+    padding: 10px; font-size: 11px; line-height: 1.45;
+    transform: rotate(-14deg) scale(0.95);
+  }
+
+  .ribbon {
+    position: absolute; left: 360px; top: 470px; width: 420px; padding: 10px 0;
+    background: linear-gradient(90deg, #b3261e, #e46962);
+    color: #fff; text-align: center; font-weight: 700; font-size: 15px;
+    letter-spacing: 3px; transform: rotate(-3deg);
+    border-radius: 4px;
+  }
+
+  .footer { position: absolute; bottom: 0; left: 40px; font-size: 12px; color: #5a6475; }
+  .footer a { color: #1b6ca8; }
+</style>
+</head>
+<body>
+  <h1>Transform Bench</h1>
+  <div class="sub">rotate · scale · translate · skew · combined · nested · transform-origin — fixture 10</div>
+
+  <div class="stage">
+    <div class="card t-rot-left"><h2>rotate(−6°)</h2><p>A tilted card whose border, fill and two lines of text must all rotate together about its centre.</p></div>
+    <div class="card t-rot-right"><h2>rotate(4°)</h2><p>Opposite tilt, default origin at the centre of the border box.</p></div>
+    <div class="card t-scale"><h2>scale(1.18)</h2><p>Uniform enlargement — strokes thicken and glyph outlines grow with the matrix.</p></div>
+    <div class="card t-translate"><h2>translate(−24, 18)</h2><p>Pure offset; the layout slot stays where it was, the pixels move.</p></div>
+    <div class="card t-combo"><h2>combined</h2><p>rotate(8°) scale(0.92) translate(10, −6) — order matters and must match.</p></div>
+    <div class="card t-origin"><h2>origin top-left</h2><p>Same rotation but hinged at the top-left corner instead of the centre.</p></div>
+    <div class="card t-skew"><h2>skewX(−12°)</h2><p>Horizontal shear — verticals lean while horizontals stay level.</p></div>
+
+    <div class="nested-outer">
+      <h2>Nested matrices</h2>
+      <div class="nested-inner">Inner box counter-rotated −14° and scaled 0.95 inside a +7° parent.</div>
+    </div>
+
+    <div class="ribbon">PIXEL-FAITHFUL ROTATION</div>
+  </div>
+
+  <p class="footer">Every box above is positioned absolutely, then transformed — notes at <a href="https://helix.corsica/transform-bench">helix.corsica/transform-bench</a>.</p>
+</body>
+</html>

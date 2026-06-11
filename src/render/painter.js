@@ -27,8 +27,15 @@ export function paint(doc, fontMap, page, boxes /*, pageHeightCssPx (unused) */)
 
   for (const { b } of order) {
     const clipped = b.clips && b.clips.length;
-    if (clipped) {
+    const transformed = b.tfms && b.tfms.length;
+    if (clipped || transformed) {
       page.saveState();
+      // CSS transforms replay outermost-first via cm; the box coordinates were
+      // measured with the transform disabled, so the matrix recreates Chromium's
+      // rendering around transform-origin.
+      if (transformed) for (const t of b.tfms) emitCssTransform(page, t, pageHeightPdf);
+    }
+    if (clipped) {
       for (const c of b.clips) {
         const csx = Math.round(c.x), csy = Math.round(c.y);
         const csw = Math.round(c.x + c.w) - csx, csh = Math.round(c.y + c.h) - csy;
@@ -59,12 +66,30 @@ export function paint(doc, fontMap, page, boxes /*, pageHeightCssPx (unused) */)
       case 'svg-text':    paintSvgText(page, fontMap, b, pageHeightPdf); break;
       case 'bullet':      paintBullet(page, b, pageHeightPdf); break;
     }
-    if (clipped) page.restoreState();
+    if (clipped || transformed) page.restoreState();
   }
 
   for (const b of boxes) {
     if (b.kind === 'link') paintLink(page, b, pageHeightPdf);
   }
+}
+
+/**
+ * Replay a CSS transform as a PDF cm. CSS matrix(a,b,c,d,e,f) maps a y-down point
+ * p to O + A·(p−O) + t around the absolute origin O. Conjugating by the CSS→PDF
+ * mapping P(x,y) = (x·k, H − y·k) gives the PDF 2×2 [a, −b, −c, d]; the
+ * translation falls out of the fixed-point identity device(P(O)) = P(O + t).
+ */
+function emitCssTransform(page, t, pageHeightPdf) {
+  const [a, bb, c, d, e, f] = t.m;
+  const Ca = a, Cb = -bb, Cc = -c, Cd = d;
+  const Px = (x) => x * CSS_TO_PDF;
+  const Py = (y) => cssYToPdfY(y, pageHeightPdf);
+  const ox = Px(t.ox), oy = Py(t.oy);              // P(O)
+  const tx = Px(t.ox + e), ty = Py(t.oy + f);      // P(O + t)
+  const ex = tx - (Ca * ox + Cc * oy);
+  const ey = ty - (Cb * ox + Cd * oy);
+  page._push(`${num(Ca)} ${num(Cb)} ${num(Cc)} ${num(Cd)} ${num(ex)} ${num(ey)} cm\n`);
 }
 
 /** Lexicographic compare of sortKey arrays; missing entries sort first. */
