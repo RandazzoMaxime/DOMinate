@@ -74,7 +74,7 @@ export async function layout(html, { width, height }) {
 
     const root = idoc.documentElement;
     const boxes = [];
-    walk(root, idoc, boxes, 0, 0);
+    walk(root, idoc, boxes, { prefix: [], seq: { n: 0 }, clips: [] });
     // (debug logs removed after sanity)
 
     return { boxes, width, height };
@@ -89,7 +89,17 @@ export { parseColor, parsePx };
 
 const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'LINK', 'META', 'TITLE', 'HEAD', 'NOSCRIPT']);
 
-function walk(el, idoc, boxes, parentX, parentY) {
+/**
+ * CSS 2.1 Appendix E paint-order approximation. Every render box receives a
+ * lexicographic sortKey; the painter stable-sorts before painting.
+ * Within a stacking context: phase 1 = the context root's own background,
+ * phase 2 = negative-z child contexts, phase 3 = in-flow block backgrounds/borders,
+ * phase 5 = inline content (text, images, svg, bullets), phase 6 = positioned
+ * z:auto/0 descendants + contexts, phase 7 = positive-z child contexts.
+ *
+ * ctx = { prefix: number[], seq: { n }, clips: [{x,y,w,h,radii}] }
+ */
+function walk(el, idoc, boxes, ctx) {
   // Use nodeType (constant across realms) instead of `instanceof Element`, since
   // elements coming from the iframe's contentDocument are instances of *its* Element
   // class, not the host window's. `instanceof` would silently bail out and we'd
@@ -103,6 +113,45 @@ function walk(el, idoc, boxes, parentX, parentY) {
   const rect = el.getBoundingClientRect();
   // We treat the iframe's own scrolling root as the coordinate origin (rect is relative
   // to the iframe viewport). The walker doesn't currently handle scrolled content.
+
+  // ── stacking-context bookkeeping ──────────────────────────────────────────
+  const positioned = cs.position !== 'static';
+  const zRaw = cs.zIndex;
+  const isCtx = (positioned && zRaw !== 'auto')
+    || parseFloat(cs.opacity || '1') < 1
+    || (cs.transform && cs.transform !== 'none');
+  let myPrefix = ctx.prefix;
+  if (isCtx) {
+    const z = zRaw === 'auto' ? 0 : (parseInt(zRaw, 10) || 0);
+    myPrefix = [...ctx.prefix, z < 0 ? 2 : z > 0 ? 7 : 6, z, ctx.seq.n++];
+  } else if (positioned) {
+    myPrefix = [...ctx.prefix, 6, 0, ctx.seq.n++];
+  }
+  // Own background paints first inside the element's own slot; for static elements
+  // (myPrefix === ctx.prefix) it lands in the shared block-background phase 3.
+  const bgPhase = (isCtx || positioned) ? 1 : 3;
+  const clipsForSelf = ctx.clips.length ? ctx.clips : undefined;
+  const key = (phase) => [...myPrefix, phase, ctx.seq.n++];
+
+  // ── overflow clip for descendants (Chromium clips to the padding box) ────
+  let childClips = ctx.clips;
+  const ov = cs.overflow || '';
+  if (ov !== 'visible' && ov !== '' && rect.width > 0 && rect.height > 0) {
+    const bl = parsePx(cs.borderLeftWidth), br = parsePx(cs.borderRightWidth);
+    const bt = parsePx(cs.borderTopWidth), bb = parsePx(cs.borderBottomWidth);
+    childClips = [...ctx.clips, {
+      x: rect.left + bl, y: rect.top + bt,
+      w: rect.width - bl - br, h: rect.height - bt - bb,
+      radii: {
+        tl: Math.max(0, parsePx(cs.borderTopLeftRadius) - Math.max(bl, bt)),
+        tr: Math.max(0, parsePx(cs.borderTopRightRadius) - Math.max(br, bt)),
+        br: Math.max(0, parsePx(cs.borderBottomRightRadius) - Math.max(br, bb)),
+        bl: Math.max(0, parsePx(cs.borderBottomLeftRadius) - Math.max(bl, bb)),
+      },
+    }];
+  }
+  const clipsForChildren = childClips.length ? childClips : undefined;
+  const childCtx = { prefix: myPrefix, seq: ctx.seq, clips: childClips };
 
   const style = {
     backgroundColor: cs.backgroundColor,
@@ -149,13 +198,19 @@ function walk(el, idoc, boxes, parentX, parentY) {
       kind: 'box',
       x: rect.left, y: rect.top, w: rect.width, h: rect.height,
       style, tag: el.tagName.toLowerCase(), el,
+      sortKey: key(bgPhase), clips: clipsForSelf,
     });
   }
 
   // SVG: emit shapes as a flat list of svg-* boxes; do NOT recurse via the HTML walker
   // (SVG children have a different attribute model).
   if (el.tagName.toLowerCase() === 'svg') {
+    const before = boxes.length;
     walkSvg(el, boxes, idoc);
+    for (let i = before; i < boxes.length; i++) {
+      boxes[i].sortKey = key(5);
+      boxes[i].clips = clipsForChildren;
+    }
     return;  // skip generic recursion for SVG children
   }
 
@@ -196,6 +251,7 @@ function walk(el, idoc, boxes, parentX, parentY) {
         tag: el.tagName.toLowerCase(),
         el,
         text: displayText,
+        sortKey: key(5), clips: clipsForChildren,
       });
     }
   }
@@ -207,6 +263,7 @@ function walk(el, idoc, boxes, parentX, parentY) {
       x: rect.left, y: rect.top, w: rect.width, h: rect.height,
       style, tag: 'img', el,
       src: el.currentSrc || el.src || '',
+      sortKey: key(5), clips: clipsForSelf,
     });
   }
 
@@ -246,9 +303,14 @@ function walk(el, idoc, boxes, parentX, parentY) {
       const raw = child.nodeValue;
       if (!raw || !raw.trim()) continue;
       if (isIconFont) continue;
+      const before = boxes.length;
       pushWordBoxes(child, idoc, boxes, style, el);
+      for (let i = before; i < boxes.length; i++) {
+        boxes[i].sortKey = key(5);
+        boxes[i].clips = clipsForChildren;
+      }
     } else if (child.nodeType === 1) {
-      walk(child, idoc, boxes, parentX, parentY);
+      walk(child, idoc, boxes, childCtx);
     }
   }
 
@@ -256,7 +318,12 @@ function walk(el, idoc, boxes, parentX, parentY) {
   // the marker aligned to that first line.
   if (isListItem) {
     const firstText = boxes.slice(liMarkerFixupIndex).find(b => b.kind === 'text');
+    const before = boxes.length;
     pushListMarker(el, cs, rect, boxes, style, firstText);
+    for (let i = before; i < boxes.length; i++) {
+      boxes[i].sortKey = key(5);
+      boxes[i].clips = clipsForChildren;
+    }
   }
 }
 

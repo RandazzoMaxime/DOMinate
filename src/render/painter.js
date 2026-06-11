@@ -17,26 +17,63 @@ import { encodeTextAsHex } from '../core/fonts/embed.js';
 export function paint(doc, fontMap, page, boxes /*, pageHeightCssPx (unused) */) {
   const pageHeightPdf = page.height;  // PDF user units
 
-  // Draw boxes first (background/border), then images, then SVG shapes, then text, then links.
-  for (const b of boxes) {
-    if (b.kind === 'box') paintBox(doc, page, b, pageHeightPdf);
+  // Single ordered pass: every box carries a lexicographic sortKey assigned by the
+  // walker (CSS 2.1 Appendix E phases within stacking contexts). Stable sort, then
+  // paint each box with its overflow clip chain applied.
+  const order = boxes
+    .map((b, i) => ({ b, i }))
+    .filter(({ b }) => b.kind !== 'link')
+    .sort((A, B) => cmpSortKeys(A.b.sortKey, B.b.sortKey) || (A.i - B.i));
+
+  for (const { b } of order) {
+    const clipped = b.clips && b.clips.length;
+    if (clipped) {
+      page.saveState();
+      for (const c of b.clips) {
+        const cx = c.x * CSS_TO_PDF;
+        const cy = cssYToPdfY(c.y + c.h, pageHeightPdf);
+        const cw = c.w * CSS_TO_PDF;
+        const ch = c.h * CSS_TO_PDF;
+        const r = c.radii || {};
+        if ((r.tl || 0) + (r.tr || 0) + (r.br || 0) + (r.bl || 0) > 0) {
+          page.pathRoundedRect(cx, cy, cw, ch, {
+            tl: (r.tl || 0) * CSS_TO_PDF, tr: (r.tr || 0) * CSS_TO_PDF,
+            br: (r.br || 0) * CSS_TO_PDF, bl: (r.bl || 0) * CSS_TO_PDF,
+          });
+        } else {
+          page._push(`${num(cx)} ${num(cy)} ${num(cw)} ${num(ch)} re\n`);
+        }
+        page.clipPath();
+      }
+    }
+    switch (b.kind) {
+      case 'box':         paintBox(doc, page, b, pageHeightPdf); break;
+      case 'image':       if (b.embedded) paintImage(page, b, pageHeightPdf); break;
+      case 'svg-rect':    paintSvgRect(page, b, pageHeightPdf, doc); break;
+      case 'svg-line':    paintSvgLine(page, b, pageHeightPdf, doc); break;
+      case 'svg-ellipse': paintSvgEllipse(page, b, pageHeightPdf, doc); break;
+      case 'text':        paintText(page, fontMap, b, pageHeightPdf, doc); break;
+      case 'svg-text':    paintSvgText(page, fontMap, b, pageHeightPdf); break;
+      case 'bullet':      paintBullet(page, b, pageHeightPdf); break;
+    }
+    if (clipped) page.restoreState();
   }
-  for (const b of boxes) {
-    if (b.kind === 'image' && b.embedded) paintImage(page, b, pageHeightPdf);
-  }
-  for (const b of boxes) {
-    if (b.kind === 'svg-rect')    paintSvgRect(page, b, pageHeightPdf, doc);
-    if (b.kind === 'svg-line')    paintSvgLine(page, b, pageHeightPdf, doc);
-    if (b.kind === 'svg-ellipse') paintSvgEllipse(page, b, pageHeightPdf, doc);
-  }
-  for (const b of boxes) {
-    if (b.kind === 'text') paintText(page, fontMap, b, pageHeightPdf, doc);
-    if (b.kind === 'svg-text') paintSvgText(page, fontMap, b, pageHeightPdf);
-    if (b.kind === 'bullet') paintBullet(page, b, pageHeightPdf);
-  }
+
   for (const b of boxes) {
     if (b.kind === 'link') paintLink(page, b, pageHeightPdf);
   }
+}
+
+/** Lexicographic compare of sortKey arrays; missing entries sort first. */
+function cmpSortKeys(a, b) {
+  a = a || []; b = b || [];
+  const n = Math.max(a.length, b.length);
+  for (let i = 0; i < n; i++) {
+    const x = a[i] !== undefined ? a[i] : -1;
+    const y = b[i] !== undefined ? b[i] : -1;
+    if (x !== y) return x - y;
+  }
+  return 0;
 }
 
 function paintSvgRect(page, b, pageHeightPdf, doc) {
