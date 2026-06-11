@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Torture — SVG paths, polygons, charts</title>
+<style>
+  @font-face { font-family: 'Inter'; font-weight: 400; src: url('/assets/fonts/Inter-400.ttf') format('truetype'); }
+  @font-face { font-family: 'Inter'; font-weight: 600; src: url('/assets/fonts/Inter-600.ttf') format('truetype'); }
+  @font-face { font-family: 'Inter'; font-weight: 700; src: url('/assets/fonts/Inter-700.ttf') format('truetype'); }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1123px; height: 794px; overflow: hidden; }
+  body { font-family: 'Inter', sans-serif; background: #ffffff; color: #1d2433; padding: 26px 38px; }
+  h1 { font-size: 24px; font-weight: 700; }
+  .sub { font-size: 12px; color: #76808f; margin-bottom: 14px; }
+  .wrap { display: flex; gap: 26px; }
+  .chartbox { border: 1px solid #dde2ea; border-radius: 8px; padding: 10px; background: #fcfdff; }
+  .legend { font-size: 12px; line-height: 1.7; max-width: 240px; }
+  .legend h2 { font-size: 13px; font-weight: 600; margin: 10px 0 4px; }
+  .legend a { color: #1b6ca8; }
+  .chip { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
+</style>
+</head>
+<body>
+  <h1>Vector Scheme Bench</h1>
+  <div class="sub">paths M/L/C/Q/A, polygon, polyline, dasharray, linecaps — fixture 08</div>
+
+  <div class="wrap">
+    <div class="chartbox">
+      <svg width="780" height="640" viewBox="0 0 780 640">
+        <!-- chart frame + dashed grid -->
+        <rect x="50" y="20" width="700" height="300" fill="#ffffff" stroke="#2b3447" stroke-width="1.5"/>
+        <line x1="50" y1="95"  x2="750" y2="95"  stroke="#c3cad6" stroke-width="1" stroke-dasharray="6 4"/>
+        <line x1="50" y1="170" x2="750" y2="170" stroke="#c3cad6" stroke-width="1" stroke-dasharray="6 4"/>
+        <line x1="50" y1="245" x2="750" y2="245" stroke="#c3cad6" stroke-width="1" stroke-dasharray="6 4"/>
+
+        <!-- filled area under curve (polygon) -->
+        <polygon points="50,320 50,250 150,210 250,230 350,150 450,170 550,90 650,120 750,60 750,320"
+                 fill="#cfe3f5" fill-opacity="0.7" stroke="none"/>
+        <!-- the curve itself (polyline) -->
+        <polyline points="50,250 150,210 250,230 350,150 450,170 550,90 650,120 750,60"
+                  fill="none" stroke="#1b6ca8" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+        <!-- second series, dashed -->
+        <polyline points="50,290 150,275 250,255 350,235 450,225 550,190 650,175 750,150"
+                  fill="none" stroke="#c44536" stroke-width="2" stroke-dasharray="8 5"/>
+        <!-- data points -->
+        <circle cx="350" cy="150" r="6" fill="#1b6ca8"/>
+        <circle cx="550" cy="90"  r="6" fill="#1b6ca8"/>
+        <circle cx="750" cy="60"  r="6" fill="#ffffff" stroke="#1b6ca8" stroke-width="2.5"/>
+
+        <!-- axis labels -->
+        <text x="50"  y="345" font-size="12" fill="#5a6475">JAN</text>
+        <text x="385" y="345" font-size="12" fill="#5a6475">JUL</text>
+        <text x="722" y="345" font-size="12" fill="#5a6475">DEC</text>
+
+        <!-- star — path with M/L/Z -->
+        <path d="M 130 480 L 152 424 L 174 480 L 234 484 L 188 522 L 202 580 L 152 548 L 102 580 L 116 522 L 70 484 Z"
+              fill="#f2b134" stroke="#a36f10" stroke-width="2" stroke-linejoin="round"/>
+
+        <!-- heart — cubic Béziers -->
+        <path d="M 340 470 C 340 440 310 425 290 445 C 270 425 240 440 240 470 C 240 505 290 540 290 540 C 290 540 340 505 340 470 Z"
+              fill="#d64550"/>
+
+        <!-- pie wedge — arc command -->
+        <path d="M 470 500 L 470 420 A 80 80 0 0 1 539 540 Z" fill="#0b6e4f" fill-opacity="0.9"/>
+        <path d="M 462 508 L 393 548 A 80 80 0 0 1 462 428 Z" fill="#87b38d"/>
+
+        <!-- quadratic blob -->
+        <path d="M 620 430 Q 700 410 710 480 Q 715 545 650 555 Q 585 560 580 500 Q 578 445 620 430 Z"
+              fill="#5d3fd3" fill-opacity="0.25" stroke="#5d3fd3" stroke-width="2.5"/>
+
+        <!-- rotated group: diamonds -->
+        <g transform="translate(420,590) rotate(-12)">
+          <rect x="0" y="0" width="26" height="26" fill="#ee6c4d"/>
+          <rect x="40" y="0" width="26" height="26" fill="#3d5a80"/>
+          <rect x="80" y="0" width="26" height="26" fill="#98c1d9"/>
+        </g>
+
+        <text x="70" y="610" font-size="13" font-weight="600" fill="#1d2433">shape bench</text>
+      </svg>
+    </div>
+
+    <div class="legend">
+      <h2>Series</h2>
+      <p><span class="chip" style="background:#1b6ca8"></span>Adjusted heights (solid, round caps)</p>
+      <p><span class="chip" style="background:#c44536"></span>Raw observations (dashed)</p>
+      <h2>Shapes</h2>
+      <p>Ten-point star via line segments, heart via cubic Béziers, two pie wedges via elliptical arcs, blob via quadratics, plus a rotated group of squares.</p>
+      <h2>Reference</h2>
+      <p>Spec notes at <a href="https://helix.corsica/svg-bench">helix.corsica/svg-bench</a>.</p>
+    </div>
+  </div>
+</body>
+</html>

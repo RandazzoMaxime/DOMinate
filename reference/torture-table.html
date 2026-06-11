@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Torture — tables, collapse, spans</title>
+<style>
+  @font-face { font-family: 'Inter'; font-weight: 400; src: url('/assets/fonts/Inter-400.ttf') format('truetype'); }
+  @font-face { font-family: 'Inter'; font-weight: 500; src: url('/assets/fonts/Inter-500.ttf') format('truetype'); }
+  @font-face { font-family: 'Inter'; font-weight: 600; src: url('/assets/fonts/Inter-600.ttf') format('truetype'); }
+  @font-face { font-family: 'Inter'; font-weight: 700; src: url('/assets/fonts/Inter-700.ttf') format('truetype'); }
+  @font-face { font-family: 'JetBrains Mono'; font-weight: 400; src: url('/assets/fonts/JetBrainsMono-Regular.ttf') format('truetype'); }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1123px; height: 794px; overflow: hidden; }
+  body { font-family: 'Inter', sans-serif; background: #fbfbfd; color: #232936; padding: 28px 40px; }
+
+  h1 { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+  .sub { font-size: 12px; color: #76808f; margin-bottom: 20px; }
+
+  table.collapse {
+    border-collapse: collapse; width: 100%; font-size: 12px;
+    background: #ffffff;
+  }
+  table.collapse caption {
+    caption-side: top; text-align: left; font-size: 13px; font-weight: 600;
+    color: #36415a; padding-bottom: 8px;
+  }
+  table.collapse th {
+    background: #36415a; color: #ffffff; text-transform: uppercase;
+    font-size: 10px; letter-spacing: 1.2px; font-weight: 600;
+    padding: 8px 12px; text-align: left; border: 1px solid #2b3447;
+  }
+  table.collapse td { border: 1px solid #cfd6e2; padding: 7px 12px; }
+  table.collapse tr.zebra td { background: #f0f3f9; }
+  table.collapse td.num { text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  table.collapse td.ok   { color: #1e7a46; font-weight: 600; }
+  table.collapse td.warn { color: #b3541e; font-weight: 600; }
+  table.collapse td.rowhead { background: #e7ebf3; font-weight: 600; }
+  table.collapse tfoot td { background: #36415a; color: #ffffff; font-weight: 600; border: 1px solid #2b3447; }
+
+  .pair { display: flex; gap: 32px; margin-top: 24px; }
+
+  table.separate {
+    border-collapse: separate; border-spacing: 6px 4px; width: 100%; font-size: 12px;
+  }
+  table.separate th {
+    background: #0b6e4f; color: #fff; padding: 6px 10px; border-radius: 4px;
+    font-size: 11px; font-weight: 600; text-align: center;
+  }
+  table.separate td {
+    background: #ffffff; border: 1px solid #d2dad2; border-radius: 4px;
+    padding: 6px 10px; text-align: center;
+  }
+
+  .legend { flex: 1; background: #ffffff; border: 1px solid #dde2ea; border-radius: 8px; padding: 16px; font-size: 12px; }
+  .legend h2 { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+  .legend p { line-height: 1.6; color: #5a6475; margin-bottom: 6px; }
+  .legend a { color: #1b6ca8; }
+</style>
+</head>
+<body>
+  <h1>Observation Ledger</h1>
+  <div class="sub">border-collapse, row/col spans, zebra rows, mono columns — fixture 07</div>
+
+  <table class="collapse">
+    <caption>Control network observations — session A</caption>
+    <thead>
+      <tr>
+        <th>Station</th><th>Type</th><th>Easting (m)</th><th>Northing (m)</th>
+        <th>Height (m)</th><th>σ (mm)</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="rowhead" rowspan="2">ST-01</td>
+        <td>GNSS static</td><td class="num">1224501.336</td><td class="num">6112839.402</td>
+        <td class="num">412.038</td><td class="num">2.1</td><td class="ok">FIXED</td>
+      </tr>
+      <tr class="zebra">
+        <td>Total station</td><td class="num">1224501.339</td><td class="num">6112839.398</td>
+        <td class="num">412.041</td><td class="num">1.4</td><td class="ok">FIXED</td>
+      </tr>
+      <tr>
+        <td class="rowhead">ST-02</td>
+        <td>GNSS RTK</td><td class="num">1224388.107</td><td class="num">6112911.554</td>
+        <td class="num">408.775</td><td class="num">8.6</td><td class="warn">FLOAT</td>
+      </tr>
+      <tr class="zebra">
+        <td class="rowhead">ST-03</td>
+        <td>Levelling</td><td class="num">1224297.880</td><td class="num">6112774.026</td>
+        <td class="num">405.114</td><td class="num">0.8</td><td class="ok">FIXED</td>
+      </tr>
+      <tr>
+        <td class="rowhead">ST-04</td>
+        <td colspan="4">Session aborted — obstruction on line of sight, re-observe next window</td>
+        <td class="warn">SKIP</td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="5">Session total — 14 observations, 3 rejected</td>
+        <td class="num" style="color:#fff">3.2</td>
+        <td>CLOSED</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div class="pair">
+    <table class="separate">
+      <thead>
+        <tr><th>Δ axis</th><th>Min</th><th>Max</th><th>RMS</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>ΔX</td><td>−0.018</td><td>+0.022</td><td>0.009</td></tr>
+        <tr><td>ΔY</td><td>−0.031</td><td>+0.015</td><td>0.012</td></tr>
+        <tr><td>ΔZ</td><td>−0.007</td><td>+0.011</td><td>0.004</td></tr>
+      </tbody>
+    </table>
+
+    <div class="legend">
+      <h2>Reading the ledger</h2>
+      <p>The main table uses the collapsed border model with shared 1px grid lines, a dark header band and zebra striping on alternate body rows.</p>
+      <p>The summary table on the left uses the separate border model with 6×4px spacing and rounded cells.</p>
+      <p>Full processing notes at <a href="https://helix.corsica/ledger/session-a">helix.corsica/ledger</a> — raw data <a href="https://helix.corsica/ledger/raw">archive</a>.</p>
+    </div>
+  </div>
+</body>
+</html>

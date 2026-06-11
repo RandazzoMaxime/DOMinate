@@ -1,0 +1,16 @@
+{
+  "viewport": {
+    "width": 1123,
+    "height": 794
+  },
+  "screenshotScale": 1,
+  "expectedLinks": [
+    "https://helix.corsica/svg-bench"
+  ],
+  "expectedTextFragments": [
+    "Vector Scheme Bench",
+    "Series",
+    "Shapes",
+    "Reference"
+  ]
+}

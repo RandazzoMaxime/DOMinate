@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Torture — boxes, borders, gradients, shadows</title>
+<style>
+  @font-face { font-family: 'Inter'; font-weight: 400; src: url('/assets/fonts/Inter-400.ttf') format('truetype'); }
+  @font-face { font-family: 'Inter'; font-weight: 500; src: url('/assets/fonts/Inter-500.ttf') format('truetype'); }
+  @font-face { font-family: 'Inter'; font-weight: 600; src: url('/assets/fonts/Inter-600.ttf') format('truetype'); }
+  @font-face { font-family: 'Inter'; font-weight: 700; src: url('/assets/fonts/Inter-700.ttf') format('truetype'); }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1123px; height: 794px; overflow: hidden; }
+  body { font-family: 'Inter', sans-serif; background: #f4f5f7; color: #1c2330; }
+
+  .hero {
+    height: 110px;
+    background: linear-gradient(90deg, #0b3954 0%, #087e8b 35%, #ff5a5f 70%, #ffba49 100%);
+    color: #fff; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 36px;
+  }
+  .hero h1 { font-size: 26px; font-weight: 700; letter-spacing: 1px; }
+  .hero .tag {
+    background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.55);
+    border-radius: 16px; padding: 6px 18px; font-size: 13px; font-weight: 500;
+  }
+
+  .grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px;
+    padding: 22px 36px;
+  }
+  .card { background: #ffffff; border-radius: 8px; padding: 14px; min-height: 150px; }
+  .card h2 { font-size: 13px; font-weight: 600; margin-bottom: 8px; color: #45506b; }
+  .card p { font-size: 11px; line-height: 1.5; color: #6a7488; }
+
+  .c-sides {
+    border-top: 4px solid #d7263d; border-right: 2px dashed #1b6ca8;
+    border-bottom: 6px double #2a9134; border-left: 8px solid #f49d37;
+    border-radius: 0;
+  }
+  .c-corners { border: 2px dotted #5d3fd3; border-radius: 24px 0 32px 6px; }
+  .c-ellipse { border-radius: 48px / 22px; background: radial-gradient(circle, #fff3b0 0%, #e09f3e 100%); }
+  .c-radial  { background: radial-gradient(ellipse at top left, #cdeac0 0%, #4f9d69 60%, #1e5631 100%); color: #fff; }
+  .c-radial h2, .c-radial p { color: #eaf6e6; }
+  .c-hardshadow { box-shadow: 8px 8px 0 0 #c44536; }
+  .c-blurshadow { box-shadow: 6px 10px 14px rgba(20, 30, 60, 0.45); }
+  .c-multistop {
+    background: linear-gradient(135deg, #22223b 0%, #4a4e69 30%, #9a8c98 55%, #c9ada7 80%, #f2e9e4 100%);
+  }
+  .c-multistop h2, .c-multistop p { color: #ffffff; }
+
+  .c-overflow { position: relative; overflow: hidden; }
+  .c-overflow .blob {
+    position: absolute; width: 140px; height: 140px; border-radius: 50%;
+    background: #ee6c4d; right: -60px; bottom: -55px;
+  }
+  .c-overflow .blob2 {
+    position: absolute; width: 90px; height: 90px; border-radius: 50%;
+    background: #3d5a80; left: -35px; top: -30px; opacity: 0.85;
+  }
+
+  .strip { display: flex; gap: 18px; padding: 0 36px; }
+  .stack {
+    position: relative; width: 250px; height: 170px; background: #ffffff;
+    border-radius: 8px; flex: none;
+  }
+  .sq { position: absolute; width: 92px; height: 92px; border-radius: 10px; }
+  .sq-red   { background: #d64550; left: 18px;  top: 22px; z-index: 3; }
+  .sq-green { background: #3a7d44; left: 64px;  top: 48px; z-index: 1; }
+  .sq-blue  { background: #2978a0; left: 110px; top: 30px; z-index: 2; }
+  .stack .caption { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; font-size: 11px; color: #6a7488; }
+
+  .opa { flex: 1; background: #ffffff; border-radius: 8px; padding: 14px; }
+  .opa .outer { opacity: 0.55; background: #5d3fd3; border-radius: 6px; padding: 12px; }
+  .opa .inner { background: #ffffff; border-radius: 4px; padding: 8px; font-size: 11px; color: #22223b; }
+  .opa h2 { font-size: 13px; font-weight: 600; margin-bottom: 8px; color: #45506b; }
+
+  .alpha { flex: 1; border-radius: 8px; padding: 14px; background: rgba(41, 120, 160, 0.16); border: 1px solid rgba(41, 120, 160, 0.5); }
+  .alpha h2 { font-size: 13px; font-weight: 600; color: #2978a0; margin-bottom: 8px; }
+  .alpha p { font-size: 11px; color: #45506b; line-height: 1.5; }
+
+  .footer {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 56px;
+    background: #1c2330; color: #aab3c5; display: flex; align-items: center;
+    justify-content: space-between; padding: 0 36px; font-size: 12px;
+  }
+  .footer a { color: #7fd1b9; text-decoration: underline; }
+</style>
+</head>
+<body>
+  <div class="hero">
+    <h1>BOX MODEL TORTURE</h1>
+    <span class="tag">fixture 05 — decoration</span>
+  </div>
+
+  <div class="grid">
+    <div class="card c-sides"><h2>Per-side borders</h2><p>Top solid red 4px, right dashed blue 2px, bottom double green 6px, left solid orange 8px.</p></div>
+    <div class="card c-corners"><h2>Per-corner radius</h2><p>Dotted violet outline with radii 24 / 0 / 32 / 6 px around the box.</p></div>
+    <div class="card c-ellipse"><h2>Elliptical radius</h2><p>48px horizontal by 22px vertical rounding with a circular radial fill.</p></div>
+    <div class="card c-radial"><h2>Radial gradient</h2><p>Ellipse anchored at the top-left corner fading from pale green to deep forest.</p></div>
+    <div class="card c-hardshadow"><h2>Hard shadow</h2><p>Offset 8px / 8px with zero blur — a crisp brick-red copy behind the card.</p></div>
+    <div class="card c-blurshadow"><h2>Soft shadow</h2><p>Offset 6px / 10px with a 14px blur at 45% black — a realistic drop shadow.</p></div>
+    <div class="card c-multistop"><h2>Five-stop gradient</h2><p>135° axis through night blue, slate, mauve, rose and bone positions.</p></div>
+    <div class="card c-overflow"><h2>Overflow hidden</h2><p>Two circles clipped by the card box.</p><div class="blob"></div><div class="blob2"></div></div>
+  </div>
+
+  <div class="strip">
+    <div class="stack">
+      <div class="sq sq-green"></div>
+      <div class="sq sq-blue"></div>
+      <div class="sq sq-red"></div>
+      <div class="caption">z-index 3 / 2 / 1 stacking</div>
+    </div>
+    <div class="opa">
+      <h2>Nested opacity</h2>
+      <div class="outer"><div class="inner">Parent at 55% opacity, this child is opaque white inside it.</div></div>
+    </div>
+    <div class="alpha">
+      <h2>Alpha backgrounds</h2>
+      <p>This panel uses rgba() fills and borders over the page background, no solid paint anywhere.</p>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>HELIX · box decoration fixture</span>
+    <span><a href="https://helix.corsica/torture/box">spec sheet</a> · <a href="https://helix.corsica/torture">index</a></span>
+  </div>
+</body>
+</html>

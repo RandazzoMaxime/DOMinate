@@ -1,0 +1,23 @@
+{
+  "viewport": {
+    "width": 1123,
+    "height": 794
+  },
+  "screenshotScale": 1,
+  "expectedLinks": [
+    "https://helix.corsica/torture/box",
+    "https://helix.corsica/torture"
+  ],
+  "expectedTextFragments": [
+    "BOX MODEL TORTURE",
+    "Per-side borders",
+    "Per-corner radius",
+    "Elliptical radius",
+    "Radial gradient",
+    "Hard shadow",
+    "Soft shadow",
+    "Five-stop gradient",
+    "Overflow hidden",
+    "Nested opacity"
+  ]
+}

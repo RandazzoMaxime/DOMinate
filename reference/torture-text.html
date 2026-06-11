@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Torture — typography, lists, code, decorations</title>
+<style>
+  @font-face { font-family: 'Inter'; font-weight: 400; src: url('/assets/fonts/Inter-400.ttf') format('truetype'); }
+  @font-face { font-family: 'Inter'; font-weight: 500; src: url('/assets/fonts/Inter-500.ttf') format('truetype'); }
+  @font-face { font-family: 'Inter'; font-weight: 600; src: url('/assets/fonts/Inter-600.ttf') format('truetype'); }
+  @font-face { font-family: 'Inter'; font-weight: 700; src: url('/assets/fonts/Inter-700.ttf') format('truetype'); }
+  @font-face { font-family: 'JetBrains Mono'; font-weight: 400; src: url('/assets/fonts/JetBrainsMono-Regular.ttf') format('truetype'); }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1123px; height: 794px; overflow: hidden; }
+  body { font-family: 'Inter', sans-serif; background: #ffffff; color: #20242c; padding: 30px 42px; }
+
+  header { border-bottom: 3px solid #20242c; padding-bottom: 12px; margin-bottom: 18px; }
+  h1 { font-size: 28px; font-weight: 700; }
+  header .sub { font-size: 13px; color: #707a8a; margin-top: 4px; letter-spacing: 2px; text-transform: uppercase; }
+
+  .cols { display: flex; gap: 34px; }
+  .col { flex: 1; min-width: 0; }
+
+  h2 { font-size: 15px; font-weight: 600; margin: 14px 0 6px; color: #344055; }
+  p { font-size: 12px; line-height: 1.55; margin-bottom: 8px; }
+
+  .t-left    { text-align: left; }
+  .t-center  { text-align: center; }
+  .t-right   { text-align: right; }
+  .t-justify { text-align: justify; }
+
+  ul.disc   { list-style-type: disc;   font-size: 12px; line-height: 1.6; padding-left: 26px; }
+  ul.circle { list-style-type: circle; font-size: 12px; line-height: 1.6; padding-left: 26px; }
+  ul.square { list-style-type: square; font-size: 12px; line-height: 1.6; padding-left: 26px; }
+  ol.nums   { list-style-type: decimal; font-size: 12px; line-height: 1.6; padding-left: 26px; }
+
+  blockquote {
+    border-left: 4px solid #b07d2b; background: #faf4e8; padding: 10px 14px;
+    font-size: 12px; line-height: 1.5; color: #5c4a1e; margin: 10px 0;
+  }
+
+  pre.codeblock {
+    background: #181d27; color: #c8d3e8; border-radius: 6px; padding: 12px 14px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.5;
+    margin: 10px 0;
+  }
+  code.inline {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    background: #eef1f6; border-radius: 3px; padding: 1px 5px; color: #8c3fb0;
+  }
+
+  .deco { font-size: 12px; line-height: 2.0; }
+  .deco .u  { text-decoration: underline; }
+  .deco .lt { text-decoration: line-through; color: #99a0ad; }
+  .deco .ls { letter-spacing: 3px; font-weight: 600; }
+  .deco .ws { word-spacing: 10px; }
+  .deco .up { text-transform: uppercase; color: #1b6ca8; font-weight: 500; }
+  .deco a   { color: #0b6e4f; }
+
+  .science { font-size: 13px; line-height: 1.8; }
+  .science sub, .science sup { font-size: 9px; }
+
+  .accents { font-size: 13px; line-height: 1.7; }
+  .accents .gk { font-weight: 600; color: #87341f; }
+
+  mark { background: #ffe066; color: #20242c; padding: 0 2px; }
+
+  hr.rule { border: none; border-top: 1px dashed #aab3c5; margin: 12px 0; }
+
+  .footnote { font-size: 10px; color: #99a0ad; margin-top: 14px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Typographic Torture Sheet</h1>
+    <div class="sub">alignment · lists · code · decoration · entities</div>
+  </header>
+
+  <div class="cols">
+    <div class="col">
+      <h2>Alignment</h2>
+      <p class="t-left">Left aligned. The quick brown fox jumps over the lazy dog while surveyors measure every fence post on the hillside.</p>
+      <p class="t-center">Centered line of measured prose.</p>
+      <p class="t-right">Right aligned closing remark.</p>
+      <p class="t-justify">Justified paragraphs stretch their inter-word spacing so that both margins stay flush, which is the hardest alignment mode to reproduce faithfully in any portable document format renderer worth its salt.</p>
+
+      <h2>Blockquote</h2>
+      <blockquote>Measure twice, cut once — the geodesist's corollary is measure thrice, adjust the network, then cut.</blockquote>
+
+      <h2>Horizontal rule</h2>
+      <hr class="rule">
+      <p>The dashed rule above is an <code class="inline">&lt;hr&gt;</code> element with a dashed top border.</p>
+    </div>
+
+    <div class="col">
+      <h2>Lists</h2>
+      <ul class="disc">
+        <li>Disc marker — total station</li>
+        <li>Second disc item with a much longer label that wraps onto a second line inside the column</li>
+      </ul>
+      <ul class="circle">
+        <li>Circle marker — GNSS rover</li>
+        <li>Circle item two</li>
+      </ul>
+      <ul class="square">
+        <li>Square marker — prism pole</li>
+      </ul>
+      <ol class="nums">
+        <li>Reconnaissance</li>
+        <li>Control network</li>
+        <li>Detail survey</li>
+        <li>Adjustment &amp; report</li>
+      </ol>
+
+      <h2>Code block</h2>
+      <pre class="codeblock">{
+  "station": "ST-04",
+  "easting":  1224501.336,
+  "northing": 6112839.402,
+  "checks": [true, false]
+}</pre>
+      <p>Inline tokens like <code class="inline">htmlToPdf()</code> and <code class="inline">--dpi=96</code> sit in the text flow.</p>
+    </div>
+
+    <div class="col">
+      <h2>Decoration</h2>
+      <p class="deco">
+        <span class="u">Underlined phrase</span> then <span class="lt">struck-through words</span><br>
+        <span class="ls">LETTERSPACED</span> and <span class="ws">wide word spacing here</span><br>
+        <span class="up">transformed to upper</span><br>
+        A link to <a href="https://helix.corsica/typo">the typography spec</a> sits inline.
+      </p>
+
+      <h2>Sub / superscript</h2>
+      <p class="science">
+        Water is H<sub>2</sub>O, area grows as r<sup>2</sup>, and the adjusted height is 412.038<sup>±3mm</sup>.
+      </p>
+
+      <h2>Accents &amp; symbols</h2>
+      <p class="accents">
+        Café, naïve, façade, über, señor — élévation contrôlée.<br>
+        Greek deltas: <span class="gk">ΔX = +0.012 m, ΔY = −0.034 m</span>.<br>
+        Highlighted <mark>survey tolerance band</mark> inline.
+      </p>
+
+      <hr class="rule">
+      <p class="footnote">Fixture 06 — typographic coverage. Rendered at 1123 × 794 CSS px, DPR 1. See also <a href="https://helix.corsica/torture">the fixture index</a>.</p>
+    </div>
+  </div>
+</body>
+</html>

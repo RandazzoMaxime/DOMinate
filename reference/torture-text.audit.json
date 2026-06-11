@@ -1,0 +1,22 @@
+{
+  "viewport": {
+    "width": 1123,
+    "height": 794
+  },
+  "screenshotScale": 1,
+  "expectedLinks": [
+    "https://helix.corsica/typo",
+    "https://helix.corsica/torture"
+  ],
+  "expectedTextFragments": [
+    "Typographic Torture Sheet",
+    "Alignment",
+    "Blockquote",
+    "Horizontal rule",
+    "Lists",
+    "Code block",
+    "Decoration",
+    "Sub / superscript",
+    "Accents & symbols"
+  ]
+}

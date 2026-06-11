@@ -1,0 +1,23 @@
+{
+  "viewport": {
+    "width": 1123,
+    "height": 794
+  },
+  "screenshotScale": 1,
+  "expectedLinks": [
+    "https://helix.corsica/ledger/session-a",
+    "https://helix.corsica/ledger/raw"
+  ],
+  "expectedTextFragments": [
+    "Observation Ledger",
+    "Control network observations — session A",
+    "Station",
+    "Type",
+    "Easting (m)",
+    "Northing (m)",
+    "Height (m)",
+    "σ (mm)",
+    "Status",
+    "Δ axis"
+  ]
+}
