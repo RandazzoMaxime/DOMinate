@@ -174,6 +174,7 @@ function walk(el, idoc, boxes, ctx) {
     borderRightStyle: cs.borderRightStyle,
     borderBottomStyle: cs.borderBottomStyle,
     borderLeftStyle: cs.borderLeftStyle,
+    boxShadow: cs.boxShadow,
     fontFamily: cs.fontFamily,
     fontSize: cs.fontSize,
     fontWeight: cs.fontWeight,
