@@ -922,7 +922,10 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
           page._push(`${encodeTextAsHex(run.font, run.text)} Tj\n`);
         }
       } else {
+        // Standard (base-14) fonts: letter-spacing via the Tc parameter.
+        if (letterSpacingCss) page.setCharSpacing(letterSpacingCss * CSS_TO_PDF);
         page.showText(run.text);
+        if (letterSpacingCss) page.setCharSpacing(0);
       }
     }
     page.endText();
