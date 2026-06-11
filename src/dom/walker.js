@@ -234,6 +234,11 @@ function walk(el, idoc, boxes, ctx) {
     borderBottomStyle: cs.borderBottomStyle,
     borderLeftStyle: cs.borderLeftStyle,
     boxShadow: cs.boxShadow,
+    textShadow: cs.textShadow,
+    outlineWidth: cs.outlineWidth,
+    outlineStyle: cs.outlineStyle,
+    outlineColor: cs.outlineColor,
+    outlineOffset: cs.outlineOffset,
     fontFamily: cs.fontFamily,
     fontSize: cs.fontSize,
     fontWeight: cs.fontWeight,
@@ -258,8 +263,10 @@ function walk(el, idoc, boxes, ctx) {
   const hasBg = style.backgroundColor && style.backgroundColor !== 'rgba(0, 0, 0, 0)' && style.backgroundColor !== 'transparent';
   const hasBgImage = style.backgroundImage && style.backgroundImage !== 'none';
   const hasBorder = ['Top', 'Right', 'Bottom', 'Left'].some(s => parseFloat(style['border' + s + 'Width']) > 0);
+  const hasOutline = parseFloat(style.outlineWidth) > 0 && style.outlineStyle !== 'none';
+  const hasShadow = style.boxShadow && style.boxShadow !== 'none';
 
-  if ((hasBg || hasBgImage || hasBorder) && rect.width > 0 && rect.height > 0) {
+  if ((hasBg || hasBgImage || hasBorder || hasOutline || hasShadow) && rect.width > 0 && rect.height > 0) {
     boxes.push({
       kind: 'box',
       x: rect.left, y: rect.top, w: rect.width, h: rect.height,

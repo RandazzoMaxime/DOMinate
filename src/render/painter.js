@@ -339,10 +339,97 @@ function paintBox(doc, page, b, pageHeightPdf) {
     paintBackgroundImage(page, b, sx, sy, sw, sh, radii, hasRadius, pageHeightPdf);
   }
 
+  // box-shadow: inset — paints above the background/bg-image, below content.
+  paintInsetShadows(doc, page, b, radii, hasRadius, x, y, w, h);
+
   // Borders — uniform 4-side borders keep the inset-stroke behavior (collapse-aware:
   // border-collapse cells center the shared stroke on the unsnapped grid line);
   // per-side widths/styles/colors (and `double`) get the 4-trapezoid decomposition.
   paintBorders(doc, page, b, radii, hasRadius, x, y, w, h, pageHeightPdf);
+
+  // outline — stroked OUTSIDE the border box at outline-offset, radius following.
+  paintOutline(doc, page, b, radii, hasRadius, x, y, w, h);
+}
+
+/** CSS outline: a stroke centered ow/2 beyond border-box + offset, radii grown. */
+function paintOutline(doc, page, b, radii, hasRadius, x, y, w, h) {
+  const ow = parsePx(b.style.outlineWidth) * CSS_TO_PDF;
+  const styleo = b.style.outlineStyle;
+  if (ow <= 0 || !styleo || styleo === 'none') return;
+  const color = parseColor(b.style.outlineColor);
+  if (!color || color.a <= 0) return;
+  const off = parsePx(b.style.outlineOffset) * CSS_TO_PDF;
+  const e = off + ow / 2;
+  page.saveState();
+  const alpha = color.a * (b.style.opacity != null ? b.style.opacity : 1);
+  if (alpha < 1) page.setExtGState(doc.addExtGState({ ca: alpha, CA: alpha }));
+  page.setStrokeRgb(color.r, color.g, color.b);
+  page.setLineWidth(ow);
+  if (styleo === 'dashed') page.setDashPattern([ow * 3, ow * 2], 0);
+  else if (styleo === 'dotted') page.setDashPattern([ow, ow], 0);
+  if (hasRadius) {
+    page.pathRoundedRect(x - e, y - e, w + 2 * e, h + 2 * e, {
+      tl: Math.max(0, radii.tl + e), tr: Math.max(0, radii.tr + e),
+      br: Math.max(0, radii.br + e), bl: Math.max(0, radii.bl + e),
+    });
+    page.strokePath();
+  } else {
+    page.strokeRect(x - e, y - e, w + 2 * e, h + 2 * e);
+  }
+  page.restoreState();
+}
+
+/**
+ * Inset box-shadows: clip to the (rounded) box, then accumulate even-odd ring fills
+ * between the box and an inner rounded rect that walks inward from −blur to +blur
+ * around (offset + spread), alphas erfc-matched like the outer-shadow path.
+ */
+function paintInsetShadows(doc, page, b, radii, hasRadius, x, y, w, h) {
+  const all = parseBoxShadowList(b.style.boxShadow).filter(s => s.inset);
+  if (!all.length) return;
+  const elOpacity = b.style.opacity != null ? b.style.opacity : 1;
+  for (let i = all.length - 1; i >= 0; i--) {
+    const sh = all[i];
+    const baseAlpha = sh.color.a * elOpacity;
+    if (baseAlpha <= 0) continue;
+    const dx = sh.dx * CSS_TO_PDF, dy = sh.dy * CSS_TO_PDF;
+    const blur = sh.blur * CSS_TO_PDF, spread = sh.spread * CSS_TO_PDF;
+    page.saveState();
+    if (hasRadius) page.pathRoundedRect(x, y, w, h, radii);
+    else page._push(`${num(x)} ${num(y)} ${num(w)} ${num(h)} re\n`);
+    page.clipPath();
+    page.setFillRgb(sh.color.r, sh.color.g, sh.color.b);
+    const N = blur > 0 ? 10 : 1;
+    const sigma = Math.max(blur / 2, 0.0001);
+    let acc = 0;
+    for (let k = 0; k < N; k++) {
+      // Ring k's inner edge sits at inset `t` from the (offset+spread) shadow rect:
+      // walk from the deepest inset (+blur) outward so rings nest.
+      const t = N === 1 ? 0 : blur * (1 - 2 * k / (N - 1));   // +blur … −blur
+      const inset = spread + t;
+      const ix = x + dx + inset, iy = y - dy + inset;
+      const iw = w - 2 * inset, ih = h - 2 * inset;
+      const target = N === 1 ? baseAlpha : baseAlpha * gaussCoverage(-t, sigma);
+      if (target <= acc) continue;
+      const layerAlpha = (target - acc) / (1 - acc);
+      acc = target;
+      page.saveState();
+      if (layerAlpha < 1) page.setExtGState(doc.addExtGState({ ca: layerAlpha, CA: layerAlpha }));
+      // Even-odd region: big outer rect minus the inner rounded rect.
+      page._push(`${num(x - 50)} ${num(y - 50)} ${num(w + 100)} ${num(h + 100)} re\n`);
+      if (iw > 0 && ih > 0) {
+        const ir = {
+          tl: Math.max(0, radii.tl - inset), tr: Math.max(0, radii.tr - inset),
+          br: Math.max(0, radii.br - inset), bl: Math.max(0, radii.bl - inset),
+        };
+        if (ir.tl + ir.tr + ir.br + ir.bl > 0) page.pathRoundedRect(ix, iy, iw, ih, ir);
+        else page._push(`${num(ix)} ${num(iy)} ${num(iw)} ${num(ih)} re\n`);
+      }
+      page._push('f*\n');
+      page.restoreState();
+    }
+    page.restoreState();
+  }
 }
 
 /**
@@ -371,8 +458,9 @@ function paintBorders(doc, page, b, radii, hasRadius, x, y, w, h, pageHeightPdf)
     top.w === right.w && top.w === bottom.w && top.w === left.w &&
     top.style === right.style && top.style === bottom.style && top.style === left.style &&
     top.css === right.css && top.css === bottom.css && top.css === left.css;
+  const TWO_TONE = ['double', 'groove', 'ridge', 'inset', 'outset'];
 
-  if (uniform && top.style !== 'double') {
+  if (uniform && !TWO_TONE.includes(top.style)) {
     // Legacy uniform behavior — keep byte-for-byte identical output for the
     // source/source-flat/wizard/report fixtures. border-collapse cells center the
     // shared stroke on the unsnapped grid line (inset 0) so adjacent cells coincide.
@@ -420,22 +508,26 @@ function paintBorders(doc, page, b, radii, hasRadius, x, y, w, h, pageHeightPdf)
   const wb = bottom.w * CSS_TO_PDF, wl = left.w * CSS_TO_PDF;
   const yT = y + h;
   const sides = [
-    { e: top,    lw: wt, len: w,
+    { e: top,    lw: wt, len: w, tl: true,
       poly: [[x, yT], [x + w, yT], [x + w - wr, yT - wt], [x + wl, yT - wt]],
       line: [x, yT - wt / 2, x + w, yT - wt / 2],
-      bands: [[x, yT - wt / 3, w, wt / 3], [x, yT - wt, w, wt / 3]] },
-    { e: right,  lw: wr, len: h,
+      bands: [[x, yT - wt / 3, w, wt / 3], [x, yT - wt, w, wt / 3]],
+      halves: [[x, yT - wt / 2, w, wt / 2], [x, yT - wt, w, wt / 2]] },
+    { e: right,  lw: wr, len: h, tl: false,
       poly: [[x + w, y], [x + w, yT], [x + w - wr, yT - wt], [x + w - wr, y + wb]],
       line: [x + w - wr / 2, y, x + w - wr / 2, yT],
-      bands: [[x + w - wr / 3, y, wr / 3, h], [x + w - wr, y, wr / 3, h]] },
-    { e: bottom, lw: wb, len: w,
+      bands: [[x + w - wr / 3, y, wr / 3, h], [x + w - wr, y, wr / 3, h]],
+      halves: [[x + w - wr / 2, y, wr / 2, h], [x + w - wr, y, wr / 2, h]] },
+    { e: bottom, lw: wb, len: w, tl: false,
       poly: [[x, y], [x + w, y], [x + w - wr, y + wb], [x + wl, y + wb]],
       line: [x, y + wb / 2, x + w, y + wb / 2],
-      bands: [[x, y, w, wb / 3], [x, y + wb * 2 / 3, w, wb / 3]] },
-    { e: left,   lw: wl, len: h,
+      bands: [[x, y, w, wb / 3], [x, y + wb * 2 / 3, w, wb / 3]],
+      halves: [[x, y, w, wb / 2], [x, y + wb / 2, w, wb / 2]] },
+    { e: left,   lw: wl, len: h, tl: true,
       poly: [[x, y], [x, yT], [x + wl, yT - wt], [x + wl, y + wb]],
       line: [x + wl / 2, y, x + wl / 2, yT],
-      bands: [[x, y, wl / 3, h], [x + wl - wl / 3, y, wl / 3, h]] },
+      bands: [[x, y, wl / 3, h], [x + wl - wl / 3, y, wl / 3, h]],
+      halves: [[x, y, wl / 2, h], [x + wl / 2, y, wl / 2, h]] },
   ];
   for (const side of sides) {
     const e = side.e;
@@ -464,8 +556,26 @@ function paintBorders(doc, page, b, radii, hasRadius, x, y, w, h, pageHeightPdf)
       page.clipPath();
       page.setFillRgb(e.color.r, e.color.g, e.color.b);
       for (const [bx, by, bw2, bh2] of side.bands) page.fillRect(bx, by, bw2, bh2);
+    } else if (e.style === 'groove' || e.style === 'ridge' || e.style === 'inset' || e.style === 'outset') {
+      // Two-tone 3D borders: Chromium darkens the border-color to ~2/3 on the
+      // "shadowed" sides. inset/outset shade whole sides; groove/ridge split each
+      // band into an outer and inner half with opposite shading.
+      const dark = { r: e.color.r * 2 / 3, g: e.color.g * 2 / 3, b: e.color.b * 2 / 3 };
+      const lite = e.color;
+      let cOuter, cInner;
+      if (e.style === 'inset')       cOuter = cInner = side.tl ? dark : lite;
+      else if (e.style === 'outset') cOuter = cInner = side.tl ? lite : dark;
+      else if (e.style === 'groove') { cOuter = side.tl ? dark : lite; cInner = side.tl ? lite : dark; }
+      else                           { cOuter = side.tl ? lite : dark; cInner = side.tl ? dark : lite; }
+      pathPolygon(page, side.poly);
+      page.clipPath();
+      const [outerHalf, innerHalf] = side.halves;
+      page.setFillRgb(cOuter.r, cOuter.g, cOuter.b);
+      page.fillRect(outerHalf[0], outerHalf[1], outerHalf[2], outerHalf[3]);
+      page.setFillRgb(cInner.r, cInner.g, cInner.b);
+      page.fillRect(innerHalf[0], innerHalf[1], innerHalf[2], innerHalf[3]);
     } else {
-      // solid (groove/ridge/inset/outset approximated as solid)
+      // solid
       page.setFillRgb(e.color.r, e.color.g, e.color.b);
       pathPolygon(page, side.poly);
       page.fillPath();
@@ -632,23 +742,29 @@ function fillShadowLayer(doc, page, x, y, w, h, radii, expand, color, alpha) {
   page.restoreState();
 }
 
-/** Parse the Chromium-computed box-shadow list. Returns [{color, dx, dy, blur, spread}]. */
-function parseBoxShadows(s) {
+/** Parse the Chromium-computed shadow list (box-shadow or text-shadow).
+ *  Returns [{color, dx, dy, blur, spread, inset}]. */
+function parseBoxShadowList(s) {
   if (!s || s === 'none') return [];
   const out = [];
   for (const part of splitTopLevel(s)) {
     const t = part.trim();
     if (!t) continue;
-    if (/\binset\b/.test(t)) continue;  // inner shadows unsupported
+    const inset = /\binset\b/.test(t);
     const cm = /(rgba?\([^)]*\)|color\([^)]*\)|#[0-9a-fA-F]{3,8})/.exec(t);
     const color = cm ? parseColor(cm[1]) : { r: 0, g: 0, b: 0, a: 1 };
     if (!color || color.a <= 0) continue;
-    const rest = cm ? t.slice(0, cm.index) + ' ' + t.slice(cm.index + cm[1].length) : t;
+    const rest = (cm ? t.slice(0, cm.index) + ' ' + t.slice(cm.index + cm[1].length) : t).replace(/\binset\b/g, ' ');
     const lens = rest.trim().split(/\s+/).filter(tok => /^-?[\d.]+(px)?$/.test(tok)).map(parseFloat);
     if (lens.length < 2) continue;
-    out.push({ color, dx: lens[0], dy: lens[1], blur: lens[2] || 0, spread: lens[3] || 0 });
+    out.push({ color, dx: lens[0], dy: lens[1], blur: lens[2] || 0, spread: lens[3] || 0, inset });
   }
   return out;
+}
+
+/** Outer shadows only (legacy callers). */
+function parseBoxShadows(s) {
+  return parseBoxShadowList(s).filter(sh => !sh.inset);
 }
 
 /** Coverage of a gaussian-blurred step edge at signed distance t outside the edge. */
@@ -742,52 +858,77 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
   else if (b.style.textTransform === 'lowercase') renderText = renderText.toLowerCase();
 
   page.saveState();
-  // Apply CSS opacity (e.g. .header-topline has opacity:0.9 over the green gradient).
-  // For text, alpha applies to fill (text painting is mode 0 = fill).
-  const opacity = (b.style.opacity != null ? b.style.opacity : 1) * (color ? color.a : 1);
-  if (opacity < 1) {
-    page.setExtGState(doc.addExtGState({ ca: opacity, CA: opacity }));
-  }
-  if (color) page.setFillRgb(color.r, color.g, color.b);
-  page.setTextPos(xPdf, yPdf);
   // Split renderText into runs of consecutive chars supported by the same font, falling
   // back along the fallbacks chain when the primary font lacks a glyph (e.g. Δ in our
   // Latin Inter is in the Greek subset).
   const runs = splitTextByFont(renderText, fontHandle, fallbacks);
   const letterSpacingCss = parsePx(b.style.letterSpacing);
-  page.beginText();
   // Synthetic oblique: Chromium fakes italic for fonts without an italic face by
   // skewing 14° (Skia kFakeItalicSkew = 0.25). Our embedded faces are all upright,
   // so every italic/oblique run gets the same synthetic shear via the text matrix.
   const italic = b.style.fontStyle === 'italic' || b.style.fontStyle === 'oblique';
-  if (italic && fontHandle.kind === 'embeddedTrueType') {
-    page._push(`1 0 0.213 1 ${num(xPdf)} ${num(yPdf)} Tm\n`);
-  } else {
-    page.setTextPos(xPdf, yPdf);
-  }
-  for (const run of runs) {
-    page.setFont(run.font, fontSizeCss * CSS_TO_PDF);
-    if (run.font.kind === 'embeddedTrueType') {
-      if (letterSpacingCss && fontSizeCss > 0 && run.text.length > 1) {
-        const offset = -(letterSpacingCss * CSS_TO_PDF) / (fontSizeCss * CSS_TO_PDF) * 1000;
-        const tjParts = ['['];
-        for (let i = 0; i < run.text.length; i++) {
-          tjParts.push(encodeTextAsHex(run.font, run.text[i]));
-          if (i < run.text.length - 1) tjParts.push(num(offset));
-        }
-        tjParts.push('] TJ\n');
-        page._push(tjParts.join(' '));
-      } else {
-        page._push(`${encodeTextAsHex(run.font, run.text)} Tj\n`);
-      }
+  const elOpacity = b.style.opacity != null ? b.style.opacity : 1;
+
+  const drawTextRuns = (atX, atY, fillColor, alpha) => {
+    page.saveState();
+    if (alpha < 1) page.setExtGState(doc.addExtGState({ ca: alpha, CA: alpha }));
+    if (fillColor) page.setFillRgb(fillColor.r, fillColor.g, fillColor.b);
+    page.beginText();
+    if (italic && fontHandle.kind === 'embeddedTrueType') {
+      page._push(`1 0 0.213 1 ${num(atX)} ${num(atY)} Tm\n`);
     } else {
-      page.showText(run.text);
+      page.setTextPos(atX, atY);
+    }
+    for (const run of runs) {
+      page.setFont(run.font, fontSizeCss * CSS_TO_PDF);
+      if (run.font.kind === 'embeddedTrueType') {
+        if (letterSpacingCss && fontSizeCss > 0 && run.text.length > 1) {
+          const offset = -(letterSpacingCss * CSS_TO_PDF) / (fontSizeCss * CSS_TO_PDF) * 1000;
+          const tjParts = ['['];
+          for (let i = 0; i < run.text.length; i++) {
+            tjParts.push(encodeTextAsHex(run.font, run.text[i]));
+            if (i < run.text.length - 1) tjParts.push(num(offset));
+          }
+          tjParts.push('] TJ\n');
+          page._push(tjParts.join(' '));
+        } else {
+          page._push(`${encodeTextAsHex(run.font, run.text)} Tj\n`);
+        }
+      } else {
+        page.showText(run.text);
+      }
+    }
+    page.endText();
+    page.restoreState();
+  };
+
+  // text-shadow: paint each shadow (reverse list order) behind the main glyphs.
+  // Blur is approximated by 3 concentric passes (center + blur/2 ring) with alphas
+  // that sum to a soft-ish profile; blur 0 is exact.
+  const tShadows = parseBoxShadows(b.style.textShadow);
+  for (let i = tShadows.length - 1; i >= 0; i--) {
+    const sh = tShadows[i];
+    const sa = sh.color.a * elOpacity;
+    const sx0 = xPdf + sh.dx * CSS_TO_PDF;
+    const sy0 = yPdf - sh.dy * CSS_TO_PDF;
+    if (sh.blur <= 1) {
+      drawTextRuns(sx0, sy0, sh.color, sa);
+    } else {
+      const r = sh.blur * CSS_TO_PDF * 0.45;
+      for (const [ox, oy, a] of [[0, 0, 0.55], [r, 0, 0.18], [-r, 0, 0.18], [0, r, 0.18], [0, -r, 0.18]]) {
+        drawTextRuns(sx0 + ox, sy0 + oy, sh.color, sa * a);
+      }
     }
   }
-  page.endText();
+
+  drawTextRuns(xPdf, yPdf, color, elOpacity * (color ? color.a : 1));
 
   // Decoration runs extend across the inter-word gap when the walker bridged them.
   const decoEndPdf = (b.decoR != null ? b.decoR : b.x + b.w) * CSS_TO_PDF;
+  const decoAlpha = elOpacity * (color ? color.a : 1);
+  if (decoAlpha < 1 && (b.style.textDecoration || '') !== 'none' && (b.style.textDecoration || '') !== '') {
+    page.setExtGState(doc.addExtGState({ ca: decoAlpha, CA: decoAlpha }));
+  }
 
   // text-decoration: line-through → stroke midway up the x-height (~0.38 em above
   // baseline measured against Chromium's rendering).

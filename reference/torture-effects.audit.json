@@ -1,0 +1,22 @@
+{
+  "viewport": {
+    "width": 1123,
+    "height": 794
+  },
+  "screenshotScale": 1,
+  "expectedLinks": [
+    "https://helix.corsica/effects-bench"
+  ],
+  "expectedTextFragments": [
+    "Effects Bench",
+    "text-shadow hard",
+    "text-shadow soft",
+    "text-shadow stacked",
+    "outline offset −10",
+    "inset hard",
+    "inset glow",
+    "inset top edge",
+    "outlines",
+    "groove"
+  ]
+}
