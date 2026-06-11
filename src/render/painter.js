@@ -28,6 +28,7 @@ export function paint(doc, fontMap, page, boxes /*, pageHeightCssPx (unused) */)
     if (b.kind === 'svg-rect')    paintSvgRect(page, b, pageHeightPdf, doc);
     if (b.kind === 'svg-line')    paintSvgLine(page, b, pageHeightPdf, doc);
     if (b.kind === 'svg-ellipse') paintSvgEllipse(page, b, pageHeightPdf, doc);
+    if (b.kind === 'svg-path')    paintSvgPath(page, b, pageHeightPdf, doc);
   }
   for (const b of boxes) {
     if (b.kind === 'text') paintText(page, fontMap, b, pageHeightPdf, doc);
@@ -71,6 +72,47 @@ function paintSvgLine(page, b, pageHeightPdf, doc) {
   page.setStrokeRgb(b.stroke.r, b.stroke.g, b.stroke.b);
   page.setLineWidth(Math.max(0.1, b.strokeWidth * CSS_TO_PDF));
   page._push(`${num(x1)} ${num(y1)} m ${num(x2)} ${num(y2)} l S\n`);
+  page.restoreState();
+}
+
+// Paint an 'svg-path' box: segments are pre-transformed to CSS px by the SVG
+// walker (anchors + control points through getScreenCTM), so this only converts
+// CSS px → PDF user units, sets stroke/fill state (dash, caps, joins, alpha)
+// and emits m/l/c/h followed by the paint operator (f, f*, S, B, B*).
+function paintSvgPath(page, b, pageHeightPdf, doc) {
+  if (!b.segments || !b.segments.length) return;
+  const fillAlpha = (b.fillOpacity != null ? b.fillOpacity : 1) * (b.fill ? b.fill.a : 1);
+  const strokeAlpha = (b.strokeOpacity != null ? b.strokeOpacity : 1) * (b.stroke ? b.stroke.a : 1);
+  const hasFill = !!b.fill && fillAlpha > 0;
+  const hasStroke = !!b.stroke && strokeAlpha > 0 && b.strokeWidth > 0;
+  if (!hasFill && !hasStroke) return;
+  const X = (v) => num(v * CSS_TO_PDF);
+  const Y = (v) => num(cssYToPdfY(v, pageHeightPdf));
+  page.saveState();
+  if ((hasFill && fillAlpha < 1) || (hasStroke && strokeAlpha < 1)) {
+    page.setExtGState(doc.addExtGState({ ca: fillAlpha, CA: strokeAlpha }));
+  }
+  if (hasFill) page.setFillRgb(b.fill.r, b.fill.g, b.fill.b);
+  if (hasStroke) {
+    page.setStrokeRgb(b.stroke.r, b.stroke.g, b.stroke.b);
+    page.setLineWidth(Math.max(0.1, b.strokeWidth * CSS_TO_PDF));
+    if (b.linecap)  page._push(`${b.linecap} J\n`);
+    if (b.linejoin) page._push(`${b.linejoin} j\n`);
+    if (b.dash && b.dash.length) page.setDashPattern(b.dash.map((v) => v * CSS_TO_PDF), 0);
+  }
+  const ops = [];
+  for (const s of b.segments) {
+    if (s.op === 'M')      ops.push(`${X(s.x)} ${Y(s.y)} m`);
+    else if (s.op === 'L') ops.push(`${X(s.x)} ${Y(s.y)} l`);
+    else if (s.op === 'C') ops.push(`${X(s.x1)} ${Y(s.y1)} ${X(s.x2)} ${Y(s.y2)} ${X(s.x)} ${Y(s.y)} c`);
+    else if (s.op === 'Z') ops.push('h');
+  }
+  const star = b.fillRule === 'evenodd' ? '*' : '';
+  let paintOp;
+  if (hasFill && hasStroke) paintOp = 'B' + star;
+  else if (hasFill)         paintOp = 'f' + star;
+  else                      paintOp = 'S';
+  page._push(ops.join('\n') + '\n' + paintOp + '\n');
   page.restoreState();
 }
 
