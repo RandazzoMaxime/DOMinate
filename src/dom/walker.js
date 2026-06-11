@@ -77,6 +77,9 @@ export async function layout(html, { width, height }) {
     // ticks. Capped at 6s.
     {
       const win = idoc.defaultView;
+      // The resource-timing buffer caps at 250 entries by default; saturated buffers
+      // would freeze resCount and let the settle loop pass during a late fetch.
+      try { win.performance.setResourceTimingBufferSize(100000); } catch { /* optional */ }
       let prevFp = '', prevRes = -1, stableTicks = 0;
       for (let tick = 0; tick < 60 && stableTicks < 2; tick++) {
         if (idoc.fonts && idoc.fonts.ready) {

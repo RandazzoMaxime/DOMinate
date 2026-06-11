@@ -92,6 +92,42 @@ function emitCssTransform(page, t, pageHeightPdf) {
   page._push(`${num(Ca)} ${num(Cb)} ${num(Cc)} ${num(Cd)} ${num(ex)} ${num(ey)} cm\n`);
 }
 
+/**
+ * Parse the 4 computed border-*-radius values into per-corner elliptical radii
+ * in PDF units. Computed values are "Rpx", "R%", or two-component "RX RY" where
+ * percentages resolve against the box width (x) / height (y) per css-backgrounds.
+ * Returns { tl:{x,y}, tr:{x,y}, br:{x,y}, bl:{x,y} } or null when all zero.
+ */
+function normRadii(style, wCss, hCss) {
+  const one = (v) => {
+    if (!v) return { x: 0, y: 0 };
+    const parts = v.trim().split(/\s+/);
+    const len = (tok, ref) => {
+      if (!tok) return 0;
+      if (tok.endsWith('%')) return parseFloat(tok) / 100 * ref;
+      return parseFloat(tok) || 0;
+    };
+    return {
+      x: len(parts[0], wCss) * CSS_TO_PDF,
+      y: len(parts[1] !== undefined ? parts[1] : parts[0], hCss) * CSS_TO_PDF,
+    };
+  };
+  const r = {
+    tl: one(style.borderTopLeftRadius),
+    tr: one(style.borderTopRightRadius),
+    br: one(style.borderBottomRightRadius),
+    bl: one(style.borderBottomLeftRadius),
+  };
+  if (r.tl.x + r.tl.y + r.tr.x + r.tr.y + r.br.x + r.br.y + r.bl.x + r.bl.y <= 0) return null;
+  return r;
+}
+
+/** Grow (+d) or shrink (−d) every radius component, clamped at 0. */
+function adjustRadii(r, d) {
+  const adj = (c) => ({ x: Math.max(0, (c.x !== undefined ? c.x : c || 0) + d), y: Math.max(0, (c.y !== undefined ? c.y : c || 0) + d) });
+  return { tl: adj(r.tl), tr: adj(r.tr), br: adj(r.br), bl: adj(r.bl) };
+}
+
 /** Lexicographic compare of sortKey arrays; missing entries sort first. */
 function cmpSortKeys(a, b) {
   a = a || []; b = b || [];
@@ -259,18 +295,13 @@ function paintBox(doc, page, b, pageHeightPdf) {
   const w = sw * CSS_TO_PDF;
   const h = sh * CSS_TO_PDF;
 
-  // Per-corner border-radius (CSS px → PDF user units).
-  // CSS shorthand maps to: top-left, top-right, bottom-right, bottom-left.
+  // Per-corner elliptical border-radius (px / % / "rx ry" forms) in PDF units.
   // PDF coord has Y inverted, so what CSS calls "top-left" lands at the upper-left
-  // of our PDF rectangle (which in PDF coords means y + h, x). Our pathRoundedRect
-  // expects { tl, tr, br, bl } where tl = upper-left in PDF coords. Map directly.
-  const radii = {
-    tl: parsePx(b.style.borderTopLeftRadius)     * CSS_TO_PDF,
-    tr: parsePx(b.style.borderTopRightRadius)    * CSS_TO_PDF,
-    br: parsePx(b.style.borderBottomRightRadius) * CSS_TO_PDF,
-    bl: parsePx(b.style.borderBottomLeftRadius)  * CSS_TO_PDF,
-  };
-  const hasRadius = radii.tl + radii.tr + radii.br + radii.bl > 0;
+  // of our PDF rectangle. pathRoundedRect takes { tl, tr, br, bl } with {x,y} radii.
+  const Z = { x: 0, y: 0 };
+  const radiiN = normRadii(b.style, b.w, b.h);
+  const radii = radiiN || { tl: Z, tr: Z, br: Z, bl: Z };
+  const hasRadius = !!radiiN;
 
   // box-shadow paints UNDER the background fill (outer shadows only — the card's
   // opaque background covers the part of the shadow inside the border box).
@@ -368,10 +399,7 @@ function paintOutline(doc, page, b, radii, hasRadius, x, y, w, h) {
   if (styleo === 'dashed') page.setDashPattern([ow * 3, ow * 2], 0);
   else if (styleo === 'dotted') page.setDashPattern([ow, ow], 0);
   if (hasRadius) {
-    page.pathRoundedRect(x - e, y - e, w + 2 * e, h + 2 * e, {
-      tl: Math.max(0, radii.tl + e), tr: Math.max(0, radii.tr + e),
-      br: Math.max(0, radii.br + e), bl: Math.max(0, radii.bl + e),
-    });
+    page.pathRoundedRect(x - e, y - e, w + 2 * e, h + 2 * e, adjustRadii(radii, e));
     page.strokePath();
   } else {
     page.strokeRect(x - e, y - e, w + 2 * e, h + 2 * e);
@@ -420,12 +448,12 @@ function paintInsetShadows(doc, page, b, radii, hasRadius, x, y, w, h) {
       // Even-odd region: big outer rect minus the inner rounded rect.
       page._push(`${num(x - 50)} ${num(y - 50)} ${num(w + 100)} ${num(h + 100)} re\n`);
       if (iw > 0 && ih > 0) {
-        const ir = {
-          tl: Math.max(0, radii.tl - inset), tr: Math.max(0, radii.tr - inset),
-          br: Math.max(0, radii.br - inset), bl: Math.max(0, radii.bl - inset),
-        };
-        if (ir.tl + ir.tr + ir.br + ir.bl > 0) page.pathRoundedRect(ix, iy, iw, ih, ir);
-        else page._push(`${num(ix)} ${num(iy)} ${num(iw)} ${num(ih)} re\n`);
+        const ir = adjustRadii(radii, -inset);
+        if (ir.tl.x + ir.tl.y + ir.tr.x + ir.tr.y + ir.br.x + ir.br.y + ir.bl.x + ir.bl.y > 0) {
+          page.pathRoundedRect(ix, iy, iw, ih, ir);
+        } else {
+          page._push(`${num(ix)} ${num(iy)} ${num(iw)} ${num(ih)} re\n`);
+        }
       }
       page._push('f*\n');
       page.restoreState();
@@ -482,12 +510,7 @@ function paintBorders(doc, page, b, radii, hasRadius, x, y, w, h, pageHeightPdf)
       const bh0 = collapsed ? b.h * CSS_TO_PDF : h;
       const ix = bx0 + inset, iy = by0 + inset;
       const iw = bw0 - 2 * inset, ih = bh0 - 2 * inset;
-      const ir = {
-        tl: Math.max(0, radii.tl - inset),
-        tr: Math.max(0, radii.tr - inset),
-        br: Math.max(0, radii.br - inset),
-        bl: Math.max(0, radii.bl - inset),
-      };
+      const ir = adjustRadii(radii, -inset);
       if (style === 'dashed' || style === 'dotted') {
         // Chromium strokes a uniform dashed/dotted border as ONE closed centerline
         // path starting at the top-left corner's arc end, clockwise, with the gap
@@ -600,8 +623,10 @@ function paintBorders(doc, page, b, radii, hasRadius, x, y, w, h, pageHeightPdf)
  */
 function strokeDashedBorderPath(page, x, y, w, h, r, lw, style) {
   const maxR = Math.min(w, h) / 2;
-  const tl = Math.min(r.tl || 0, maxR), tr = Math.min(r.tr || 0, maxR);
-  const br = Math.min(r.br || 0, maxR), bl = Math.min(r.bl || 0, maxR);
+  // Elliptical radii degrade to circular (min component) for the dash walk.
+  const rv = (c) => (c && c.x !== undefined) ? Math.min(c.x, c.y) : (c || 0);
+  const tl = Math.min(rv(r.tl), maxR), tr = Math.min(rv(r.tr), maxR);
+  const br = Math.min(rv(r.br), maxR), bl = Math.min(rv(r.bl), maxR);
   // Chromium aligns strokes to device pixels: snap each side's outer band edge and
   // the dash-pattern origin to the CSS pixel grid (PDF coords are css·0.75, and the
   // page dimensions are whole css px, so the grid is the multiples of CSS_TO_PDF).
@@ -730,13 +755,8 @@ function fillShadowLayer(doc, page, x, y, w, h, radii, expand, color, alpha) {
   page.saveState();
   if (alpha < 1) page.setExtGState(doc.addExtGState({ ca: alpha, CA: alpha }));
   page.setFillRgb(color.r, color.g, color.b);
-  const r = {
-    tl: Math.max(0, radii.tl + expand),
-    tr: Math.max(0, radii.tr + expand),
-    br: Math.max(0, radii.br + expand),
-    bl: Math.max(0, radii.bl + expand),
-  };
-  if (r.tl + r.tr + r.br + r.bl > 0) {
+  const r = adjustRadii(radii, expand);
+  if (r.tl.x + r.tl.y + r.tr.x + r.tr.y + r.br.x + r.br.y + r.bl.x + r.bl.y > 0) {
     page.pathRoundedRect(xx, yy, ww, hh, r);
     page.fillPath();
   } else {
@@ -1071,13 +1091,8 @@ function paintImage(page, b, pageHeightPdf) {
   const sw = Math.round(b.x + b.w) - sx, sh = Math.round(b.y + b.h) - sy;
   if (sw <= 0 || sh <= 0) return;
 
-  const radii = {
-    tl: parsePx(b.style.borderTopLeftRadius),
-    tr: parsePx(b.style.borderTopRightRadius),
-    br: parsePx(b.style.borderBottomRightRadius),
-    bl: parsePx(b.style.borderBottomLeftRadius),
-  };
-  const hasRadius = radii.tl + radii.tr + radii.br + radii.bl > 0;
+  const radii = normRadii(b.style, sw, sh);  // PDF units, elliptical, % resolved
+  const hasRadius = !!radii;
 
   // object-fit geometry in CSS px.
   const iw = b.embedded.width || sw, ih = b.embedded.height || sh;
@@ -1100,10 +1115,7 @@ function paintImage(page, b, pageHeightPdf) {
     const cx = sx * CSS_TO_PDF, cy = cssYToPdfY(sy + sh, pageHeightPdf);
     const cw = sw * CSS_TO_PDF, ch = sh * CSS_TO_PDF;
     if (hasRadius) {
-      page.pathRoundedRect(cx, cy, cw, ch, {
-        tl: radii.tl * CSS_TO_PDF, tr: radii.tr * CSS_TO_PDF,
-        br: radii.br * CSS_TO_PDF, bl: radii.bl * CSS_TO_PDF,
-      });
+      page.pathRoundedRect(cx, cy, cw, ch, radii);
     } else {
       page._push(`${num(cx)} ${num(cy)} ${num(cw)} ${num(ch)} re\n`);
     }

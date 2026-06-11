@@ -370,34 +370,43 @@ class Page {
    */
   pathRoundedRect(x, y, w, h, r) {
     if (typeof r === 'number') r = { tl: r, tr: r, br: r, bl: r };
-    // Clamp
-    const maxR = Math.min(w, h) / 2;
-    const tl = Math.min(r.tl || 0, maxR);
-    const tr = Math.min(r.tr || 0, maxR);
-    const br = Math.min(r.br || 0, maxR);
-    const bl = Math.min(r.bl || 0, maxR);
+    // Normalize each corner to elliptical {x, y} radii (plain numbers = circular).
+    const norm = (c) => {
+      if (c == null) return { x: 0, y: 0 };
+      if (typeof c === 'number') return { x: Math.max(0, c), y: Math.max(0, c) };
+      return { x: Math.max(0, c.x || 0), y: Math.max(0, c.y || 0) };
+    };
+    let tl = norm(r.tl), tr = norm(r.tr), br = norm(r.br), bl = norm(r.bl);
+    // CSS overlap rule: scale ALL radii by the largest factor keeping adjacent
+    // pairs within the box edges.
+    const f = Math.min(1,
+      w / Math.max(1e-6, tl.x + tr.x), w / Math.max(1e-6, bl.x + br.x),
+      h / Math.max(1e-6, tl.y + bl.y), h / Math.max(1e-6, tr.y + br.y));
+    if (f < 1) {
+      const s = (c) => ({ x: c.x * f, y: c.y * f });
+      tl = s(tl); tr = s(tr); br = s(br); bl = s(bl);
+    }
     const k = 0.5522847498;  // cubic Bezier circle factor
 
     // PDF coords: rectangle is from (x,y) to (x+w, y+h), with y+h being TOP.
-    // Walk: bottom-left → bottom-right → top-right → top-left → close
-    // Start at the bottom-left after the corner
+    // Walk: bottom-left → bottom-right → top-right → top-left → close.
     const ops = [];
-    ops.push(`${num(x + bl)} ${num(y)} m`);
-    ops.push(`${num(x + w - br)} ${num(y)} l`);
-    if (br > 0) {
-      ops.push(`${num(x + w - br + br * k)} ${num(y)} ${num(x + w)} ${num(y + br - br * k)} ${num(x + w)} ${num(y + br)} c`);
+    ops.push(`${num(x + bl.x)} ${num(y)} m`);
+    ops.push(`${num(x + w - br.x)} ${num(y)} l`);
+    if (br.x > 0 || br.y > 0) {
+      ops.push(`${num(x + w - br.x + br.x * k)} ${num(y)} ${num(x + w)} ${num(y + br.y - br.y * k)} ${num(x + w)} ${num(y + br.y)} c`);
     }
-    ops.push(`${num(x + w)} ${num(y + h - tr)} l`);
-    if (tr > 0) {
-      ops.push(`${num(x + w)} ${num(y + h - tr + tr * k)} ${num(x + w - tr + tr * k)} ${num(y + h)} ${num(x + w - tr)} ${num(y + h)} c`);
+    ops.push(`${num(x + w)} ${num(y + h - tr.y)} l`);
+    if (tr.x > 0 || tr.y > 0) {
+      ops.push(`${num(x + w)} ${num(y + h - tr.y + tr.y * k)} ${num(x + w - tr.x + tr.x * k)} ${num(y + h)} ${num(x + w - tr.x)} ${num(y + h)} c`);
     }
-    ops.push(`${num(x + tl)} ${num(y + h)} l`);
-    if (tl > 0) {
-      ops.push(`${num(x + tl - tl * k)} ${num(y + h)} ${num(x)} ${num(y + h - tl + tl * k)} ${num(x)} ${num(y + h - tl)} c`);
+    ops.push(`${num(x + tl.x)} ${num(y + h)} l`);
+    if (tl.x > 0 || tl.y > 0) {
+      ops.push(`${num(x + tl.x - tl.x * k)} ${num(y + h)} ${num(x)} ${num(y + h - tl.y + tl.y * k)} ${num(x)} ${num(y + h - tl.y)} c`);
     }
-    ops.push(`${num(x)} ${num(y + bl)} l`);
-    if (bl > 0) {
-      ops.push(`${num(x)} ${num(y + bl - bl * k)} ${num(x + bl - bl * k)} ${num(y)} ${num(x + bl)} ${num(y)} c`);
+    ops.push(`${num(x)} ${num(y + bl.y)} l`);
+    if (bl.x > 0 || bl.y > 0) {
+      ops.push(`${num(x)} ${num(y + bl.y - bl.y * k)} ${num(x + bl.x - bl.x * k)} ${num(y)} ${num(x + bl.x)} ${num(y)} c`);
     }
     ops.push(`h`);
     this._push(ops.join('\n') + '\n');
