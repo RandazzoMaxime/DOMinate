@@ -159,9 +159,10 @@ function paintBox(doc, page, b, pageHeightPdf) {
   };
   const hasRadius = radii.tl + radii.tr + radii.br + radii.bl > 0;
 
-  // Background-image (linear-gradient) takes priority over background-color in CSS.
-  // Iter 3 uses a solid-fill approximation (start color of the gradient).
+  // Background-image (linear-gradient / radial-gradient) takes priority over
+  // background-color in CSS.
   const grad = parseLinearGradient(b.style.backgroundImage);
+  const rgrad = grad ? null : parseRadialGradient(b.style.backgroundImage);
 
   function paintFill(color) {
     page.saveState();
@@ -182,12 +183,34 @@ function paintBox(doc, page, b, pageHeightPdf) {
   if (grad && grad.stops.length >= 2) {
     // Compute the gradient line endpoints in PDF coords from the CSS angle and the box.
     const line = gradientLine(grad.angleDeg, x, y, w, h);
-    const c0 = grad.stops[0].color;
-    const c1 = grad.stops[grad.stops.length - 1].color;
-    const shading = doc.addAxialShading({
-      x0: line.x0, y0: line.y0, x1: line.x1, y1: line.y1, c0, c1,
-    });
+    let shading;
+    if (grad.stops.length === 2 && grad.stops[0].position === 0 && grad.stops[1].position === 1) {
+      // Plain 2-stop gradient — keep the simple single-function shading.
+      shading = doc.addAxialShading({
+        x0: line.x0, y0: line.y0, x1: line.x1, y1: line.y1,
+        c0: grad.stops[0].color, c1: grad.stops[grad.stops.length - 1].color,
+      });
+    } else {
+      // Multi-stop (or offset stops) — FunctionType 3 stitching function.
+      shading = doc.addAxialShadingStops({
+        x0: line.x0, y0: line.y0, x1: line.x1, y1: line.y1, stops: grad.stops,
+      });
+    }
     page.fillRectShading(shading, x, y, w, h, hasRadius ? radii : null);
+  } else if (rgrad && rgrad.stops.length >= 2) {
+    // Radial gradient. PDF radial shadings (ShadingType 3) are circular only, so:
+    // clip to the (rounded) box, translate to the gradient center, scale Y by ry/rx
+    // via cm, then paint a circular shading of radius rx at the origin.
+    const geo = resolveRadialGeometry(rgrad, b.w, b.h);  // CSS px, relative to box
+    const cxPdf = (b.x + geo.cx) * CSS_TO_PDF;
+    const cyPdf = cssYToPdfY(b.y + geo.cy, pageHeightPdf);
+    const rxPdf = Math.max(geo.rx, 0.01) * CSS_TO_PDF;
+    const ryPdf = Math.max(geo.ry, 0.01) * CSS_TO_PDF;
+    const shading = doc.addRadialShadingStops({
+      cx: 0, cy: 0, r0: 0, r1: rxPdf, stops: rgrad.stops,
+    });
+    page.fillRectShadingMatrix(shading, x, y, w, h, hasRadius ? radii : null,
+      [1, 0, 0, ryPdf / rxPdf, cxPdf, cyPdf]);
   } else if (grad && grad.stops.length === 1) {
     paintFill(grad.stops[0].color);
   } else if (fill && fill.a > 0) {
@@ -505,8 +528,19 @@ function parseLinearGradient(s) {
     stopsStart = 1;
   }
 
+  const stops = parseStopList(parts, stopsStart);
+  if (stops.length < 2) return null;
+  completeStopPositions(stops);
+  return { angleDeg, stops };
+}
+
+/**
+ * Parse the color-stop tail of a gradient function (parts already split at top-level
+ * commas; stops begin at index `start`). Returns [{color, position: 0..1|null}, ...].
+ */
+function parseStopList(parts, start) {
   const stops = [];
-  for (let i = stopsStart; i < parts.length; i++) {
+  for (let i = start; i < parts.length; i++) {
     const p = parts[i].trim();
     // Color part = up to the first standalone position token (a length/percentage that
     // is NOT inside parentheses). Strip an optional trailing position; the leftover is
@@ -527,8 +561,166 @@ function parseLinearGradient(s) {
     }
     stops.push({ color, position: pos });
   }
+  return stops;
+}
+
+/**
+ * Complete missing stop positions per CSS (css-images-3 §3.4.3), in place:
+ *   1. first defaults to 0, last to 1;
+ *   2. specified positions are clamped monotonically non-decreasing;
+ *   3. runs of unpositioned stops are distributed evenly between known neighbors.
+ * Positions are finally clamped to [0, 1] (PDF shadings cover the [0,1] domain only;
+ * out-of-range CSS stops are rare and approximated by the clamp).
+ */
+function completeStopPositions(stops) {
+  if (!stops.length) return;
+  if (stops[0].position == null) stops[0].position = 0;
+  if (stops[stops.length - 1].position == null) stops[stops.length - 1].position = 1;
+  // Monotonic clamp of the specified positions.
+  let maxSoFar = stops[0].position;
+  for (const st of stops) {
+    if (st.position == null) continue;
+    if (st.position < maxSoFar) st.position = maxSoFar;
+    maxSoFar = st.position;
+  }
+  // Distribute nulls evenly between the surrounding positioned stops.
+  let i = 0;
+  while (i < stops.length) {
+    if (stops[i].position != null) { i++; continue; }
+    let j = i;
+    while (stops[j].position == null) j++;           // last stop is never null
+    const prev = stops[i - 1].position;              // first stop is never null
+    const next = stops[j].position;
+    const n = j - i + 1;                             // gaps between prev and next
+    for (let k = i; k < j; k++) {
+      stops[k].position = prev + (next - prev) * (k - i + 1) / n;
+    }
+    i = j + 1;
+  }
+  for (const st of stops) st.position = Math.min(1, Math.max(0, st.position));
+}
+
+/**
+ * Minimal radial-gradient() parser for the browser-COMPUTED serialization. Chromium
+ * normalizes shapes/positions, e.g.:
+ *   radial-gradient(rgb(...) 0%, rgb(...) 100%)                — ellipse farthest-corner at center
+ *   radial-gradient(circle, rgb(...) 0%, rgb(...) 100%)
+ *   radial-gradient(at 0% 0%, rgb(...) 0%, ...)                — "ellipse at top left" form
+ *   radial-gradient(123px 45px at 10px 20px, rgb(...), ...)    — explicit radii
+ *
+ * Returns { shape, sizeKeyword, explicitSize, posX, posY, stops } or null.
+ * posX/posY are { v, unit: '%'|'px' }; explicitSize is [{v,unit}, {v,unit}] or null.
+ * Resolve against a box with resolveRadialGeometry().
+ */
+function parseRadialGradient(s) {
+  if (!s || s === 'none') return null;
+  const m = /^radial-gradient\((.*)\)$/s.exec(s.trim());
+  if (!m) return null;
+  const parts = splitTopLevel(m[1]);
+  if (parts.length < 2) return null;
+
+  let shape = null;            // 'circle' | 'ellipse' | null (inferred)
+  let sizeKeyword = null;      // closest-side | closest-corner | farthest-side | farthest-corner
+  const explicit = [];         // explicit radii tokens
+  let posX = null, posY = null;
+  let stopsStart = 0;
+
+  const first = parts[0].trim();
+  // The first part is a prelude only if it does not start with a color.
+  const isColorStart = /^(rgba?\(|hsla?\(|color\(|#)/i.test(first) || parseColor(first.split(/\s+/)[0]);
+  if (!isColorStart) {
+    stopsStart = 1;
+    const [beforeAt, afterAt] = first.split(/\bat\b/i).map(t => (t || '').trim());
+    for (const tok of beforeAt.split(/\s+/).filter(Boolean)) {
+      const t = tok.toLowerCase();
+      if (t === 'circle' || t === 'ellipse') shape = t;
+      else if (/^(closest|farthest)-(side|corner)$/.test(t)) sizeKeyword = t;
+      else if (/^[-\d.]+(px|%)$/.test(t)) {
+        explicit.push({ v: parseFloat(t), unit: t.endsWith('%') ? '%' : 'px' });
+      }
+    }
+    if (afterAt) {
+      const posToks = afterAt.split(/\s+/).filter(Boolean);
+      const kw = { left: { v: 0, unit: '%' }, right: { v: 100, unit: '%' },
+                   top: { v: 0, unit: '%' }, bottom: { v: 100, unit: '%' },
+                   center: { v: 50, unit: '%' } };
+      const resolved = posToks.map(t => {
+        const lt = t.toLowerCase();
+        if (kw[lt]) return kw[lt];
+        if (/^[-\d.]+%$/.test(t)) return { v: parseFloat(t), unit: '%' };
+        if (/^[-\d.]+(px)?$/.test(t)) return { v: parseFloat(t), unit: 'px' };
+        return null;
+      }).filter(Boolean);
+      posX = resolved[0] || null;
+      posY = resolved[1] || null;  // single component → vertical defaults to center
+    }
+  }
+  if (!posX) posX = { v: 50, unit: '%' };
+  if (!posY) posY = { v: 50, unit: '%' };
+  if (!shape) shape = explicit.length === 1 ? 'circle' : 'ellipse';
+  if (!sizeKeyword && !explicit.length) sizeKeyword = 'farthest-corner';
+
+  const stops = parseStopList(parts, stopsStart);
   if (stops.length < 2) return null;
-  return { angleDeg, stops };
+  completeStopPositions(stops);
+  return { shape, sizeKeyword, explicitSize: explicit.length ? explicit : null, posX, posY, stops };
+}
+
+/**
+ * Resolve a parsed radial gradient against its box (CSS px). Implements the ending-shape
+ * sizing rules of css-images-3 §3.2.3: extent keywords for circles use distances to the
+ * closest/farthest side/corner; ellipses with *-corner extents take the aspect ratio of
+ * the corresponding *-side ellipse and pass through that corner.
+ * Returns { cx, cy, rx, ry } relative to the box's top-left, in CSS px.
+ */
+function resolveRadialGeometry(g, w, h) {
+  const cx = g.posX.unit === '%' ? g.posX.v / 100 * w : g.posX.v;
+  const cy = g.posY.unit === '%' ? g.posY.v / 100 * h : g.posY.v;
+  let rx, ry;
+
+  if (g.explicitSize) {
+    if (g.explicitSize.length === 1) {
+      rx = ry = g.explicitSize[0].unit === '%' ? g.explicitSize[0].v / 100 * w : g.explicitSize[0].v;
+    } else {
+      rx = g.explicitSize[0].unit === '%' ? g.explicitSize[0].v / 100 * w : g.explicitSize[0].v;
+      ry = g.explicitSize[1].unit === '%' ? g.explicitSize[1].v / 100 * h : g.explicitSize[1].v;
+    }
+    return { cx, cy, rx: Math.max(rx, 0.01), ry: Math.max(ry, 0.01) };
+  }
+
+  const dxNear = Math.min(Math.abs(cx), Math.abs(w - cx));
+  const dxFar  = Math.max(Math.abs(cx), Math.abs(w - cx));
+  const dyNear = Math.min(Math.abs(cy), Math.abs(h - cy));
+  const dyFar  = Math.max(Math.abs(cy), Math.abs(h - cy));
+
+  if (g.shape === 'circle') {
+    let r;
+    switch (g.sizeKeyword) {
+      case 'closest-side':    r = Math.min(dxNear, dyNear); break;
+      case 'farthest-side':   r = Math.max(dxFar, dyFar); break;
+      case 'closest-corner':  r = Math.hypot(dxNear, dyNear); break;
+      default:                r = Math.hypot(dxFar, dyFar); break;  // farthest-corner
+    }
+    rx = ry = r;
+  } else {
+    switch (g.sizeKeyword) {
+      case 'closest-side':    rx = dxNear; ry = dyNear; break;
+      case 'farthest-side':   rx = dxFar;  ry = dyFar;  break;
+      case 'closest-corner': {
+        const a = Math.max(dxNear, 0.01) / Math.max(dyNear, 0.01);
+        ry = Math.hypot(dxNear / a, dyNear);
+        rx = a * ry;
+        break;
+      }
+      default: {  // farthest-corner
+        const a = Math.max(dxFar, 0.01) / Math.max(dyFar, 0.01);
+        ry = Math.hypot(dxFar / a, dyFar);
+        rx = a * ry;
+        break;
+      }
+    }
+  }
+  return { cx, cy, rx: Math.max(rx, 0.01), ry: Math.max(ry, 0.01) };
 }
 
 function splitTopLevel(s) {

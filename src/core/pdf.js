@@ -119,6 +119,87 @@ export class PdfDocument {
   }
 
   /**
+   * Build a FunctionType 3 stitching function over N-1 FunctionType 2 segments
+   * from a sorted multi-stop list: [{color: {r,g,b}, position: 0..1}, ...].
+   * If the first stop position is > 0 (or the last < 1) the end color is duplicated
+   * so the function stays constant over the uncovered range (CSS clamp semantics).
+   * Returns the function's indirect object.
+   */
+  _buildStitchingFunction(stops) {
+    const sts = stops.slice();
+    if (sts[0].position > 0) sts.unshift({ color: sts[0].color, position: 0 });
+    if (sts[sts.length - 1].position < 1) sts.push({ color: sts[sts.length - 1].color, position: 1 });
+    // Collect non-degenerate segments (zero-width segments — hard stops — are skipped;
+    // the following segment picks up the new color, producing the discontinuity).
+    const segs = [];
+    for (let i = 0; i < sts.length - 1; i++) {
+      const p0 = sts[i].position, p1 = sts[i + 1].position;
+      if (p1 <= p0) continue;
+      segs.push({ p0, p1, c0: sts[i].color, c1: sts[i + 1].color });
+    }
+    if (segs.length === 0) {
+      // All stops coincide — constant function of the last color.
+      const c = sts[sts.length - 1].color;
+      return this._allocObject({
+        FunctionType: 2, Domain: [0, 1], C0: [c.r, c.g, c.b], C1: [c.r, c.g, c.b], N: 1,
+      });
+    }
+    const fns = segs.map(s => this._allocObject({
+      FunctionType: 2,
+      Domain: [0, 1],
+      C0: [s.c0.r, s.c0.g, s.c0.b],
+      C1: [s.c1.r, s.c1.g, s.c1.b],
+      N: 1,
+    }));
+    if (fns.length === 1) return fns[0];
+    return this._allocObject({
+      FunctionType: 3,
+      Domain: [0, 1],
+      Functions: fns,
+      Bounds: segs.slice(1).map(s => s.p0),
+      Encode: segs.flatMap(() => [0, 1]),
+    });
+  }
+
+  /**
+   * Add a multi-stop axial (linear) gradient shading. Coordinates in PDF user units.
+   * stops: [{color: {r,g,b}, position: 0..1}, ...] sorted by position.
+   * Returns a handle: { alias: 'Sh1', objRef }
+   */
+  addAxialShadingStops({ x0, y0, x1, y1, stops }) {
+    const alias = 'Sh' + (this._shadingCounter = (this._shadingCounter || 0) + 1);
+    const fn = this._buildStitchingFunction(stops);
+    const shading = this._allocObject({
+      ShadingType: 2,
+      ColorSpace: name('DeviceRGB'),
+      Coords: [x0, y0, x1, y1],
+      Domain: [0, 1],
+      Function: fn,
+      Extend: [true, true],
+    });
+    return { alias, objRef: shading, kind: 'axialShading' };
+  }
+
+  /**
+   * Add a multi-stop radial gradient shading (ShadingType 3, circular only — apply a
+   * cm scale on the page for elliptical gradients). Coordinates in PDF user units.
+   * Returns a handle: { alias: 'Sh1', objRef }
+   */
+  addRadialShadingStops({ cx, cy, r0, r1, stops }) {
+    const alias = 'Sh' + (this._shadingCounter = (this._shadingCounter || 0) + 1);
+    const fn = this._buildStitchingFunction(stops);
+    const shading = this._allocObject({
+      ShadingType: 3,
+      ColorSpace: name('DeviceRGB'),
+      Coords: [cx, cy, r0, cx, cy, r1],
+      Domain: [0, 1],
+      Function: fn,
+      Extend: [true, true],
+    });
+    return { alias, objRef: shading, kind: 'radialShading' };
+  }
+
+  /**
    * Add one of the 14 PDF standard Type 1 fonts. No embedding needed.
    * Returns a font handle: { alias: 'F1', baseFont: 'Helvetica', objRef }
    */
@@ -360,6 +441,26 @@ class Page {
       this._push(`${num(x)} ${num(y)} ${num(w)} ${num(h)} re\n`);
     }
     this._push('W n\n');
+    this._push(`/${shading.alias} sh\n`);
+    this._push('Q\n');
+  }
+
+  /**
+   * Fill an axis-aligned (optionally rounded) rectangle with a shading painted under a
+   * transform matrix m = [a b c d e f] (applied via cm AFTER the clip is set, so the
+   * clip stays in page space). Used for elliptical radial gradients: clip to the box,
+   * translate to the gradient center, scale Y by ry/rx, paint a circular shading.
+   */
+  fillRectShadingMatrix(shading, x, y, w, h, radii, m) {
+    this.shadingsUsed.add(shading);
+    this._push('q\n');
+    if (radii) {
+      this.pathRoundedRect(x, y, w, h, radii);
+    } else {
+      this._push(`${num(x)} ${num(y)} ${num(w)} ${num(h)} re\n`);
+    }
+    this._push('W n\n');
+    this._push(`${m.map(num).join(' ')} cm\n`);
     this._push(`/${shading.alias} sh\n`);
     this._push('Q\n');
   }
