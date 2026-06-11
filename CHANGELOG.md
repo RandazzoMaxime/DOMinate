@@ -246,3 +246,22 @@ Baseline at session start: 4 fixtures, overall 5.885%, all gates green.
 | torture-text | 1.993% | markers/AA |
 | report | 4.626% | deterministic now; under investigation |
 | **overall** | **1.415%** | all functional gates green on 9 fixtures |
+
+## Iterations 38-45 (01:00-01:45)
+
+- **iter 38** — synthetic oblique (Skia-style 0.213 shear) for italic/oblique runs.
+- **iter 39** — CSS transforms: measure-untransformed technique (disable transform inline,
+  measure subtree, restore; painter replays matrix chains as PDF cm conjugated by the
+  y-flip). Fixture torture-transform debuts 0.959%.
+- **iter 40/41/42** — text-shadow (9-pass gaussian), inset box-shadow (even-odd erfc
+  rings; sign bug fixed 2.76->1.16%), outline + outline-offset, groove/ridge/inset/outset
+  two-tone borders. Fixture torture-effects.
+- **iter 43** — lazy font embedding: scan boxes for used weight buckets / Greek / mono;
+  PDFs shrink 2-3x (image 550->128 KB), diff byte-identical, validity 77/77.
+- **iter 44** — fixture torture-flow (floats, CSS columns, text-indent, vertical-align,
+  word-break — all "free" via the measurement architecture) + text-overflow: ellipsis
+  (word trim + … synthesis). Explored & reverted: hairline glyph stroke (2 Tr) — Chromium
+  glyphs are not uniformly heavier, regressed +21k px.
+- **iter 45** — 3D border dark factor 0.46 (sampled: #4f9d69 -> #244930 in Chromium).
+
+## State at 01:45 — 12 fixtures, overall 1.418%, two consecutive runs byte-identical
