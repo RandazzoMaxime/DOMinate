@@ -300,3 +300,10 @@ Baseline at session start: 4 fixtures, overall 5.885%, all gates green.
 validity suite 84/84, two consecutive loop runs byte-identical. Remaining diff is
 glyph-level anti-aliasing between Skia and pdfjs plus the LCD fringes retained in the
 protected source.png reference.
+
+- **iter 53 (03:00)** — letter-spacing via Tc for base-14 fonts: flat 1.018 -> 0.888%.
+
+# SESSION CLOSED 03:10 — overall 0.751% (89002/11856282 px), 12 fixtures,
+# all gates green, validity 84/84, loop byte-stable. 25 iterations + 3 agent
+# merges this session; src/ grew 2.2K -> 3.6K LOC, every feature diff-verified
+# against Chromium ground truth.
