@@ -77,6 +77,23 @@ export async function htmlToPdf(input, opts = {}) {
   const html = typeof input === 'string' ? input : input.outerHTML;
   const { boxes } = await layout(html, viewport);
 
+  // Scan the render boxes to find which faces the document ACTUALLY needs, so we
+  // only embed those (a full embed of all 11 bundled faces costs ~450 KB per PDF).
+  // Inter-400 is always embedded: it anchors svg-text and every fallback chain.
+  const bucketOf = (w) => (w >= 700 ? 700 : w >= 600 ? 600 : w >= 500 ? 500 : 400);
+  const needWeights = new Set([400]);
+  const needGreek = new Set();
+  const needMono = new Set();
+  for (const b of boxes) {
+    if (b.kind !== 'text' || !b.text) continue;
+    const w = bucketOf(b.style.resolvedWeight || parseInt(b.style.fontWeight, 10) || 400);
+    needWeights.add(w);
+    const fam = (b.style.fontFamily || '').toLowerCase();
+    if (/^['"]?(jetbrains mono|consolas|monospace)\b/.test(fam)) { needMono.add(w); needMono.add(400); }
+    // Anything beyond Latin-1 + punctuation may live in the Greek subset fallback.
+    if (/[Ͱ-⿿]/.test(b.text)) needGreek.add(w);
+  }
+
   // Embed Inter weights (Latin + Greek subsets) when bundled. Falls back to Helvetica.
   const inters = await loadInter();
   /** @type {*} */
@@ -85,24 +102,24 @@ export async function htmlToPdf(input, opts = {}) {
     const embed = (b, name) => b ? embedTrueTypeFont(doc, b, name) : null;
     const [r400, r500, r600, r700] = await Promise.all([
       embed(inters.latin[400], 'Inter-Regular'),
-      embed(inters.latin[500], 'Inter-Medium'),
-      embed(inters.latin[600], 'Inter-SemiBold'),
-      embed(inters.latin[700], 'Inter-Bold'),
+      embed(needWeights.has(500) ? inters.latin[500] : null, 'Inter-Medium'),
+      embed(needWeights.has(600) ? inters.latin[600] : null, 'Inter-SemiBold'),
+      embed(needWeights.has(700) ? inters.latin[700] : null, 'Inter-Bold'),
     ]);
     const [g400, g500, g600, g700] = await Promise.all([
-      embed(inters.greek[400], 'Inter-Regular-Greek'),
-      embed(inters.greek[500], 'Inter-Medium-Greek'),
-      embed(inters.greek[600], 'Inter-SemiBold-Greek'),
-      embed(inters.greek[700], 'Inter-Bold-Greek'),
+      embed(needGreek.has(400) ? inters.greek[400] : null, 'Inter-Regular-Greek'),
+      embed(needGreek.has(500) ? inters.greek[500] : null, 'Inter-Medium-Greek'),
+      embed(needGreek.has(600) ? inters.greek[600] : null, 'Inter-SemiBold-Greek'),
+      embed(needGreek.has(700) ? inters.greek[700] : null, 'Inter-Bold-Greek'),
     ]);
     // Helvetica/Arial alternates use the PDF base-14 Helvetica to match the typical
     // reference rendering (which falls back to Arial when no @font-face Inter is set).
     const helv = doc.addStandardFont('Helvetica');
     const helvBold = doc.addStandardFont('Helvetica-Bold');
     // Monospace alternate (for font-family: 'JetBrains Mono', monospace, etc).
-    const jbMonoFont = inters.jbMono ? await embedTrueTypeFont(doc, inters.jbMono, 'JetBrainsMono-Regular') : null;
-    const jbMono500 = inters.jbMono500 ? await embedTrueTypeFont(doc, inters.jbMono500, 'JetBrainsMono-Medium') : null;
-    const jbMono700 = inters.jbMono700 ? await embedTrueTypeFont(doc, inters.jbMono700, 'JetBrainsMono-Bold') : null;
+    const jbMonoFont = needMono.size && inters.jbMono ? await embedTrueTypeFont(doc, inters.jbMono, 'JetBrainsMono-Regular') : null;
+    const jbMono500 = needMono.has(500) && inters.jbMono500 ? await embedTrueTypeFont(doc, inters.jbMono500, 'JetBrainsMono-Medium') : null;
+    const jbMono700 = (needMono.has(700) || needMono.has(600)) && inters.jbMono700 ? await embedTrueTypeFont(doc, inters.jbMono700, 'JetBrainsMono-Bold') : null;
     const courier = doc.addStandardFont('Courier');
     const courierBold = doc.addStandardFont('Courier-Bold');
     fontMap = {
