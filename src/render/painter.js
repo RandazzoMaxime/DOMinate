@@ -731,7 +731,15 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
   const runs = splitTextByFont(renderText, fontHandle, fallbacks);
   const letterSpacingCss = parsePx(b.style.letterSpacing);
   page.beginText();
-  page.setTextPos(xPdf, yPdf);
+  // Synthetic oblique: Chromium fakes italic for fonts without an italic face by
+  // skewing 14° (Skia kFakeItalicSkew = 0.25). Our embedded faces are all upright,
+  // so every italic/oblique run gets the same synthetic shear via the text matrix.
+  const italic = b.style.fontStyle === 'italic' || b.style.fontStyle === 'oblique';
+  if (italic && fontHandle.kind === 'embeddedTrueType') {
+    page._push(`1 0 0.213 1 ${num(xPdf)} ${num(yPdf)} Tm\n`);
+  } else {
+    page.setTextPos(xPdf, yPdf);
+  }
   for (const run of runs) {
     page.setFont(run.font, fontSizeCss * CSS_TO_PDF);
     if (run.font.kind === 'embeddedTrueType') {

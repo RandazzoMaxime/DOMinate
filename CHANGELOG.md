@@ -203,3 +203,46 @@ extraction, FontFile2+Inter signature, size sanity).
 
 PDF deliverable: `S:/HTML_TO_PDF_CLIENT/PROGRESS_REPORT.pdf` (197 KB, vector-only,
 embedded Inter-400/500/600/700, 2 link annotations, ISO 32000-2 conformant).
+
+---
+
+# Session 2026-06-11/12 — "TOUT le CSS/HTML" (deadline 03:30)
+
+Baseline at session start: 4 fixtures, overall 5.885%, all gates green.
+
+## Iteration log (summary — full detail in git log)
+
+- **fixtures**: +5 torture fixtures (box / text / table / svg / image) + scripts/make-reference.mjs
+  (Chromium ground-truth generator), scripts/diff-regions.mjs (diff clustering),
+  scripts/inspect-patch.mjs (ASCII patch comparator), scripts/probe-layout-diff.mjs.
+- **iter 29** — text engine v2: per-character Range measurement -> word-exact boxes;
+  white-space:pre, justify, wrap all exact. ::marker synthesis (disc/circle/square + counters).
+- **iter 30** — CSS 2.1 Appendix E paint order (stacking contexts, z-index) + overflow clipping.
+- **iter 31** — line-through, marker gap tuned vs Blink, decoration bridging across word gaps.
+- **iter 32** — pixel-grid snapping for fills; collapse-aware border strokes.
+- **iter 33** — stale wizard reference regenerated (Tailwind CDN drift): 7.72 -> 0.83%.
+- **iter 34** — from-scratch PNG decoder (inflate via DecompressionStream, Paeth & co,
+  palette/tRNS, SMask alpha), object-fit, background-image url() + size/position/repeat.
+- **merges** — 3 parallel agent worktrees: SVG paths M/L/H/V/C/S/Q/T/A/Z + dasharray/caps/joins
+  (svg 5.87 -> 0.51%); multi-stop axial + radial shadings w/ FunctionType 3 stitching
+  (box 16.99 -> 4.65% standalone); per-side borders 4-trapezoid + double/dashed/dotted
+  Chromium dash fitting + box-shadow gaussian penumbra via erfc-matched nested fills.
+- **iter 35** — exact baselines from in-engine measureText fontBoundingBox metrics.
+- **iter 36/37** — deterministic settle: fonts.ready + no-loading-faces + resource-count
+  + layout fingerprint stable 2 ticks; css-fonts-4 weight resolution vs document.fonts
+  (variable ranges incl.); JetBrains Mono 500/700 embedded.
+
+## State at 00:43
+
+| Fixture | Diff | Notes |
+|---|---|---|
+| source | 0.952% | text AA floor |
+| wizard | 0.677% | icon font skipped (woff2 out of scope) |
+| torture-svg | 0.503% | vector geometry pixel-exact |
+| torture-table | 1.052% | collapse grid lines sub-px |
+| torture-image | 1.157% | resample AA on scaled rasters |
+| torture-box | 1.405% | radial edges + shadow tails |
+| source-flat | 1.410% | |
+| torture-text | 1.993% | markers/AA |
+| report | 4.626% | deterministic now; under investigation |
+| **overall** | **1.415%** | all functional gates green on 9 fixtures |
