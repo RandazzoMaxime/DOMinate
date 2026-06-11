@@ -69,8 +69,17 @@ export async function layout(html, { width, height }) {
     // Two rAFs to ensure post-font-load reflow has settled.
     await new Promise(r => requestAnimationFrame(() => r()));
     await new Promise(r => requestAnimationFrame(() => r()));
-    // Tailwind-CDN runtime needs an extra tick for its CSSOM mutation to settle.
-    await new Promise(r => setTimeout(r, 100));
+    // Async CSSOM mutators (Tailwind-CDN JIT, late @font-face swaps) keep reflowing
+    // the document AFTER the load event. Poll a cheap layout fingerprint until it is
+    // stable across two consecutive 100ms ticks (capped at 2s) instead of hoping a
+    // fixed delay is enough.
+    let prevFp = '';
+    for (let tick = 0; tick < 20; tick++) {
+      const fp = layoutFingerprint(idoc);
+      if (fp === prevFp) break;
+      prevFp = fp;
+      await new Promise(r => setTimeout(r, 100));
+    }
 
     const root = idoc.documentElement;
     const boxes = [];
@@ -86,6 +95,18 @@ export async function layout(html, { width, height }) {
 import { walkSvg } from '../render/svg.js';
 import { parseColor, parsePx } from './utils.js';
 export { parseColor, parsePx };
+
+/** Cheap whole-document layout fingerprint: scrollHeight + ~50 sampled element rects. */
+function layoutFingerprint(idoc) {
+  let s = idoc.body ? idoc.body.scrollHeight + ':' : '';
+  const els = idoc.querySelectorAll('*');
+  const step = Math.max(1, Math.floor(els.length / 50));
+  for (let i = 0; i < els.length; i += step) {
+    const r = els[i].getBoundingClientRect();
+    s += (r.top | 0) + ',' + (r.left | 0) + ',' + (r.width | 0) + ';';
+  }
+  return s;
+}
 
 const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'LINK', 'META', 'TITLE', 'HEAD', 'NOSCRIPT']);
 
