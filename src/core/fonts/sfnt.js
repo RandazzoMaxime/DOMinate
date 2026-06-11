@@ -172,3 +172,100 @@ function parseCmapFormat12(cmap, offset, out) {
     g += 12;
   }
 }
+
+/**
+ * Parse the GSUB 'liga' ligature substitutions (LookupType 4, incl. Extension
+ * lookups type 7). Icon fonts like Material Symbols map glyph-name sequences
+ * ("settings") to a single icon glyph through these.
+ *
+ * @param {ArrayBuffer|Uint8Array} input  raw font bytes
+ * @returns {Map<number, Array<{comps: number[], lig: number}>>}
+ *   keyed by FIRST component GID; entries sorted longest-components-first.
+ */
+export function parseGsubLigatures(input) {
+  const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const out = new Map();
+
+  const numTables = dv.getUint16(4, false);
+  let gsubOff = -1;
+  for (let i = 0; i < numTables; i++) {
+    const off = 12 + i * 16;
+    const tag = String.fromCharCode(bytes[off], bytes[off + 1], bytes[off + 2], bytes[off + 3]);
+    if (tag === 'GSUB') { gsubOff = dv.getUint32(off + 8, false); break; }
+  }
+  if (gsubOff < 0) return out;
+
+  const u16 = (o) => dv.getUint16(o, false);
+  const u32 = (o) => dv.getUint32(o, false);
+
+  const featureListOff = gsubOff + u16(gsubOff + 6);
+  const lookupListOff  = gsubOff + u16(gsubOff + 8);
+
+  // Collect lookup indices referenced by every 'liga' feature (any script/lang).
+  const ligaLookups = new Set();
+  const featureCount = u16(featureListOff);
+  for (let i = 0; i < featureCount; i++) {
+    const rec = featureListOff + 2 + i * 6;
+    const tag = String.fromCharCode(bytes[rec], bytes[rec + 1], bytes[rec + 2], bytes[rec + 3]);
+    if (tag !== 'liga' && tag !== 'rlig' && tag !== 'ccmp') continue;
+    const featOff = featureListOff + u16(rec + 4);
+    const lookupCount = u16(featOff + 2);
+    for (let j = 0; j < lookupCount; j++) ligaLookups.add(u16(featOff + 4 + j * 2));
+  }
+  if (!ligaLookups.size) return out;
+
+  const lookupCount = u16(lookupListOff);
+  for (const li of ligaLookups) {
+    if (li >= lookupCount) continue;
+    const lookupOff = lookupListOff + u16(lookupListOff + 2 + li * 2);
+    let type = u16(lookupOff);
+    const subCount = u16(lookupOff + 4);
+    for (let s = 0; s < subCount; s++) {
+      let subOff = lookupOff + u16(lookupOff + 6 + s * 2);
+      let effType = type;
+      if (type === 7) {  // Extension: real subtable behind a 32-bit offset
+        effType = u16(subOff + 2);
+        subOff = subOff + u32(subOff + 4);
+      }
+      if (effType !== 4) continue;
+      if (u16(subOff) !== 1) continue;  // substFormat 1 only
+      const coverage = readCoverage(dv, subOff + u16(subOff + 2));
+      const ligSetCount = u16(subOff + 4);
+      for (let cs = 0; cs < Math.min(ligSetCount, coverage.length); cs++) {
+        const firstGid = coverage[cs];
+        const setOff = subOff + u16(subOff + 6 + cs * 2);
+        const ligCount = u16(setOff);
+        for (let l = 0; l < ligCount; l++) {
+          const ligOff = setOff + u16(setOff + 2 + l * 2);
+          const ligGlyph = u16(ligOff);
+          const compCount = u16(ligOff + 2);
+          const comps = [];
+          for (let c = 0; c < compCount - 1; c++) comps.push(u16(ligOff + 4 + c * 2));
+          if (!out.has(firstGid)) out.set(firstGid, []);
+          out.get(firstGid).push({ comps, lig: ligGlyph });
+        }
+      }
+    }
+  }
+  for (const arr of out.values()) arr.sort((a, b) => b.comps.length - a.comps.length);
+  return out;
+}
+
+function readCoverage(dv, off) {
+  const u16 = (o) => dv.getUint16(o, false);
+  const fmt = u16(off);
+  const glyphs = [];
+  if (fmt === 1) {
+    const n = u16(off + 2);
+    for (let i = 0; i < n; i++) glyphs.push(u16(off + 4 + i * 2));
+  } else if (fmt === 2) {
+    const n = u16(off + 2);
+    for (let i = 0; i < n; i++) {
+      const start = u16(off + 4 + i * 6);
+      const end = u16(off + 6 + i * 6);
+      for (let g = start; g <= end; g++) glyphs.push(g);
+    }
+  }
+  return glyphs;
+}

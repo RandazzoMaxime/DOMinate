@@ -12,6 +12,7 @@ import { PdfDocument } from './core/pdf.js';
 import { layout } from './dom/walker.js';
 import { paint } from './render/painter.js';
 import { embedTrueTypeFont } from './core/fonts/embed.js';
+import { parseGsubLigatures } from './core/fonts/sfnt.js';
 import { embedJpeg } from './core/images/jpeg.js';
 import { embedPng } from './core/images/png.js';
 
@@ -84,12 +85,14 @@ export async function htmlToPdf(input, opts = {}) {
   const needWeights = new Set([400]);
   const needGreek = new Set();
   const needMono = new Set();
+  let needManrope = false;
   for (const b of boxes) {
     if (b.kind !== 'text' || !b.text) continue;
     const w = bucketOf(b.style.resolvedWeight || parseInt(b.style.fontWeight, 10) || 400);
     needWeights.add(w);
     const fam = (b.style.fontFamily || '').toLowerCase();
     if (/^['"]?(jetbrains mono|consolas|monospace)\b/.test(fam)) { needMono.add(w); needMono.add(400); }
+    if (/^['"]?manrope\b/.test(fam)) needManrope = true;
     // Anything beyond Latin-1 + punctuation may live in the Greek subset fallback.
     if (/[Ͱ-⿿]/.test(b.text)) needGreek.add(w);
   }
@@ -122,6 +125,16 @@ export async function htmlToPdf(input, opts = {}) {
     const jbMono700 = (needMono.has(700) || needMono.has(600)) && inters.jbMono700 ? await embedTrueTypeFont(doc, inters.jbMono700, 'JetBrainsMono-Bold') : null;
     const courier = doc.addStandardFont('Courier');
     const courierBold = doc.addStandardFont('Courier-Bold');
+    // Manrope (display family used by the wizard fixture) — weights 700/800.
+    let man700 = null, man800 = null;
+    if (needManrope) {
+      const [b700, b800] = await Promise.all([
+        fetch('/assets/fonts/Manrope-700.ttf').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null),
+        fetch('/assets/fonts/Manrope-800.ttf').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null),
+      ]);
+      man700 = b700 ? await embedTrueTypeFont(doc, b700, 'Manrope-Bold') : null;
+      man800 = b800 ? await embedTrueTypeFont(doc, b800, 'Manrope-ExtraBold') : null;
+    }
     fontMap = {
       regular:    r400, medium: r500 || r400, semibold: r600 || r400, bold: r700 || r600 || r400,
       oblique:    r400,
@@ -142,6 +155,7 @@ export async function htmlToPdf(input, opts = {}) {
           : { regular: courier,    bold: courierBold, semibold: courierBold, medium: courier },
         consolas:         { regular: jbMonoFont || courier, bold: jbMono700 || jbMonoFont || courierBold, semibold: jbMono700 || jbMonoFont || courierBold, medium: jbMono500 || jbMonoFont || courier },
         monospace:        { regular: jbMonoFont || courier, bold: jbMono700 || jbMonoFont || courierBold, semibold: jbMono700 || jbMonoFont || courierBold, medium: jbMono500 || jbMonoFont || courier },
+        ...(man700 ? { manrope: { regular: man700, medium: man700, semibold: man700, bold: man700, black: man800 || man700 } } : {}),
       },
       embedded: true,
     };
@@ -180,6 +194,19 @@ export async function htmlToPdf(input, opts = {}) {
       const m = /^url\(["']?([^"')]+)["']?\)$/.exec(b.style.backgroundImage.trim());
       if (m) b.bgEmbedded = await fetchAndEmbed(m[1]);
     }
+  }
+
+  // Icon fonts (Material Symbols): glyph names resolve through GSUB ligatures.
+  // Embedded lazily — only when the page actually contains icon-font runs.
+  if (boxes.some(b => b.iconFont)) {
+    try {
+      const r = await fetch('/assets/fonts/MaterialSymbolsOutlined.ttf');
+      if (r.ok) {
+        const iconBytes = new Uint8Array(await r.arrayBuffer());
+        fontMap.icons = await embedTrueTypeFont(doc, iconBytes, 'MaterialSymbolsOutlined');
+        fontMap.icons.ligatures = parseGsubLigatures(iconBytes);
+      }
+    } catch { /* offline — icon runs stay blank */ }
   }
 
   const page = doc.addPage();

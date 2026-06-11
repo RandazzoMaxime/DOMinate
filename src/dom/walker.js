@@ -378,13 +378,16 @@ function walk(el, idoc, boxes, ctx) {
     if (child.nodeType === 3) {
       const raw = child.nodeValue;
       if (!raw || !raw.trim()) continue;
-      if (isIconFont) continue;
       const before = boxes.length;
       pushWordBoxes(child, idoc, boxes, style, el);
       for (let i = before; i < boxes.length; i++) {
         boxes[i].sortKey = key(5);
         boxes[i].clips = clipsForChildren;
         boxes[i].tfms = tfms;
+        // Icon-font runs (Material Symbols etc.) carry glyph NAMES that resolve
+        // through GSUB ligatures; the painter draws them only when the icon font
+        // could be embedded, otherwise they stay blank like before.
+        if (isIconFont) boxes[i].iconFont = true;
       }
     } else if (child.nodeType === 1) {
       walk(child, idoc, boxes, childCtx);

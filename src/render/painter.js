@@ -787,6 +787,7 @@ function erf(x) {
 function paintText(page, fontMap, b, pageHeightPdf, doc) {
   const txt = b.text;
   if (!txt) return;
+  if (b.iconFont) { paintIconRun(page, fontMap, b, pageHeightPdf, doc); return; }
   const color = parseColor(b.style.color);
   const fontSizeCss = parsePx(b.style.fontSize) || 10;
   // resolvedWeight = the weight Chromium actually rendered with (css-fonts-4
@@ -798,7 +799,7 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
   // request should still pick Arial-like rendering).
   const fontFam = (b.style.fontFamily || '').toLowerCase();
   const altKey = (() => {
-    const m = /^['"]?(arial|helvetica|jetbrains mono|consolas|monospace)\b/i.exec(fontFam);
+    const m = /^['"]?(arial|helvetica|jetbrains mono|consolas|monospace|manrope)\b/i.exec(fontFam);
     return m ? m[1].toLowerCase() : null;
   })();
   const altMap = altKey && fontMap.alternates ? fontMap.alternates[altKey] : null;
@@ -806,7 +807,8 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
   // Pick the closest available weight + the matching fallback chain.
   let fontHandle, fallbacks;
   if (altMap) {
-    if      (weight >= 700) fontHandle = altMap.bold;
+    if      (weight >= 800 && altMap.black) fontHandle = altMap.black;
+    else if (weight >= 700) fontHandle = altMap.bold;
     else if (weight >= 600) fontHandle = altMap.semibold;
     else if (weight >= 500) fontHandle = altMap.medium;
     else                    fontHandle = altMap.regular;
@@ -1006,6 +1008,61 @@ function paintBullet(page, b, pageHeightPdf) {
     }
   }
   page.restoreState();
+}
+
+/**
+ * Icon-font run (Material Symbols): the box text is a glyph NAME ("settings");
+ * map its chars to GIDs via cmap, collapse through the GSUB ligature table, then
+ * emit the resulting glyph IDs directly (Identity-H: hex codes ARE GIDs).
+ */
+function paintIconRun(page, fontMap, b, pageHeightPdf, doc) {
+  const icons = fontMap.icons;
+  if (!icons || !icons.ligatures) return;  // icon font unavailable — leave blank
+  const color = parseColor(b.style.color);
+  const fontSizeCss = parsePx(b.style.fontSize) || 24;
+  const map = icons.font.unicodeToGid;
+  const gids = [];
+  for (const ch of b.text) gids.push(map.get(ch.codePointAt(0)) ?? 0);
+  const resolved = resolveLigatures(gids, icons.ligatures);
+  const baselineCssY = Math.round(b.metrics
+    ? b.y + (b.h - b.metrics.boxH) / 2 + b.metrics.ascent
+    : b.y + b.h * 0.80);
+  page.saveState();
+  const alpha = (b.style.opacity != null ? b.style.opacity : 1) * (color ? color.a : 1);
+  if (alpha < 1) page.setExtGState(doc.addExtGState({ ca: alpha, CA: alpha }));
+  if (color) page.setFillRgb(color.r, color.g, color.b);
+  page.beginText();
+  page.setFont(icons, fontSizeCss * CSS_TO_PDF);
+  page.setTextPos(b.x * CSS_TO_PDF, cssYToPdfY(baselineCssY, pageHeightPdf));
+  let hex = '<';
+  for (const g of resolved) {
+    hex += ((g >>> 8) & 0xff).toString(16).padStart(2, '0') + (g & 0xff).toString(16).padStart(2, '0');
+  }
+  page._push(`${hex}> Tj\n`);
+  page.endText();
+  page.restoreState();
+}
+
+/** Greedy longest-match ligature collapse over a GID sequence. */
+function resolveLigatures(gids, ligMap) {
+  const out = [];
+  for (let i = 0; i < gids.length; ) {
+    const entries = ligMap.get(gids[i]);
+    let matched = null;
+    if (entries) {
+      for (const e of entries) {
+        if (i + 1 + e.comps.length > gids.length) continue;
+        let ok = true;
+        for (let c = 0; c < e.comps.length; c++) {
+          if (gids[i + 1 + c] !== e.comps[c]) { ok = false; break; }
+        }
+        if (ok) { matched = e; break; }
+      }
+    }
+    if (matched) { out.push(matched.lig); i += 1 + matched.comps.length; }
+    else { out.push(gids[i]); i++; }
+  }
+  return out;
 }
 
 function paintImage(page, b, pageHeightPdf) {
