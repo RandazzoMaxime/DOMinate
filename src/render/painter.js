@@ -231,7 +231,7 @@ function paintSvgEllipse(page, b, pageHeightPdf, doc) {
 function paintSvgText(page, fontMap, b, pageHeightPdf) {
   if (!b.text || !b.text.trim()) return;
   const xPdf = b.baselineX * CSS_TO_PDF;
-  const yPdf = cssYToPdfY(b.baselineY, pageHeightPdf);
+  const yPdf = cssYToPdfY(Math.round(b.baselineY), pageHeightPdf);
   page.saveState();
   if (b.textColor) page.setFillRgb(b.textColor.r, b.textColor.g, b.textColor.b);
   page.beginText();

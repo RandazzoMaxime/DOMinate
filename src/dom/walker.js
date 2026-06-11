@@ -623,7 +623,11 @@ function pushListMarker(el, cs, rect, boxes, style, firstText, idoc) {
   // falling back to the li's own top + line-height.
   const lineTop = firstText ? firstText.y : rect.top;
   const lineH = firstText ? firstText.h : (parsePx(cs.lineHeight) || fontSize * 1.4);
-  const baseline = lineTop + lineH * 0.80;
+  // Match the painter's integer-pixel baseline snapping so markers ride the same
+  // line as the text they precede.
+  const baseline = Math.round(firstText && firstText.metrics
+    ? firstText.y + (firstText.h - firstText.metrics.boxH) / 2 + firstText.metrics.ascent
+    : lineTop + lineH * 0.80);
 
   if (type === 'disc' || type === 'circle' || type === 'square') {
     // Blink sizes bullets at ascent/3 (≈ 0.32 em for Inter), vertically centered a bit
