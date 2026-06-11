@@ -409,7 +409,9 @@ function paintInsetShadows(doc, page, b, radii, hasRadius, x, y, w, h) {
       const inset = spread + t;
       const ix = x + dx + inset, iy = y - dy + inset;
       const iw = w - 2 * inset, ih = h - 2 * inset;
-      const target = N === 1 ? baseAlpha : baseAlpha * gaussCoverage(-t, sigma);
+      // Desired coverage at depth d from the edge is gaussCoverage(d − spread, σ);
+      // this ring's band sits at d = spread + t, so the argument is simply t.
+      const target = N === 1 ? baseAlpha : baseAlpha * gaussCoverage(t, sigma);
       if (target <= acc) continue;
       const layerAlpha = (target - acc) / (1 - acc);
       acc = target;
