@@ -1120,15 +1120,22 @@ function paintImage(page, b, pageHeightPdf) {
  */
 function paintBackgroundImage(page, b, sx, sy, sw, sh, radii, hasRadius, pageHeightPdf) {
   const img = b.bgEmbedded;
-  const iw = img.width || sw, ih = img.height || sh;
+  // The background POSITIONING AREA defaults to the padding box (background-origin),
+  // while painting still clips to the border box (background-clip). Shift the origin
+  // inside the borders or repeated tiles land 1 border-width off Chromium's phase.
+  const bL = parsePx(b.style.borderLeftWidth), bR = parsePx(b.style.borderRightWidth);
+  const bT = parsePx(b.style.borderTopWidth), bB = parsePx(b.style.borderBottomWidth);
+  const px0 = sx + bL, py0 = sy + bT;
+  const pw = sw - bL - bR, ph = sh - bT - bB;
+  const iw = img.width || pw, ih = img.height || ph;
 
-  // background-size
+  // background-size (relative to the positioning area)
   let dw = iw, dh = ih;
   const size = (b.style.backgroundSize || 'auto').trim();
   if (size === 'cover') {
-    const s = Math.max(sw / iw, sh / ih); dw = iw * s; dh = ih * s;
+    const s = Math.max(pw / iw, ph / ih); dw = iw * s; dh = ih * s;
   } else if (size === 'contain') {
-    const s = Math.min(sw / iw, sh / ih); dw = iw * s; dh = ih * s;
+    const s = Math.min(pw / iw, ph / ih); dw = iw * s; dh = ih * s;
   } else if (size !== 'auto') {
     const parts = size.split(/\s+/);
     const parseSize = (tok, ref, auto) => {
@@ -1136,8 +1143,8 @@ function paintBackgroundImage(page, b, sx, sy, sw, sh, radii, hasRadius, pageHei
       if (tok.endsWith('%')) return parseFloat(tok) / 100 * ref;
       return parseFloat(tok);
     };
-    dw = parseSize(parts[0], sw, iw);
-    dh = parseSize(parts[1], sh, dw * (ih / iw));
+    dw = parseSize(parts[0], pw, iw);
+    dh = parseSize(parts[1], ph, dw * (ih / iw));
   }
 
   // background-position (computed style is "X% Y%" or px values)
@@ -1147,8 +1154,8 @@ function paintBackgroundImage(page, b, sx, sy, sw, sh, radii, hasRadius, pageHei
     if (tok.endsWith('%')) return (parseFloat(tok) / 100) * (span - dspan);
     return parseFloat(tok);
   };
-  const ox = sx + posOf(pos[0], sw, dw);
-  const oy = sy + posOf(pos[1], sh, dh);
+  const ox = px0 + posOf(pos[0], pw, dw);
+  const oy = py0 + posOf(pos[1], ph, dh);
 
   const repeat = b.style.backgroundRepeat || 'repeat';
   const tiles = [];
