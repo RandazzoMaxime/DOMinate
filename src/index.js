@@ -34,11 +34,15 @@ async function loadInter() {
         fetchOne('/assets/fonts/Inter-600-greek.ttf'),
         fetchOne('/assets/fonts/Inter-700-greek.ttf'),
       ]);
-      const jbMono = await fetchOne('/assets/fonts/JetBrainsMono-Regular.ttf');
+      const [jbMono, jbMono500, jbMono700] = await Promise.all([
+        fetchOne('/assets/fonts/JetBrainsMono-Regular.ttf'),
+        fetchOne('/assets/fonts/JetBrainsMono-500.ttf'),
+        fetchOne('/assets/fonts/JetBrainsMono-700.ttf'),
+      ]);
     return {
       latin: { 400: w400, 500: w500, 600: w600, 700: w700 },
       greek: { 400: w400g, 500: w500g, 600: w600g, 700: w700g },
-      jbMono,
+      jbMono, jbMono500, jbMono700,
     };
     })();
   }
@@ -97,6 +101,8 @@ export async function htmlToPdf(input, opts = {}) {
     const helvBold = doc.addStandardFont('Helvetica-Bold');
     // Monospace alternate (for font-family: 'JetBrains Mono', monospace, etc).
     const jbMonoFont = inters.jbMono ? await embedTrueTypeFont(doc, inters.jbMono, 'JetBrainsMono-Regular') : null;
+    const jbMono500 = inters.jbMono500 ? await embedTrueTypeFont(doc, inters.jbMono500, 'JetBrainsMono-Medium') : null;
+    const jbMono700 = inters.jbMono700 ? await embedTrueTypeFont(doc, inters.jbMono700, 'JetBrainsMono-Bold') : null;
     const courier = doc.addStandardFont('Courier');
     const courierBold = doc.addStandardFont('Courier-Bold');
     fontMap = {
@@ -115,10 +121,10 @@ export async function htmlToPdf(input, opts = {}) {
         helvetica:        { regular: helv,           bold: helvBold,    semibold: helvBold,    medium: helv },
         arial:            { regular: helv,           bold: helvBold,    semibold: helvBold,    medium: helv },
         'jetbrains mono': jbMonoFont
-          ? { regular: jbMonoFont, bold: jbMonoFont, semibold: jbMonoFont, medium: jbMonoFont }
+          ? { regular: jbMonoFont, medium: jbMono500 || jbMonoFont, semibold: jbMono700 || jbMono500 || jbMonoFont, bold: jbMono700 || jbMonoFont }
           : { regular: courier,    bold: courierBold, semibold: courierBold, medium: courier },
-        consolas:         { regular: jbMonoFont || courier, bold: jbMonoFont || courierBold, semibold: jbMonoFont || courierBold, medium: jbMonoFont || courier },
-        monospace:        { regular: jbMonoFont || courier, bold: jbMonoFont || courierBold, semibold: jbMonoFont || courierBold, medium: jbMonoFont || courier },
+        consolas:         { regular: jbMonoFont || courier, bold: jbMono700 || jbMonoFont || courierBold, semibold: jbMono700 || jbMonoFont || courierBold, medium: jbMono500 || jbMonoFont || courier },
+        monospace:        { regular: jbMonoFont || courier, bold: jbMono700 || jbMonoFont || courierBold, semibold: jbMono700 || jbMonoFont || courierBold, medium: jbMono500 || jbMonoFont || courier },
       },
       embedded: true,
     };

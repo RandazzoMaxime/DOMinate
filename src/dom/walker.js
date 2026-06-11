@@ -69,16 +69,27 @@ export async function layout(html, { width, height }) {
     // Two rAFs to ensure post-font-load reflow has settled.
     await new Promise(r => requestAnimationFrame(() => r()));
     await new Promise(r => requestAnimationFrame(() => r()));
-    // Async CSSOM mutators (Tailwind-CDN JIT, late @font-face swaps) keep reflowing
-    // the document AFTER the load event. Poll a cheap layout fingerprint until it is
-    // stable across two consecutive 100ms ticks (capped at 2s) instead of hoping a
-    // fixed delay is enough.
-    let prevFp = '';
-    for (let tick = 0; tick < 20; tick++) {
-      const fp = layoutFingerprint(idoc);
-      if (fp === prevFp) break;
-      prevFp = fp;
-      await new Promise(r => setTimeout(r, 100));
+    // Async CSSOM mutators (Tailwind-CDN JIT, lazily-triggered @font-face loads)
+    // keep reflowing the document AFTER the load event — and a style injection can
+    // TRIGGER new font fetches, which reflow again on arrival. Loop until, in the
+    // same tick: fonts.ready has resolved, no font is loading, the resource-entry
+    // count is unchanged AND the layout fingerprint is unchanged for 2 consecutive
+    // ticks. Capped at 6s.
+    {
+      const win = idoc.defaultView;
+      let prevFp = '', prevRes = -1, stableTicks = 0;
+      for (let tick = 0; tick < 60 && stableTicks < 2; tick++) {
+        if (idoc.fonts && idoc.fonts.ready) {
+          await Promise.race([idoc.fonts.ready, new Promise(r => setTimeout(r, 1500))]);
+        }
+        const loading = idoc.fonts ? [...idoc.fonts].some(f => f.status === 'loading') : false;
+        const resCount = win.performance ? win.performance.getEntriesByType('resource').length : 0;
+        const fp = layoutFingerprint(idoc);
+        if (!loading && fp === prevFp && resCount === prevRes) stableTicks++;
+        else stableTicks = 0;
+        prevFp = fp; prevRes = resCount;
+        if (stableTicks < 2) await new Promise(r => setTimeout(r, 100));
+      }
     }
 
     const root = idoc.documentElement;
@@ -199,6 +210,7 @@ function walk(el, idoc, boxes, ctx) {
     fontFamily: cs.fontFamily,
     fontSize: cs.fontSize,
     fontWeight: cs.fontWeight,
+    resolvedWeight: resolveUsedWeight(idoc, cs.fontFamily, parseInt(cs.fontWeight, 10) || 400),
     fontStyle: cs.fontStyle,
     fontVariant: cs.fontVariant,
     letterSpacing: cs.letterSpacing,
@@ -352,6 +364,57 @@ function walk(el, idoc, boxes, ctx) {
       boxes[i].clips = clipsForChildren;
     }
   }
+}
+
+/**
+ * Resolve the font-weight Chromium ACTUALLY used: CSS font matching picks the
+ * nearest available weight of the first matching @font-face family, which can be
+ * lighter than the computed font-weight (e.g. computed 600 with only 400/500
+ * loaded resolves to 500). We mirror the css-fonts-4 algorithm against the
+ * weights registered in the iframe's document.fonts.
+ */
+function resolveUsedWeight(idoc, fontFamily, weight) {
+  let fam = idoc.__pdfFamilyWeights;
+  if (!fam) {
+    fam = idoc.__pdfFamilyWeights = new Map();
+    try {
+      for (const f of idoc.fonts) {
+        const name = f.family.replace(/^["']|["']$/g, '').toLowerCase();
+        // f.weight may be a variable-font RANGE ("400 700") — keep [min, max].
+        const m = /^\s*([\d.]+)(?:\s+([\d.]+))?\s*$/.exec(f.weight || '');
+        const lo = m ? parseFloat(m[1]) : 400;
+        const hi = m && m[2] ? parseFloat(m[2]) : lo;
+        if (!fam.has(name)) fam.set(name, []);
+        fam.get(name).push([lo, hi]);
+      }
+    } catch { /* no FontFaceSet access */ }
+  }
+  const families = (fontFamily || '').split(',').map(s => s.trim().replace(/^["']|["']$/g, '').toLowerCase());
+  for (const f of families) {
+    const ranges = fam.get(f);
+    if (!ranges || !ranges.length) continue;
+    // Inside any face's range → the desired weight is available exactly.
+    if (ranges.some(([lo, hi]) => weight >= lo && weight <= hi)) return weight;
+    const ws = [...new Set(ranges.flat())].sort((a, b) => a - b);
+    const avail = new Set(ws);
+    if (avail.has(weight)) return weight;
+    const below = ws.filter(w => w < weight);
+    const above = ws.filter(w => w > weight);
+    if (weight >= 400 && weight <= 500) {
+      const up500 = above.filter(w => w <= 500);
+      if (up500.length) return up500[0];
+      if (below.length) return below[below.length - 1];
+      return above[0];
+    }
+    if (weight < 400) {
+      if (below.length) return below[below.length - 1];
+      return above[0];
+    }
+    // weight > 500: ascending first, then descending.
+    if (above.length) return above[0];
+    return below[below.length - 1];
+  }
+  return weight;  // no registered face — system font, keep computed weight
 }
 
 /**

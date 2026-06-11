@@ -645,7 +645,9 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
   if (!txt) return;
   const color = parseColor(b.style.color);
   const fontSizeCss = parsePx(b.style.fontSize) || 10;
-  const weight = parseInt(b.style.fontWeight, 10) || 400;
+  // resolvedWeight = the weight Chromium actually rendered with (css-fonts-4
+  // matching against the weights registered in the page), set by the walker.
+  const weight = b.style.resolvedWeight || parseInt(b.style.fontWeight, 10) || 400;
   // Detect alternate font families. CSS computed fontFamily is the full chain string,
   // e.g. "Arial, Helvetica, sans-serif". We match the FIRST family (browsers always
   // try in order, so the first available wins; with our embedded Inter, an Arial
