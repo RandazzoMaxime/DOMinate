@@ -100,7 +100,11 @@ export async function layout(html, { width, height }) {
     walk(root, idoc, boxes, { prefix: [], seq: { n: 0 }, clips: [], tfms: [] });
     // (debug logs removed after sanity)
 
-    return { boxes, width, height };
+    // Content taller than the viewport flows beyond the iframe; report the real
+    // document height so the caller can paginate.
+    const contentHeight = Math.max(height, idoc.documentElement ? idoc.documentElement.scrollHeight : height);
+
+    return { boxes, width, height, contentHeight };
   } finally {
     iframe.remove();
   }

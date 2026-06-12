@@ -76,7 +76,7 @@ export async function htmlToPdf(input, opts = {}) {
   });
 
   const html = typeof input === 'string' ? input : input.outerHTML;
-  const { boxes } = await layout(html, viewport);
+  const { boxes, contentHeight } = await layout(html, viewport);
 
   // Scan the render boxes to find which faces the document ACTUALLY needs, so we
   // only embed those (a full embed of all 11 bundled faces costs ~450 KB per PDF).
@@ -209,8 +209,45 @@ export async function htmlToPdf(input, opts = {}) {
     } catch { /* offline — icon runs stay blank */ }
   }
 
-  const page = doc.addPage();
-  paint(doc, fontMap, page, boxes);
+  // Pagination: content taller than one viewport is sliced into N pages (screenshot
+  // semantics — each page shows the band [k·H, (k+1)·H) of the laid-out document).
+  const pageH = viewport.height;
+  const pageCount = Math.max(1, Math.min(200, Math.ceil((contentHeight - 1) / pageH)));
+  for (let k = 0; k < pageCount; k++) {
+    const page = doc.addPage();
+    const top = k * pageH;
+    const pageBoxes = boxes
+      .filter(b => boxIntersectsBand(b, top, pageH))
+      .map(b => (top === 0 ? b : shiftBoxForPage(b, top)));
+    paint(doc, fontMap, page, pageBoxes);
+  }
 
   return doc.toBytes();
+}
+
+/** Does the box (or its decoration) touch the band [top, top+H)? */
+function boxIntersectsBand(b, top, H) {
+  // Lines/shapes with explicit endpoints (svg) always pass — the MediaBox clips.
+  if (b.kind === 'svg-line' || b.kind === 'svg-path') return true;
+  const y0 = b.y - top;
+  const h = b.h || 0;
+  return y0 + h > -50 && y0 < H + 50;  // small margin for shadows/outlines
+}
+
+/** Shallow-clone a render box shifted up by `dy` CSS px (page k slicing). */
+function shiftBoxForPage(b, dy) {
+  const nb = { ...b, y: b.y - dy };
+  if (b.y1 !== undefined) { nb.y1 = b.y1 - dy; nb.y2 = b.y2 - dy; }
+  if (b.cy !== undefined) nb.cy = b.cy - dy;
+  if (b.baselineY !== undefined) nb.baselineY = b.baselineY - dy;
+  if (b.segments) nb.segments = b.segments.map(s => {
+    const ns = { ...s };
+    if (ns.y !== undefined) ns.y -= dy;
+    if (ns.y1 !== undefined) ns.y1 -= dy;
+    if (ns.y2 !== undefined) ns.y2 -= dy;
+    return ns;
+  });
+  if (b.clips) nb.clips = b.clips.map(c => ({ ...c, y: c.y - dy }));
+  if (b.tfms) nb.tfms = b.tfms.map(t => ({ ...t, oy: t.oy - dy }));
+  return nb;
 }
