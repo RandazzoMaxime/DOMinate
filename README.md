@@ -14,7 +14,7 @@ The PDF contains real selectable text, real clickable hyperlinks, embedded
 fonts, vector geometry — no canvas rasterization, no third-party PDF
 generators. See **CONSTRAINTS.md** for the no-dependency rules.
 
-## Status (session 2026-06-11/12, closed 03:30 — 12 fixtures)
+## Status (session 2026-06-11/12, closed at the 03:30 deadline — 13 fixtures)
 
 | Fixture | Diff vs Chromium | What it exercises |
 |---------|------------------|-------------------|
@@ -22,17 +22,18 @@ generators. See **CONSTRAINTS.md** for the no-dependency rules.
 | `torture-svg` | **0.235%** | SVG paths M/L/H/V/C/S/Q/T/A/Z, polygons, dasharray, linecaps, rotated groups |
 | `torture-transform` | **0.493%** | rotate/scale/translate/skew/matrix3d, nested, transform-origin |
 | `torture-table` | **0.534%** | border-collapse, row/col spans, zebra, separate+spacing |
-| `wizard` | **0.582%** | Tailwind dark theme, forms, gradients, Material Symbols icons, Manrope |
+| `wizard` | **0.575%** | Tailwind dark theme, forms, gradients, Material Symbols icons, Manrope |
 | `torture-box` | **0.678%** | per-side borders, multi-stop/radial gradients, box-shadows, z-index, overflow |
 | `torture-effects` | **0.803%** | text-shadow, inset box-shadow, outline+offset, groove/ridge/inset/outset |
 | `source` | **0.825%** | rounded cards, tables, flexbox, SVG scheme, links (LCD-AA reference kept) |
+| `torture-semantic` | **0.829%** | dl/dt/dd, abbr/ins/del/kbd, colgroup, details, decoration styles/colors |
+| `source-flat` | **0.888%** | flat business design, Arial/Helvetica mapping, tracked headers |
 | `torture-text` | **0.905%** | justify, lists/markers, code blocks, sub/sup, decorations |
 | `torture-flow` | **0.916%** | floats, CSS columns, text-indent, vertical-align, word-break, ellipsis |
-| `source-flat` | **1.018%** | flat business design, Arial/Helvetica mapping |
 | `report` | **2.242%** | dense 10-11px text, italics, inline code (glyph-AA dominated) |
-| **overall** | **0.760%** | all functional gates green, 84/84 validity checks, byte-stable across runs |
+| **overall** | **0.755%** | all functional gates green, validity suite green, byte-stable across runs |
 
-Session start was 5.885% over 4 fixtures; session end is 0.760% over 12.
+Session start was 5.885% over 4 fixtures; session end is 0.755% over 13.
 
 The strict exit criterion is < 0.1% per fixture; the remaining diff is dominated
 by per-glyph anti-aliasing differences between Chromium's text rasterizer and
@@ -43,7 +44,8 @@ effects are structurally exact; the PDFs are visually correct in real viewers.
 
 - **Text**: per-word exact positions (character-level Range measurement), real
   font baselines from in-engine metrics, justify, letter/word-spacing,
-  text-transform, underline/line-through (bridged across spaces), synthetic
+  text-transform, underline/line-through with style/color/offset
+  (solid/double/dotted/dashed/wavy, bridged across spaces), synthetic
   italics, text-shadow (multi, blurred), `white-space: pre`, ellipsis truncation,
   sub/sup, css-fonts-4 weight resolution against the page's loaded faces
 - **Fonts**: TTF/OTF parse + Type0/CIDFontType2 embedding with ToUnicode, lazy
@@ -69,10 +71,12 @@ effects are structurally exact; the PDFs are visually correct in real viewers.
 
 - **Icon fonts**: Material Symbols glyph names resolved through the font's GSUB
   ligature table (LookupType 4 + Extension), GIDs emitted directly via Identity-H
+- **Multi-page**: content taller than the viewport slices into N pages
+  (screenshot semantics; lines crossing a boundary are cut, not pushed)
 
 Known gaps: `::before/::after` pseudo-elements, WOFF2, variable-font axis
-instancing (icons render at the default wght/FILL/opsz), multi-page pagination,
-bidi/RTL shaping, column-rule.
+instancing (icons render at the default wght/FILL/opsz), break-avoiding
+pagination, bidi/RTL shaping, column-rule.
 
 ## Running
 

@@ -307,3 +307,17 @@ protected source.png reference.
 # all gates green, validity 84/84, loop byte-stable. 25 iterations + 3 agent
 # merges this session; src/ grew 2.2K -> 3.6K LOC, every feature diff-verified
 # against Chromium ground truth.
+
+## Iterations 54-57 (02:00-02:30) — the premature "FINAL @ 03:10" commit was a clock
+## misread (it was 01:49); the session continued.
+
+- **iter 54** — icon outlines fattened 0.07em toward Chromium variable-instance weight.
+- **iter 55** — multi-page output: contentHeight from scrollHeight, band slicing with
+  shifted clips/transform-origins/svg endpoints; verified 2800px -> 4 pages with text and
+  links on the right pages; single-page fixtures byte-identical.
+- **iter 56/57** — text-decoration styles (double/dotted/dashed/wavy), colors, offsets +
+  fixture torture-semantic (dl/dt/dd grid, abbr/ins/del/kbd, colgroup, details open/closed):
+  debuts 0.877 -> 0.829% after the double-underline geometry fix.
+- Explorations reverted: small-text and luminance-gated glyph strokes (inconsistent).
+
+# TRUE FINAL — 13 fixtures, overall 0.755%, gates green, validity green.
