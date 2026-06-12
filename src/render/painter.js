@@ -989,8 +989,9 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
       }
       page._push(ops.join('\n') + '\nS\n');
     } else if (styleD === 'double') {
-      page._push(`${num(xPdf)} ${num(lineY + lw)} m ${num(decoEndPdf)} ${num(lineY + lw)} l S\n`);
-      page._push(`${num(xPdf)} ${num(lineY - lw)} m ${num(decoEndPdf)} ${num(lineY - lw)} l S\n`);
+      // First line at the normal position, second one BELOW with a one-thickness gap.
+      page._push(`${num(xPdf)} ${num(lineY)} m ${num(decoEndPdf)} ${num(lineY)} l S\n`);
+      page._push(`${num(xPdf)} ${num(lineY - 2 * lw)} m ${num(decoEndPdf)} ${num(lineY - 2 * lw)} l S\n`);
     } else {
       page._push(`${num(xPdf)} ${num(lineY)} m ${num(decoEndPdf)} ${num(lineY)} l S\n`);
     }
