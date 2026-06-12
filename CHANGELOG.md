@@ -338,3 +338,22 @@ protected source.png reference.
 # functional gates green, validity 98/98, two consecutive loop runs byte-identical.
 # Start of session: 5.885% over 4 fixtures. 32 accepted iterations + 3 parallel
 # agent merges; src/ 2.2K -> ~4K LOC.
+
+## Closing audit (02:20-02:55) — adversarial workflow: code-review agent + fuzz agent
+
+Review agent found 6 runtime-verified bugs on inputs outside the fixtures, all fixed
+in iter 62: parsePathD infinite loop on malformed "Z 5 5" path data (hang!), calc()
+border-radius -> NaN -> writer throw (crash), svg-ellipse boxes lost in pagination,
+letter-spaced TJ splitting surrogate pairs, ::before/::after phantoms on replaced
+elements, SVG named colors (fill="red") painted invisible.
+
+Fuzz agent: 9 hostile documents (empty, malformed markup, bad entities, emoji/ZWJ/
+flags/CJK/RTL, zero-size painted elements, corrupt/missing images, calc()/variables,
+20000px doc -> 26 pages) — zero library exceptions, all PDFs valid and parseable.
+The one harness failure is Playwrights bundled chrome-headless-shell crashing on
+>=196-deep DOM nesting with no library code involved (branded Chrome handles 5000).
+
+Side casualty: removing the morning agent worktrees deleted node_modules contents
+through their junctions; npm install restored, loop re-verified byte-identical.
+
+# FINAL: 14 fixtures, overall 0.729%, gates green, validity 98/98, fuzz-clean.
