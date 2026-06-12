@@ -71,12 +71,12 @@ effects are structurally exact; the PDFs are visually correct in real viewers.
 
 - **Icon fonts**: Material Symbols glyph names resolved through the font's GSUB
   ligature table (LookupType 4 + Extension), GIDs emitted directly via Identity-H
-- **Multi-page**: content taller than the viewport slices into N pages
-  (screenshot semantics; lines crossing a boundary are cut, not pushed)
+- **Multi-page**: content taller than the viewport paginates with line-level
+  break avoidance (straddling text lines move whole to the next page)
 
 Known gaps: `::before/::after` pseudo-elements, WOFF2, variable-font axis
-instancing (icons render at the default wght/FILL/opsz), break-avoiding
-pagination, bidi/RTL shaping, column-rule.
+instancing (icons render at the default wght/FILL/opsz), paragraph-level
+break-inside control, bidi/RTL shaping, column-rule.
 
 ## Running
 

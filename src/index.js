@@ -209,15 +209,41 @@ export async function htmlToPdf(input, opts = {}) {
     } catch { /* offline — icon runs stay blank */ }
   }
 
-  // Pagination: content taller than one viewport is sliced into N pages (screenshot
-  // semantics — each page shows the band [k·H, (k+1)·H) of the laid-out document).
+  // Pagination: content taller than one viewport is sliced into pages. Cut points
+  // avoid splitting text lines: when a text/bullet box straddles the candidate cut,
+  // the cut moves UP to that line's top so the whole line lands on the next page
+  // (leaving whitespace at the bottom, like real pagination). A safety floor of
+  // half a page keeps a giant unbreakable element from stalling progress.
   const pageH = viewport.height;
-  const pageCount = Math.max(1, Math.min(200, Math.ceil((contentHeight - 1) / pageH)));
-  for (let k = 0; k < pageCount; k++) {
+  const cuts = [0];
+  while (cuts[cuts.length - 1] + pageH < contentHeight - 1 && cuts.length < 200) {
+    const last = cuts[cuts.length - 1];
+    let cut = last + pageH;
+    let lowest = cut;
+    // Pushing one line up can make another line straddle the new cut — iterate
+    // to a fixed point (bounded by the box count).
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const b of boxes) {
+        if (b.kind !== 'text' && b.kind !== 'bullet') continue;
+        if (b.y < lowest && b.y + b.h > lowest && b.h < pageH / 2) { lowest = b.y; changed = true; }
+      }
+    }
+    if (lowest > last + pageH / 2) cut = lowest;
+    cuts.push(cut);
+  }
+  for (let k = 0; k < cuts.length; k++) {
     const page = doc.addPage();
-    const top = k * pageH;
+    const top = cuts[k];
+    const span = (k + 1 < cuts.length ? cuts[k + 1] : contentHeight) - top;
+    // Clip the page to its band so content pushed to the next page never bleeds
+    // into this one's bottom whitespace (PDF units, y-up).
+    if (span < pageH - 0.5) {
+      page._push(`0 ${(pageH - span) * 0.75} ${viewport.width * 0.75} ${span * 0.75} re W n\n`);
+    }
     const pageBoxes = boxes
-      .filter(b => boxIntersectsBand(b, top, pageH))
+      .filter(b => boxIntersectsBand(b, top, span))
       .map(b => (top === 0 ? b : shiftBoxForPage(b, top)));
     paint(doc, fontMap, page, pageBoxes);
   }
