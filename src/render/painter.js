@@ -979,7 +979,7 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
     else if (styleD === 'dashed') page.setDashPattern([lw * 4, lw * 2], 0);
     if (styleD === 'wavy') {
       // Sine-ish wave via repeating quarter beziers: amplitude ≈ lw, period ≈ 6 lw.
-      const amp = Math.max(lw, 0.6), period = amp * 6;
+      const amp = Math.max(lw, 0.6) * 1.6, period = amp * 4.5;
       const ops = [`${num(xPdf)} ${num(lineY)} m`];
       let sign = 1;
       for (let x0 = xPdf; x0 < decoEndPdf; x0 += period, sign = -sign) {
