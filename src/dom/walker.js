@@ -427,10 +427,20 @@ function walk(el, idoc, boxes, ctx) {
     if (!pcs || pcs.display === 'none') continue;
     const content = pcs.content;
     if (!content || content === 'none' || content === 'normal') continue;
+    let text = null;
     const cm2 = /^"((?:[^"\\]|\\.)*)"$/.exec(content);
-    if (!cm2) continue;  // counters, attr(), quotes, url() — unsupported
-    const text = cm2[1].replace(/\\([\s\S])/g, '$1');
-    if (!text.trim()) continue;
+    if (cm2) {
+      text = cm2[1].replace(/\\([\s\S])/g, '$1');
+    } else {
+      const am = /^attr\(([\w-]+)\)$/.exec(content);
+      if (am) text = el.getAttribute(am[1]) || '';
+      else if (content === 'open-quote' || content === 'close-quote') {
+        // First pair of the computed `quotes` list (nesting depth ignored).
+        const qm = /^"((?:[^"\\]|\\.)*)"\s+"((?:[^"\\]|\\.)*)"/.exec(pcs.quotes || '');
+        text = qm ? (content === 'open-quote' ? qm[1] : qm[2]) : (content === 'open-quote' ? '“' : '”');
+      }
+    }
+    if (text == null || !text.trim()) continue;  // counters, url(), mixed — unsupported
     const pseudoStyle = {
       ...style,
       color: pcs.color,
