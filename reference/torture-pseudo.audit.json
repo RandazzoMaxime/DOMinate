@@ -1,0 +1,19 @@
+{
+  "viewport": {
+    "width": 1123,
+    "height": 794
+  },
+  "screenshotScale": 1,
+  "expectedLinks": [
+    "https://helix.corsica/pseudo-bench"
+  ],
+  "expectedTextFragments": [
+    "Pseudo-element Bench",
+    "Breadcrumb separators (li + li::before)",
+    "Required-field markers (label::after)",
+    "Hash chips (span::before)",
+    "Quote marks (blockquote::before/::after)",
+    "Button arrow (::after)",
+    "Prefixed callout (::before)"
+  ]
+}

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Torture — ::before / ::after</title>
+<style>
+  @font-face { font-family: 'Inter'; font-weight: 400; src: url('/assets/fonts/Inter-400.ttf') format('truetype'); }
+  @font-face { font-family: 'Inter'; font-weight: 600; src: url('/assets/fonts/Inter-600.ttf') format('truetype'); }
+  @font-face { font-family: 'Inter'; font-weight: 700; src: url('/assets/fonts/Inter-700.ttf') format('truetype'); }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1123px; height: 794px; overflow: hidden; }
+  body { font-family: 'Inter', sans-serif; background: #fcfcfd; color: #232936; padding: 28px 40px; }
+  h1 { font-size: 24px; font-weight: 700; }
+  .sub { font-size: 12px; color: #76808f; margin-bottom: 22px; }
+  h2 { font-size: 13px; font-weight: 600; color: #36415a; margin: 16px 0 8px; }
+  .cols { display: flex; gap: 40px; }
+  .col { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.6; }
+
+  .crumbs { list-style: none; font-size: 12px; }
+  .crumbs li { display: inline; color: #45506b; }
+  .crumbs li + li::before { content: " » "; color: #9aa4b3; font-weight: 600; }
+
+  .req label { font-weight: 600; }
+  .req label::after { content: " *"; color: #d7263d; font-weight: 700; }
+  .req { margin-bottom: 6px; }
+
+  .tags span { display: inline-block; background: #eef1f6; border-radius: 10px; padding: 3px 10px; margin: 0 6px 6px 0; font-size: 11px; color: #36415a; }
+  .tags span::before { content: "# "; color: #1b6ca8; font-weight: 700; }
+
+  blockquote.fancy { background: #faf4e8; border-radius: 8px; padding: 12px 16px; color: #5c4a1e; font-size: 12.5px; }
+  blockquote.fancy::before { content: "“ "; font-size: 22px; font-weight: 700; color: #b07d2b; }
+  blockquote.fancy::after { content: " ”"; font-size: 22px; font-weight: 700; color: #b07d2b; }
+
+  .next::after { content: " >>"; font-weight: 700; letter-spacing: -1px; }
+  .next { display: inline-block; background: #0b6e4f; color: #fff; padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-top: 4px; }
+
+  .note { border-left: 4px solid #1b6ca8; background: #eef5fb; padding: 8px 12px; font-size: 12px; color: #36415a; margin-top: 8px; }
+  .note::before { content: "NOTE: "; font-weight: 700; color: #1b6ca8; }
+
+  .footer { margin-top: 20px; font-size: 11px; color: #76808f; }
+  .footer a { color: #0b6e4f; }
+</style>
+</head>
+<body>
+  <h1>Pseudo-element Bench</h1>
+  <div class="sub">::before / ::after string content — breadcrumbs, required marks, chips, quotes, buttons — fixture 14</div>
+
+  <div class="cols">
+    <div class="col">
+      <h2>Breadcrumb separators (li + li::before)</h2>
+      <ul class="crumbs">
+        <li>Projects</li><li>Corsica</li><li>Survey 2026</li><li>Deliverables</li>
+      </ul>
+
+      <h2>Required-field markers (label::after)</h2>
+      <div class="req"><label>Client name</label> — text input follows</div>
+      <div class="req"><label>Mission date</label> — date picker follows</div>
+
+      <h2>Hash chips (span::before)</h2>
+      <div class="tags"><span>gnss</span><span>lidar</span><span>bathymetry</span><span>adjustment</span></div>
+    </div>
+
+    <div class="col">
+      <h2>Quote marks (blockquote::before/::after)</h2>
+      <blockquote class="fancy">Measure twice, adjust the network, then cut once.</blockquote>
+
+      <h2>Button arrow (::after)</h2>
+      <span class="next">Continue to review</span>
+
+      <h2>Prefixed callout (::before)</h2>
+      <div class="note">Pseudo-element content participates in layout but exposes no geometry; positions here are derived from the neighbouring words.</div>
+    </div>
+  </div>
+
+  <p class="footer">Pseudo coverage sheet — notes at <a href="https://helix.corsica/pseudo-bench">helix.corsica/pseudo-bench</a>.</p>
+</body>
+</html>

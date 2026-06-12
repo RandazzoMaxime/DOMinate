@@ -417,6 +417,65 @@ function walk(el, idoc, boxes, ctx) {
     }
   }
 
+  // ::before / ::after with plain string content — synthesized as text boxes
+  // anchored to the element's first/last real word (Chromium exposes the pseudo's
+  // computed style but no geometry). Conservative subset: inline, same-line,
+  // literal string content only.
+  for (const which of ['::before', '::after']) {
+    let pcs;
+    try { pcs = idoc.defaultView.getComputedStyle(el, which); } catch { continue; }
+    if (!pcs || pcs.display === 'none') continue;
+    const content = pcs.content;
+    if (!content || content === 'none' || content === 'normal') continue;
+    const cm2 = /^"((?:[^"\\]|\\.)*)"$/.exec(content);
+    if (!cm2) continue;  // counters, attr(), quotes, url() — unsupported
+    const text = cm2[1].replace(/\\([\s\S])/g, '$1');
+    if (!text.trim()) continue;
+    const pseudoStyle = {
+      ...style,
+      color: pcs.color,
+      fontFamily: pcs.fontFamily, fontSize: pcs.fontSize, fontWeight: pcs.fontWeight,
+      fontStyle: pcs.fontStyle, letterSpacing: pcs.letterSpacing,
+      textTransform: pcs.textTransform, textDecoration: pcs.textDecorationLine,
+      textShadow: pcs.textShadow || 'none',
+      resolvedWeight: resolveUsedWeight(idoc, pcs.fontFamily, parseInt(pcs.fontWeight, 10) || 400),
+    };
+    const pm = fontMetricsFor(idoc, pseudoStyle);
+    let tw = (parsePx(pcs.fontSize) || 12) * 0.6 * text.length;
+    try {
+      let mctx = idoc.__pdfMeasureCtx;
+      if (!mctx) mctx = idoc.__pdfMeasureCtx = idoc.createElement('canvas').getContext('2d');
+      mctx.font = `${pcs.fontStyle === 'italic' ? 'italic ' : ''}${pcs.fontWeight} ${pcs.fontSize} ${pcs.fontFamily}`;
+      const m3 = mctx.measureText(text);
+      if (m3.width > 0) tw = m3.width;
+    } catch { /* keep estimate */ }
+    const sub = boxes.slice(textStartIndex);
+    const texts = sub.filter(bb => bb.kind === 'text');
+    const anchor = which === '::before' ? texts[0] : texts[texts.length - 1];
+    const boxH = pm ? pm.boxH : (parsePx(pcs.fontSize) || 12) * 1.2;
+    let px, py;
+    if (anchor) {
+      const aBase = anchor.metrics
+        ? anchor.y + (anchor.h - anchor.metrics.boxH) / 2 + anchor.metrics.ascent
+        : anchor.y + anchor.h * 0.8;
+      py = pm ? aBase - pm.ascent + (pm.boxH - boxH) / 2 : anchor.y;
+      px = which === '::before'
+        ? anchor.x - parsePx(pcs.marginRight) - parsePx(pcs.paddingRight) - tw - parsePx(pcs.paddingLeft)
+        : anchor.x + anchor.w + parsePx(pcs.marginLeft) + parsePx(pcs.paddingLeft);
+    } else {
+      // No real content: anchor inside the element's content box.
+      const cLeft = rect.left + parsePx(cs.borderLeftWidth) + parsePx(cs.paddingLeft);
+      px = which === '::before' ? cLeft : rect.left + rect.width - parsePx(cs.borderRightWidth) - parsePx(cs.paddingRight) - tw;
+      py = rect.top + parsePx(cs.borderTopWidth) + parsePx(cs.paddingTop);
+    }
+    boxes.push({
+      kind: 'text', x: px, y: py, w: tw, h: boxH,
+      style: pseudoStyle, tag: el.tagName.toLowerCase() + which, el,
+      text, metrics: pm,
+      sortKey: key(5), clips: clipsForChildren, tfms,
+    });
+  }
+
   // text-overflow: ellipsis — Chromium hides the partially-clipped tail entirely
   // and draws "…" after the last visible character. We trim/drop the word boxes
   // emitted for this element and synthesize the ellipsis box.
