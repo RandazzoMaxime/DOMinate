@@ -253,11 +253,12 @@ export async function htmlToPdf(input, opts = {}) {
 
 /** Does the box (or its decoration) touch the band [top, top+H)? */
 function boxIntersectsBand(b, top, H) {
-  // Lines/shapes with explicit endpoints (svg) always pass — the MediaBox clips.
-  if (b.kind === 'svg-line' || b.kind === 'svg-path') return true;
+  // Shapes whose geometry lives outside x/y/w/h (svg endpoints, ellipse centers)
+  // always pass — the MediaBox clips strays.
+  if (b.kind === 'svg-line' || b.kind === 'svg-path' || b.kind === 'svg-ellipse') return true;
   const y0 = b.y - top;
   const h = b.h || 0;
-  return y0 + h > -50 && y0 < H + 50;  // small margin for shadows/outlines
+  return y0 + h > -300 && y0 < H + 300;  // margin for far-reaching shadows/outlines
 }
 
 /** Shallow-clone a render box shifted up by `dy` CSS px (page k slicing). */

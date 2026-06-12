@@ -104,8 +104,10 @@ function normRadii(style, wCss, hCss) {
     const parts = v.trim().split(/\s+/);
     const len = (tok, ref) => {
       if (!tok) return 0;
-      if (tok.endsWith('%')) return parseFloat(tok) / 100 * ref;
-      return parseFloat(tok) || 0;
+      // calc() and other unresolved computed forms parse to NaN — treat as 0
+      // rather than letting a NaN reach the PDF number writer (which throws).
+      const n = tok.endsWith('%') ? parseFloat(tok) / 100 * ref : parseFloat(tok);
+      return isFinite(n) ? Math.max(0, n) : 0;
     };
     return {
       x: len(parts[0], wCss) * CSS_TO_PDF,
@@ -911,10 +913,13 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
       if (run.font.kind === 'embeddedTrueType') {
         if (letterSpacingCss && fontSizeCss > 0 && run.text.length > 1) {
           const offset = -(letterSpacingCss * CSS_TO_PDF) / (fontSizeCss * CSS_TO_PDF) * 1000;
+          // Iterate by CODE POINTS — splitting surrogate pairs would emit two
+          // .notdef glyphs for every astral character.
+          const cps = [...run.text];
           const tjParts = ['['];
-          for (let i = 0; i < run.text.length; i++) {
-            tjParts.push(encodeTextAsHex(run.font, run.text[i]));
-            if (i < run.text.length - 1) tjParts.push(num(offset));
+          for (let i = 0; i < cps.length; i++) {
+            tjParts.push(encodeTextAsHex(run.font, cps[i]));
+            if (i < cps.length - 1) tjParts.push(num(offset));
           }
           tjParts.push('] TJ\n');
           page._push(tjParts.join(' '));

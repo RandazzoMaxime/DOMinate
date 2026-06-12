@@ -199,14 +199,17 @@ export function walkSvg(svg, boxes, idoc) {
 }
 
 function computedFill(el, cs) {
-  const v = el.getAttribute('fill') ?? cs.fill ?? null;
+  // Prefer the COMPUTED value: it serializes named colors (red, rebeccapurple,
+  // currentColor) to rgb(...), which parseColor understands. The raw attribute
+  // is only a fallback when no computed style is available.
+  const v = cs.fill || el.getAttribute('fill') || null;
   if (v === 'none' || v === null || v === '') return null;
-  return parseColor(v);
+  return parseColor(v) ?? parseColor(el.getAttribute('fill') || '');
 }
 function computedStroke(el, cs) {
-  const v = el.getAttribute('stroke') ?? cs.stroke ?? null;
+  const v = cs.stroke || el.getAttribute('stroke') || null;
   if (v === 'none' || v === null || v === '') return null;
-  return parseColor(v);
+  return parseColor(v) ?? parseColor(el.getAttribute('stroke') || '');
 }
 
 // CSS stroke-linecap → PDF line cap style (J operator).
@@ -269,6 +272,10 @@ function parsePathD(d) {
     if (C === 'Z') {
       segs.push({ op: 'Z' });
       cx = spx; cy = spy;
+      // Z consumes no parameters: a stray NUMBER after Z is malformed path data.
+      // Browsers abort parsing at the error — do the same (the old code looped
+      // forever pushing Z without ever advancing the token index).
+      if (i < tokens.length && typeof tokens[i] !== 'string') break;
     } else if (C === 'M') {
       let x = take(), y = take();
       if (rel) { x += cx; y += cy; }

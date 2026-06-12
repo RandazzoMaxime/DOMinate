@@ -127,6 +127,9 @@ function layoutFingerprint(idoc) {
 }
 
 const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'LINK', 'META', 'TITLE', 'HEAD', 'NOSCRIPT']);
+// Replaced and void elements cannot host ::before/::after content boxes.
+const NO_PSEUDO_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT', 'IMG', 'BR', 'HR',
+  'IFRAME', 'VIDEO', 'AUDIO', 'CANVAS', 'EMBED', 'OBJECT', 'SVG']);
 
 /**
  * CSS 2.1 Appendix E paint-order approximation. Every render box receives a
@@ -422,6 +425,9 @@ function walk(el, idoc, boxes, ctx) {
   // computed style but no geometry). Conservative subset: inline, same-line,
   // literal string content only.
   for (const which of ['::before', '::after']) {
+    // Replaced/void elements never generate pseudo boxes (Chromium still REPORTS
+    // a computed style for them, so the content check alone is not enough).
+    if (NO_PSEUDO_TAGS.has(el.tagName)) break;
     let pcs;
     try { pcs = idoc.defaultView.getComputedStyle(el, which); } catch { continue; }
     if (!pcs || pcs.display === 'none') continue;
