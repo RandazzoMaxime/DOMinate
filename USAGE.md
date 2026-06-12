@@ -9,7 +9,7 @@
   // Convert any HTML string into a PDF (Uint8Array).
   const html = document.getElementById('my-doc').outerHTML;
   const bytes = await htmlToPdf(html, {
-    viewport: { width: 1123, height: 794 },  // A4 landscape in CSS px
+    viewport: { width: 794, height: 1123 },  // A4 portrait in CSS px
   });
 
   // Download
@@ -34,64 +34,71 @@ htmlToPdf(input: string | HTMLElement, opts?: {
 ```
 
 The lib:
-- Loads the HTML into a hidden iframe at `viewport` size
-- Walks every element, capturing computed styles + Range geometry
-- Emits a vector-only PDF: real text (BT…ET ops with embedded Inter CIDFontType2),
-  real link annotations (`/Subtype /Link`), real path geometry (rectangles, rounded
-  corners, gradients, SVG shapes, dashed borders, transparency)
+- Loads the HTML into a hidden iframe at `viewport` size and waits for a
+  deterministic settle (fonts loaded, no pending fetches, layout stable)
+- Walks every element, capturing computed styles + per-character Range geometry
+- Emits a vector-only PDF: real text (embedded CIDFontType2 fonts), real link
+  annotations, real path geometry (gradients, shadows, transforms, SVG paths)
+- **Paginates**: content taller than the viewport becomes multiple pages, with
+  text lines never cut at a page boundary
 
 ## What's supported
 
-- Text: any Unicode in Inter Latin + Greek subsets (~250 glyphs incl. ΔΣΩ, accented Latin)
-- CSS layout: anything the browser's own layout engine produces (block, flex, grid, table)
-- CSS fill: solid colors, linear-gradient (axial PDF shading), opacity, color() / color-mix()
-- CSS borders: solid, dashed, dotted, with per-corner border-radius
-- CSS letter-spacing, text-transform, line-height
-- SVG: `<rect>`, `<line>`, `<circle>`, `<ellipse>`, `<text>`, `<g transform>`
-- Hyperlinks: `<a href>` becomes a `/Subtype /Link` annotation with `/A /URI`
-- `<img>`: JPEG passthrough as `XObject /DCTDecode` (PNG decoding TODO)
-- `<input>`/`<select>`/`<textarea>` placeholders + values
+See README.md for the full coverage list. Highlights:
+
+- Text: word-exact positions, real baselines, justify, decorations with
+  style/color/offset (solid/double/dotted/dashed/wavy), synthetic italics,
+  text-shadow, `white-space: pre`, `text-overflow: ellipsis`, sub/sup
+- Layout: anything the browser computes — block, flex, grid, table, floats,
+  CSS columns, inline-block, position, vertical-align, word-break
+- Paint: CSS 2.1 stacking contexts (z-index/opacity/transforms), overflow
+  clipping, CSS transforms (rotate/scale/skew/matrix, nested, origin)
+- Boxes: per-side borders (all styles incl. groove/ridge/inset/outset),
+  %/elliptical border-radius, outer+inset box-shadow, outline+offset
+- Backgrounds: multi-stop linear + radial gradients, `background-image: url()`
+  with size/position/repeat
+- Images: JPEG passthrough, full PNG decoder (palette/alpha → SMask), object-fit
+- SVG: paths (M/L/H/V/C/S/Q/T/A/Z), polygons, dasharray, caps/joins, transforms
+- Fonts: Inter, JetBrains Mono 400/500/700, Manrope 700/800, Arial/Helvetica →
+  base-14 mapping, Material Symbols icons (GSUB ligatures), lazy embedding
+- Pseudo-elements: ::before/::after with string / attr() / quote content
+- `<input>`/`<select>`/`<textarea>` placeholders + values, list markers
 
 ## What's not (yet)
 
-- PNG image decoding (only JPEG works currently)
-- Box-shadow, backdrop-filter, filter
-- 3D transforms
-- Icon fonts via OpenType ligatures (Material Symbols, Font Awesome)
-- Multi-page output (currently emits single page sized to viewport)
-- Custom @font-face from URL (only the bundled Inter + Greek subsets)
+- CSS counters in pseudo content; paragraph-level break-inside control
+- WOFF2 web fonts (bundle TTF/OTF instead); variable-font axis instancing
+- bidi/RTL shaping, complex scripts (Arabic, Indic)
+- `filter:`, `backdrop-filter:`, 3D transforms, `column-rule`
 
 ## Bundled fonts
-
-Bundled in `assets/fonts/`:
 
 | File | Size | Coverage |
 |------|------|----------|
 | `Inter-{400,500,600,700}.ttf` | ~68 KB each | Latin |
 | `Inter-{400,500,600,700}-greek.ttf` | ~16 KB each | Greek (incl. Δ) |
-| `JetBrainsMono-Regular.ttf` | 270 KB | Monospace fallback |
+| `JetBrainsMono-{Regular,500,700}.ttf` | 110–270 KB | Monospace |
+| `Manrope-{700,800}.ttf` | ~95 KB each | Display headlines |
+| `MaterialSymbolsOutlined.ttf` | 963 KB | Icon ligatures |
 
-All TTFs are static instances from [fontsource](https://fontsource.org). Variable
-fonts are NOT used — most PDF readers don't honor variable axes.
+Faces are embedded lazily — a PDF only contains the faces its content uses.
 
 ## Vector fidelity guarantee
 
 The output PDF contains:
 
-- **Real text** — `BT (Hello) Tj ET` operators referencing embedded fonts, NOT
+- **Real text** — `BT … Tj ET` operators referencing embedded fonts, NOT
   rasterized canvas pixels. Use Ctrl+F in a PDF reader to confirm.
 - **Real link annotations** — clickable hyperlinks with `/Subtype /Link` + `/A /URI`.
-  Try clicking them in Acrobat or any modern reader.
 - **Real geometry** — rectangles, paths, gradients are PDF operators (`re`, `m`, `l`,
   `c`, `f`, `S`, `sh`), not embedded images.
-- **Embedded fonts** — Inter is parsed (SFNT), shaped to GIDs via the cmap table,
-  and embedded as `/CIDFontType2` with `/Identity-H` encoding and a `ToUnicode`
-  CMap so text extraction recovers the original codepoints.
+- **Embedded fonts** — parsed (SFNT), mapped to GIDs via cmap (and GSUB ligatures
+  for icon fonts), embedded as `/CIDFontType2` with `/Identity-H` + ToUnicode.
 
 There is NO fallback to "rasterize the page to a canvas, embed as image". That's the
 opposite of what this lib does.
 
 ## License / authorship
 
-Built end-to-end in a 3-hour `/long-run` session (2026-05-08 02:13 → 05:15 UTC+1).
+Built across two `/long-run` sessions (2026-05-08 and 2026-06-11/12).
 No third-party PDF libraries in `src/` — see `CONSTRAINTS.md` for the rules.
