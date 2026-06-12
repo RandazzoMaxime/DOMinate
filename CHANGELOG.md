@@ -321,3 +321,20 @@ protected source.png reference.
 - Explorations reverted: small-text and luminance-gated glyph strokes (inconsistent).
 
 # TRUE FINAL — 13 fixtures, overall 0.755%, gates green, validity green.
+
+## Iterations 58-60 (02:05-02:35)
+
+- **iter 58** — break-avoiding pagination: cut points walk up to straddling text-line
+  tops (fixed-point), pages clip to their band; 60-paragraph A4 doc verified clean.
+- **iter 59** — ::before/::after synthesis: literal string content measured via the
+  iframe canvas, anchored to the elements first/last word with the pseudos own
+  computed style. Fixture torture-pseudo (14th) debuts at 0.364%.
+- **iter 60** — pseudo content attr() + open/close-quote (first pair of computed
+  quotes). Counters remain unsupported.
+- report diff characterized exhaustively: 50% dark glyph-edge AA, the rest halo
+  pixels around bold glyphs — rasterizer-level floor, no structural deltas left.
+
+# SESSION CLOSED — 14 fixtures, overall 0.729% (99491/13639606 px), all
+# functional gates green, validity 98/98, two consecutive loop runs byte-identical.
+# Start of session: 5.885% over 4 fixtures. 32 accepted iterations + 3 parallel
+# agent merges; src/ 2.2K -> ~4K LOC.

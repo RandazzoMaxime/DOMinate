@@ -14,12 +14,13 @@ The PDF contains real selectable text, real clickable hyperlinks, embedded
 fonts, vector geometry — no canvas rasterization, no third-party PDF
 generators. See **CONSTRAINTS.md** for the no-dependency rules.
 
-## Status (session 2026-06-11/12, closed at the 03:30 deadline — 13 fixtures)
+## Status (session 2026-06-11/12, closed at the 03:30 deadline — 14 fixtures)
 
 | Fixture | Diff vs Chromium | What it exercises |
 |---------|------------------|-------------------|
 | `torture-image` | **0.125%** | PNG decode+alpha SMask, JPEG, object-fit, css backgrounds, tiling |
 | `torture-svg` | **0.235%** | SVG paths M/L/H/V/C/S/Q/T/A/Z, polygons, dasharray, linecaps, rotated groups |
+| `torture-pseudo` | **0.364%** | ::before/::after string/attr()/quote content, breadcrumbs, markers |
 | `torture-transform` | **0.493%** | rotate/scale/translate/skew/matrix3d, nested, transform-origin |
 | `torture-table` | **0.534%** | border-collapse, row/col spans, zebra, separate+spacing |
 | `wizard` | **0.575%** | Tailwind dark theme, forms, gradients, Material Symbols icons, Manrope |
@@ -31,9 +32,9 @@ generators. See **CONSTRAINTS.md** for the no-dependency rules.
 | `torture-text` | **0.905%** | justify, lists/markers, code blocks, sub/sup, decorations |
 | `torture-flow` | **0.916%** | floats, CSS columns, text-indent, vertical-align, word-break, ellipsis |
 | `report` | **2.242%** | dense 10-11px text, italics, inline code (glyph-AA dominated) |
-| **overall** | **0.755%** | all functional gates green, validity suite green, byte-stable across runs |
+| **overall** | **0.729%** | all functional gates green, validity 98/98, byte-stable across runs |
 
-Session start was 5.885% over 4 fixtures; session end is 0.755% over 13.
+Session start was 5.885% over 4 fixtures; session end is 0.729% over 14.
 
 The strict exit criterion is < 0.1% per fixture; the remaining diff is dominated
 by per-glyph anti-aliasing differences between Chromium's text rasterizer and
@@ -73,8 +74,11 @@ effects are structurally exact; the PDFs are visually correct in real viewers.
   ligature table (LookupType 4 + Extension), GIDs emitted directly via Identity-H
 - **Multi-page**: content taller than the viewport paginates with line-level
   break avoidance (straddling text lines move whole to the next page)
+- **Pseudo-elements**: ::before/::after with string, attr() or open/close-quote
+  content, synthesized from the pseudo's computed style and anchored to the
+  element's first/last word
 
-Known gaps: `::before/::after` pseudo-elements, WOFF2, variable-font axis
+Known gaps: CSS counters in pseudo content, WOFF2, variable-font axis
 instancing (icons render at the default wght/FILL/opsz), paragraph-level
 break-inside control, bidi/RTL shaping, column-rule.
 
