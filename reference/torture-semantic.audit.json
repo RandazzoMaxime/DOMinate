@@ -1,0 +1,21 @@
+{
+  "viewport": {
+    "width": 1123,
+    "height": 794
+  },
+  "screenshotScale": 1,
+  "expectedLinks": [
+    "https://helix.corsica/semantic-bench"
+  ],
+  "expectedTextFragments": [
+    "Semantic & Decoration Bench",
+    "Decoration styles",
+    "Inline semantics",
+    "Definition list (grid)",
+    "Colgroup-sized table",
+    "Deliverable",
+    "Format",
+    "Due",
+    "Details (open + closed)"
+  ]
+}

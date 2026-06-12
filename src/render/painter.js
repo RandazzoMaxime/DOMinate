@@ -963,23 +963,50 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
 
   // Decoration runs extend across the inter-word gap when the walker bridged them.
   const decoEndPdf = (b.decoR != null ? b.decoR : b.x + b.w) * CSS_TO_PDF;
-  const decoAlpha = elOpacity * (color ? color.a : 1);
+  const decoColor = parseColor(b.style.textDecorationColor) || color;
+  const decoAlpha = elOpacity * (decoColor ? decoColor.a : 1);
   if (decoAlpha < 1 && (b.style.textDecoration || '') !== 'none' && (b.style.textDecoration || '') !== '') {
     page.setExtGState(doc.addExtGState({ ca: decoAlpha, CA: decoAlpha }));
   }
 
+  /** Stroke one decoration line honoring text-decoration-style (solid/double/
+   *  dotted/dashed/wavy) from x0 to x1 at lineY (PDF units, lw thick). */
+  const strokeDecoration = (lineY, lw) => {
+    if (decoColor) page.setStrokeRgb(decoColor.r, decoColor.g, decoColor.b);
+    page.setLineWidth(lw);
+    const styleD = b.style.textDecorationStyle || 'solid';
+    if (styleD === 'dotted') page.setDashPattern([lw, lw], 0);
+    else if (styleD === 'dashed') page.setDashPattern([lw * 4, lw * 2], 0);
+    if (styleD === 'wavy') {
+      // Sine-ish wave via repeating quarter beziers: amplitude ≈ lw, period ≈ 6 lw.
+      const amp = Math.max(lw, 0.6), period = amp * 6;
+      const ops = [`${num(xPdf)} ${num(lineY)} m`];
+      let sign = 1;
+      for (let x0 = xPdf; x0 < decoEndPdf; x0 += period, sign = -sign) {
+        const x1 = Math.min(x0 + period, decoEndPdf);
+        const mid = (x0 + x1) / 2;
+        ops.push(`${num(mid)} ${num(lineY + sign * amp * 2)} ${num(mid)} ${num(lineY + sign * amp * 2)} ${num(x1)} ${num(lineY)} c`);
+      }
+      page._push(ops.join('\n') + '\nS\n');
+    } else if (styleD === 'double') {
+      page._push(`${num(xPdf)} ${num(lineY + lw)} m ${num(decoEndPdf)} ${num(lineY + lw)} l S\n`);
+      page._push(`${num(xPdf)} ${num(lineY - lw)} m ${num(decoEndPdf)} ${num(lineY - lw)} l S\n`);
+    } else {
+      page._push(`${num(xPdf)} ${num(lineY)} m ${num(decoEndPdf)} ${num(lineY)} l S\n`);
+    }
+    if (styleD === 'dotted' || styleD === 'dashed') page.setDashPattern([], 0);
+  };
+
   // text-decoration: line-through → stroke midway up the x-height (~0.38 em above
   // baseline measured against Chromium's rendering).
   if ((b.style.textDecoration || '').includes('line-through')) {
-    const lineY = yPdf + fontSizeCss * CSS_TO_PDF * 0.38;
-    const lineW = Math.max(0.5, fontSizeCss * CSS_TO_PDF * 0.049);
-    if (color) page.setStrokeRgb(color.r, color.g, color.b);
-    page.setLineWidth(lineW);
-    page._push(`${num(xPdf)} ${num(lineY)} m ${num(decoEndPdf)} ${num(lineY)} l S\n`);
+    strokeDecoration(yPdf + fontSizeCss * CSS_TO_PDF * 0.38,
+      Math.max(0.5, fontSizeCss * CSS_TO_PDF * 0.049));
   }
 
   // text-decoration: underline → draw a line at the font's intrinsic underline position
-  // (post.underlinePosition / unitsPerEm × fontSize) with the font's intrinsic thickness.
+  // (post.underlinePosition / unitsPerEm × fontSize) with the font's intrinsic
+  // thickness, shifted further by text-underline-offset when set.
   if ((b.style.textDecoration || '').includes('underline')) {
     let underlineOffsetEm = 0.10;  // fallback: 10% em below baseline
     let underlineThicknessEm = 0.05;
@@ -990,11 +1017,9 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
       underlineOffsetEm = -(fontHandle.font.underlinePosition || -100) / upe;
       underlineThicknessEm = (fontHandle.font.underlineThickness || 50) / upe;
     }
-    const lineY = yPdf - fontSizeCss * CSS_TO_PDF * underlineOffsetEm;
-    const lineW = Math.max(0.5, fontSizeCss * CSS_TO_PDF * underlineThicknessEm);
-    if (color) page.setStrokeRgb(color.r, color.g, color.b);
-    page.setLineWidth(lineW);
-    page._push(`${num(xPdf)} ${num(lineY)} m ${num(decoEndPdf)} ${num(lineY)} l S\n`);
+    const extraOffset = parsePx(b.style.textUnderlineOffset) * CSS_TO_PDF;
+    strokeDecoration(yPdf - fontSizeCss * CSS_TO_PDF * underlineOffsetEm - extraOffset,
+      Math.max(0.5, fontSizeCss * CSS_TO_PDF * underlineThicknessEm));
   }
 
   page.restoreState();
