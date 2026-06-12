@@ -5,7 +5,7 @@
 
 import { CSS_TO_PDF, cssYToPdfY } from '../core/pdf.js';
 import { parseColor, parsePx } from '../dom/utils.js';
-import { encodeTextAsHex } from '../core/fonts/embed.js';
+import { encodeTextAsHex, measureText } from '../core/fonts/embed.js';
 
 /**
  * @param {import('../core/pdf.js').PdfDocument} doc
@@ -268,7 +268,12 @@ function paintSvgEllipse(page, b, pageHeightPdf, doc) {
 
 function paintSvgText(page, fontMap, b, pageHeightPdf) {
   if (!b.text || !b.text.trim()) return;
-  const xPdf = b.baselineX * CSS_TO_PDF;
+  let xPdf = b.baselineX * CSS_TO_PDF;
+  // SVG text-anchor: shift by the measured advance (middle = half, end = full).
+  if ((b.anchor === 'middle' || b.anchor === 'end') && fontMap.regular.kind === 'embeddedTrueType') {
+    const adv = measureText(fontMap.regular, b.text, b.textSizeCss * CSS_TO_PDF);
+    xPdf -= b.anchor === 'middle' ? adv / 2 : adv;
+  }
   const yPdf = cssYToPdfY(Math.round(b.baselineY), pageHeightPdf);
   page.saveState();
   if (b.textColor) page.setFillRgb(b.textColor.r, b.textColor.g, b.textColor.b);

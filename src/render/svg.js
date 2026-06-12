@@ -180,6 +180,7 @@ export function walkSvg(svg, boxes, idoc) {
           kind: 'svg-text',
           x: p.x, y: p.y - fontSize * transformLength(1) * 0.78,  // approximate top of line
           w: 0, h: fontSize * transformLength(1),
+          anchor: cs.textAnchor || child.getAttribute('text-anchor') || 'start',
           baselineX: p.x, baselineY: p.y,
           style: { color: cs.color, fontSize: cs.fontSize, fontFamily: cs.fontFamily, fontWeight: cs.fontWeight, textAlign: 'left', textTransform: 'none' },
           text,
