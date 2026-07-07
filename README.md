@@ -1,148 +1,123 @@
-# HTML_TO_PDF_CLIENT
+# DOMinate
 
-A from-scratch, **client-side**, vector-fidelity HTML→PDF rendering library.
+**From-scratch, client-side, vector-fidelity HTML → PDF.**
+No jsPDF. No pdf-lib. No html2canvas. No headless browser at runtime. No server.
+
+DOMinate runs entirely in the browser, uses the browser's own layout engine to
+position every element exactly where Chromium would, and hand-writes a valid
+PDF 1.7 document byte-by-byte: real selectable text, real embedded fonts, real
+clickable links, real vector paths — never a rasterized screenshot glued onto
+a page.
 
 ```js
 import { htmlToPdf } from './src/index.js';
+
 const bytes = await htmlToPdf(htmlString, {
-  viewport: { width: 1123, height: 794 },  // A4 landscape in CSS px
+  viewport: { width: 1123, height: 794 },  // A4 landscape, CSS px
 });
-// → Uint8Array of valid PDF 1.7
+// → Uint8Array, a valid PDF 1.7 document
 ```
 
-The PDF contains real selectable text, real clickable hyperlinks, embedded
-fonts, vector geometry — no canvas rasterization, no third-party PDF
-generators. See **CONSTRAINTS.md** for the no-dependency rules.
+## Why
 
-## Status (session 2026-06-11/12, closed at the 03:30 deadline — 14 fixtures)
+Every existing "HTML to PDF in the browser" library either drags in a heavy
+third-party PDF writer, or rasterizes the page to a `<canvas>` and embeds a
+JPEG/PNG — which means no selectable text, no real hyperlinks, blurry output
+at any zoom level, and a much larger file. DOMinate does neither: it reuses
+the browser's CSS engine for layout (the same primitive as `fetch` or
+`DOMParser` — not a dependency) and writes PDF objects itself.
 
-| Fixture | Diff vs Chromium | What it exercises |
-|---------|------------------|-------------------|
-| `torture-image` | **0.125%** | PNG decode+alpha SMask, JPEG, object-fit, css backgrounds, tiling |
-| `torture-svg` | **0.235%** | SVG paths M/L/H/V/C/S/Q/T/A/Z, polygons, dasharray, linecaps, rotated groups |
-| `torture-pseudo` | **0.364%** | ::before/::after string/attr()/quote content, breadcrumbs, markers |
-| `torture-transform` | **0.493%** | rotate/scale/translate/skew/matrix3d, nested, transform-origin |
-| `torture-table` | **0.534%** | border-collapse, row/col spans, zebra, separate+spacing |
-| `wizard` | **0.575%** | Tailwind dark theme, forms, gradients, Material Symbols icons, Manrope |
-| `torture-box` | **0.678%** | per-side borders, multi-stop/radial gradients, box-shadows, z-index, overflow |
-| `torture-effects` | **0.803%** | text-shadow, inset box-shadow, outline+offset, groove/ridge/inset/outset |
-| `source` | **0.825%** | rounded cards, tables, flexbox, SVG scheme, links (LCD-AA reference kept) |
-| `torture-semantic` | **0.829%** | dl/dt/dd, abbr/ins/del/kbd, colgroup, details, decoration styles/colors |
-| `source-flat` | **0.888%** | flat business design, Arial/Helvetica mapping, tracked headers |
-| `torture-text` | **0.905%** | justify, lists/markers, code blocks, sub/sup, decorations |
-| `torture-flow` | **0.916%** | floats, CSS columns, text-indent, vertical-align, word-break, ellipsis |
-| `report` | **2.242%** | dense 10-11px text, italics, inline code (glyph-AA dominated) |
-| **overall** | **0.729%** | all functional gates green, validity 98/98, byte-stable across runs |
-
-Session start was 5.885% over 4 fixtures; session end is 0.729% over 14.
-
-The strict exit criterion is < 0.1% per fixture; the remaining diff is dominated
-by per-glyph anti-aliasing differences between Chromium's text rasterizer and
-pdf.js (the harness rasterizer). Word positions, baselines, geometry, colors and
-effects are structurally exact; the PDFs are visually correct in real viewers.
-
-## CSS / HTML coverage
-
-- **Text**: per-word exact positions (character-level Range measurement), real
-  font baselines from in-engine metrics, justify, letter/word-spacing,
-  text-transform, underline/line-through with style/color/offset
-  (solid/double/dotted/dashed/wavy, bridged across spaces), synthetic
-  italics, text-shadow (multi, blurred), `white-space: pre`, ellipsis truncation,
-  sub/sup, css-fonts-4 weight resolution against the page's loaded faces
-- **Fonts**: TTF/OTF parse + Type0/CIDFontType2 embedding with ToUnicode, lazy
-  per-document face selection, Latin+Greek fallback chains, JetBrains Mono
-  400/500/700, base-14 mapping for Arial/Helvetica
-- **Boxes**: per-side borders (solid/dashed/dotted/double/groove/ridge/inset/outset
-  with Chromium dash fitting), border-radius incl. per-corner, outline +
-  outline-offset, box-shadow outer+inset (erfc-matched gaussian rings),
-  pixel-grid snapping, border-collapse aware strokes
-- **Backgrounds**: solid, multi-stop linear gradients (FunctionType 3 stitching),
-  radial gradients (circle/ellipse, all CSS extent keywords),
-  `background-image: url()` with size/position/repeat
-- **Images**: JPEG passthrough, from-scratch PNG decoder (palette/gray/alpha →
-  SMask), object-fit cover/contain/none/scale-down, border-radius clipping
-- **Layout** (via browser engine): flex, grid, tables, floats, CSS columns,
-  inline-block, position absolute/relative/sticky, vertical-align, word-break
-- **Paint model**: CSS 2.1 Appendix E stacking contexts (z-index, opacity,
-  transforms), overflow clipping to the padding box, CSS transforms replayed as
-  PDF matrices (measure-untransformed technique)
-- **SVG**: paths with arcs→Béziers, polygons/polylines, dasharray, caps/joins,
-  fill-rule, per-element getScreenCTM transforms, text
-- **Interactive**: link annotations, form-control placeholder/value rendering
-
-- **Icon fonts**: Material Symbols glyph names resolved through the font's GSUB
-  ligature table (LookupType 4 + Extension), GIDs emitted directly via Identity-H
-- **Multi-page**: content taller than the viewport paginates with line-level
-  break avoidance (straddling text lines move whole to the next page)
-- **Pseudo-elements**: ::before/::after with string, attr() or open/close-quote
-  content, synthesized from the pseudo's computed style and anchored to the
-  element's first/last word
-
-Known gaps: CSS counters in pseudo content, WOFF2, variable-font axis
-instancing (icons render at the default wght/FILL/opsz), paragraph-level
-break-inside control, bidi/RTL shaping, column-rule.
-
-## Running
+## Quick start
 
 ```bash
 npm install
-npx playwright install chromium
+npx playwright install chromium   # only needed for the test/dev tooling
 
-npm run loop      # diff iteration over all reference/*.html fixtures
-npm test          # validity suite (magic bytes, links, text, fonts, size)
-npm run demo      # http://localhost:5173/ — drag-drop HTML→PDF playground
-node scripts/make-reference.mjs <stem>   # (re)generate Chromium ground truth
-node scripts/diff-regions.mjs <stem>     # cluster the diff into regions
-node scripts/inspect-patch.mjs <stem> x y w h  # ASCII ref/dist patch compare
+npm run demo       # http://localhost:5173 — drag-and-drop playground
 ```
 
-## Architecture
+Or just double-click **`convert.bat`** — it starts the local server and opens
+the drag-and-drop converter for you. No command line needed. Full walkthrough
+in **[`documentation.html`](documentation.html)**.
 
-The lib uses the **host browser's native layout engine** (`getBoundingClientRect`,
-`getComputedStyle`, `Range` character rects, `getScreenCTM`, `document.fonts`,
-canvas `measureText` on a hidden iframe) rather than reimplementing CSS layout.
-See **CLAUDE.md "Architectural decision"**.
+## Features
+
+- **Real text** — `BT … Tj ET` operators against embedded fonts, not pixels.
+  Ctrl+F works in any PDF reader.
+- **Real links** — `/Subtype /Link` annotations with `/A /URI`, positioned
+  exactly over the source `<a>` element.
+- **Real fonts** — TTF/OTF parsed and subset from scratch, embedded as
+  `Type0`/`CIDFontType2` with `ToUnicode`, only the faces actually used.
+- **Real vector geometry** — borders, shadows, gradients (linear + radial,
+  multi-stop), SVG paths, transforms — all PDF path/shading operators.
+- **Faithful layout** — flex, grid, tables, floats, columns, position,
+  z-index/opacity stacking contexts, overflow clipping: whatever the browser
+  computes, because the browser computes it.
+- **Pagination** — content taller than one page slices automatically without
+  ever cutting a text line in half, plus manual control:
+
+  ```html
+  <div class="page-break"></div>
+  ```
+
+  drops a page break wherever you put it (aliases: `pagebreak`, `break-page`,
+  `data-page-break`, or standard `style="break-before: page"`).
+- **Images** — JPEG passthrough, a from-scratch PNG decoder (palette/alpha →
+  soft mask), `object-fit`.
+
+See **[`USAGE.md`](USAGE.md)** for the full API and coverage list.
+
+## Architecture
 
 ```
 HTML string
   │
-  ▼  walker.js (hidden iframe, browser layout, deterministic settle loop)
-flat render boxes (style + geometry + sortKey + clip chain + transform chain)
+  ▼  dom/walker.js — hidden iframe, browser layout engine, deterministic settle
+flat render boxes (style + geometry + paint order + clip/transform chains)
   │
-  ▼  painter.js (stable sort by Appendix-E key → single paint pass)
-PDF content stream (paths, shadings, text Tj/TJ, images, annotations)
+  ▼  render/painter.js — stable-sorted single paint pass
+PDF content stream (paths, shadings, text, images, link annotations)
   │
   ▼  core/pdf.js
-PDF document bytes (xref, catalog, fonts, images, shadings, ExtGState)
+PDF document bytes (xref, catalog, embedded fonts, images, shadings)
 ```
-
-### Modules (`src/`, ≈ 3.4 K LOC)
 
 ```
 src/
-├── index.js                  → public API, lazy font selection, image prefetch
+├── index.js              public API — font selection, image prefetch, pagination
 ├── core/
-│   ├── pdf.js                → PDF writer + axial/radial stitched shadings
-│   ├── fonts/ sfnt.js, embed.js → TTF/OTF parse, Type0/CIDFontType2 + ToUnicode
-│   └── images/ jpeg.js, png.js  → DCT passthrough; from-scratch PNG inflate/unfilter
+│   ├── pdf.js             PDF object writer, xref, axial/radial shadings
+│   ├── fonts/              sfnt.js (TTF/OTF parse) · embed.js (Type0/CIDFontType2)
+│   └── images/             jpeg.js (passthrough) · png.js (from-scratch decoder)
 ├── dom/
-│   ├── walker.js             → layout extraction: per-char text measurement, stacking
-│   │                           keys, clips, transforms, markers, ellipsis, metrics
-│   └── utils.js              → parseColor, parsePx
+│   ├── walker.js          layout extraction: per-character text measurement,
+│   │                       stacking contexts, clips, transforms, page breaks
+│   └── utils.js            color/length parsing
 └── render/
-    ├── painter.js            → ordered paint pass: boxes, borders, shadows, gradients,
-    │                           text (+shadows/decorations/italics), images, bullets
-    └── svg.js                → SVG walker: paths/shapes/text via getScreenCTM
+    ├── painter.js          ordered paint pass: boxes, text, images, bullets
+    └── svg.js               SVG → PDF path translation
 ```
 
-### Test loop (`scripts/`)
+Full rationale for "browser-as-layout-engine" in **[`CLAUDE.md`](CLAUDE.md)**.
 
-`loop.mjs` renders every `reference/*.html` through the lib in headless Chromium,
-rasterizes at 96 dpi (pdfjs + canvas), pixelmatches against the Chromium
-ground-truth PNG and audits links/text/fonts. `make-reference.mjs` regenerates
-ground truth with the same settle protocol the walker uses.
+## Testing
 
-## License / authorship
+```bash
+npm run loop      # renders every reference/*.html fixture, pixel-diffs vs
+                   # Chromium ground truth, audits links/text/fonts
+npm test           # validity suite: magic bytes, xref integrity, size sanity
+```
 
-Built autonomously across two `/long-run` sessions (2026-05-08 and 2026-06-11/12).
-No third-party PDF libraries in `src/`. Full iteration journal in **CHANGELOG.md**.
+`scripts/loop.mjs` is the convergence gate this project was built against —
+see `CHANGELOG.md` for the full iteration journal (14 fixtures, 0.729% mean
+pixel diff against native Chromium rendering, all functional gates green).
+
+## Constraints
+
+`src/` never imports a third-party PDF/canvas-rasterization library. The full
+list of forbidden packages and disallowed shortcuts (e.g. "rasterize to
+canvas and embed as image") is in **[`CONSTRAINTS.md`](CONSTRAINTS.md)**.
+
+## License
+
+Private project. No license granted for external use.

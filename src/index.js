@@ -76,7 +76,7 @@ export async function htmlToPdf(input, opts = {}) {
   });
 
   const html = typeof input === 'string' ? input : input.outerHTML;
-  const { boxes, contentHeight } = await layout(html, viewport);
+  const { boxes, contentHeight, forcedBreaks } = await layout(html, viewport);
 
   // Scan the render boxes to find which faces the document ACTUALLY needs, so we
   // only embed those (a full embed of all 11 bundled faces costs ~450 KB per PDF).
@@ -214,23 +214,36 @@ export async function htmlToPdf(input, opts = {}) {
   // the cut moves UP to that line's top so the whole line lands on the next page
   // (leaving whitespace at the bottom, like real pagination). A safety floor of
   // half a page keeps a giant unbreakable element from stalling progress.
+  //
+  // A manual page-break marker (see dom/walker.js collectForcedBreaks) always wins:
+  // if one falls before the automatic cut, it becomes the cut instead — exactly at
+  // its own top edge, ignoring the half-page floor, since the author asked for it
+  // explicitly. This also forces pagination for documents that fit in one viewport
+  // but still contain a marker.
   const pageH = viewport.height;
   const cuts = [0];
-  while (cuts[cuts.length - 1] + pageH < contentHeight - 1 && cuts.length < 200) {
+  const nextForcedAfter = (y) => forcedBreaks.find(fb => fb > y + 0.5);
+  while (cuts.length < 200 &&
+         (cuts[cuts.length - 1] + pageH < contentHeight - 1 || nextForcedAfter(cuts[cuts.length - 1]) !== undefined)) {
     const last = cuts[cuts.length - 1];
     let cut = last + pageH;
-    let lowest = cut;
-    // Pushing one line up can make another line straddle the new cut — iterate
-    // to a fixed point (bounded by the box count).
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (const b of boxes) {
-        if (b.kind !== 'text' && b.kind !== 'bullet') continue;
-        if (b.y < lowest && b.y + b.h > lowest && b.h < pageH / 2) { lowest = b.y; changed = true; }
+    const forced = forcedBreaks.filter(y => y > last + 0.5 && y < cut - 0.5);
+    if (forced.length) {
+      cut = forced[0];
+    } else {
+      let lowest = cut;
+      // Pushing one line up can make another line straddle the new cut — iterate
+      // to a fixed point (bounded by the box count).
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const b of boxes) {
+          if (b.kind !== 'text' && b.kind !== 'bullet') continue;
+          if (b.y < lowest && b.y + b.h > lowest && b.h < pageH / 2) { lowest = b.y; changed = true; }
+        }
       }
+      if (lowest > last + pageH / 2) cut = lowest;
     }
-    if (lowest > last + pageH / 2) cut = lowest;
     cuts.push(cut);
   }
   for (let k = 0; k < cuts.length; k++) {

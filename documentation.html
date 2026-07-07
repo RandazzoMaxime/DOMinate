@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>HTML → PDF — Documentation</title>
+<style>
+  :root {
+    --green: #289e22;
+    --green-strong: #1f7a1c;
+    --slate-50: #f8fafc;
+    --slate-100: #f1f5f9;
+    --slate-200: #e2e8f0;
+    --slate-300: #cbd5e1;
+    --slate-500: #64748b;
+    --slate-700: #334155;
+    --slate-900: #0f172a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: var(--slate-50);
+    color: var(--slate-900);
+    margin: 0;
+    padding: 32px 24px 64px;
+    line-height: 1.55;
+  }
+  .container { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 26px; font-weight: 800; margin: 0 0 4px; }
+  .subtitle { color: var(--slate-500); font-size: 14px; margin-bottom: 32px; }
+  h2 {
+    font-size: 16px; font-weight: 700; margin: 40px 0 12px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--slate-200);
+  }
+  h2 .n {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--green); color: #fff; font-size: 12px; font-weight: 700;
+    margin-right: 8px;
+  }
+  p { margin: 0 0 12px; font-size: 14px; color: var(--slate-700); }
+  ul { margin: 0 0 12px; padding-left: 20px; font-size: 14px; color: var(--slate-700); }
+  li { margin-bottom: 6px; }
+  code {
+    background: var(--slate-100);
+    border: 1px solid var(--slate-200);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font: 13px ui-monospace, Consolas, monospace;
+    color: var(--green-strong);
+  }
+  pre {
+    background: var(--slate-900);
+    color: #e2e8f0;
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font: 13px ui-monospace, Consolas, monospace;
+    margin: 0 0 14px;
+  }
+  pre code { background: none; border: 0; padding: 0; color: inherit; }
+  .card {
+    background: #fff;
+    border: 1px solid var(--slate-200);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+  }
+  .badge {
+    display: inline-block;
+    font-size: 11px; font-weight: 700;
+    background: #f0fdf4; color: var(--green-strong);
+    border: 1px solid #bbf7d0;
+    border-radius: 999px;
+    padding: 2px 10px;
+    margin-bottom: 10px;
+  }
+  .note {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #92400e;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-bottom: 14px;
+  }
+  footer {
+    margin-top: 48px;
+    padding-top: 16px;
+    border-top: 1px solid var(--slate-200);
+    font-size: 12px;
+    color: var(--slate-500);
+  }
+  a { color: var(--green-strong); }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>HTML → PDF — Documentation</h1>
+  <p class="subtitle">Convertisseur 100% client-side, sans serveur, sans jsPDF/pdf-lib/html2canvas. Voir <code>README.md</code> et <code>CONSTRAINTS.md</code> pour le détail technique.</p>
+
+  <h2><span class="n">1</span>Démarrer l'outil</h2>
+  <div class="card">
+    <p>Double-clique sur <code>convert.bat</code> (à la racine du projet). Il lance un petit serveur local et ouvre automatiquement la page de conversion dans ton navigateur.</p>
+    <p>Ferme la fenêtre console noire pour arrêter le serveur.</p>
+  </div>
+
+  <h2><span class="n">2</span>Convertir un fichier</h2>
+  <ul>
+    <li>Glisse-dépose un fichier <code>.html</code> dans la zone prévue (ou clique pour le choisir).</li>
+    <li>Choisis un format de page (A4, Letter, portrait/paysage, ou une taille personnalisée).</li>
+    <li>Clique <strong>Convertir → PDF</strong>, vérifie l'aperçu, puis <strong>Télécharger</strong>.</li>
+  </ul>
+  <p>Le PDF généré contient du vrai texte vectoriel (sélectionnable, cherchable), les polices utilisées, et les liens cliquables — jamais une image de la page.</p>
+
+  <h2><span class="n">3</span>Forcer un saut de page</h2>
+  <div class="card">
+    <span class="badge">nouveau</span>
+    <p>Par défaut, un document plus haut qu'une page est découpé automatiquement (sans jamais couper une ligne de texte). Pour forcer un saut de page à un endroit précis, ajoute un marqueur dans le HTML :</p>
+    <pre><code>&lt;div class="page-break"&gt;&lt;/div&gt;</code></pre>
+    <p>Tout ce qui suit ce marqueur commence sur une nouvelle page. Le marqueur peut être un <code>&lt;div&gt;</code> vide placé n'importe où entre deux sections.</p>
+    <p>Variantes acceptées (au choix) :</p>
+    <ul>
+      <li><code>class="pagebreak"</code> ou <code>class="break-page"</code> (alias de <code>page-break</code>)</li>
+      <li><code>data-page-break</code> comme attribut sur n'importe quel élément</li>
+      <li>CSS standard : <code>style="break-before: page"</code> ou <code>style="page-break-before: always"</code></li>
+    </ul>
+  </div>
+  <div class="note">Le marqueur définit où la <em>nouvelle</em> page commence : place-le juste avant le contenu qui doit démarrer la page suivante.</div>
+
+  <h2><span class="n">4</span>Exemple complet</h2>
+  <pre><code>&lt;h1&gt;Section 1&lt;/h1&gt;
+&lt;p&gt;Contenu de la première page…&lt;/p&gt;
+
+&lt;div class="page-break"&gt;&lt;/div&gt;
+
+&lt;h1&gt;Section 2&lt;/h1&gt;
+&lt;p&gt;Ce texte commence sur une nouvelle page.&lt;/p&gt;</code></pre>
+
+  <h2><span class="n">5</span>Aller plus loin</h2>
+  <ul>
+    <li><code>USAGE.md</code> — API JavaScript (<code>htmlToPdf(html, opts)</code>), options, ce qui est supporté / pas encore.</li>
+    <li><code>README.md</code> — vue d'ensemble du projet.</li>
+    <li><code>demo/converter.html</code> — la page de conversion elle-même (glisser-déposer).</li>
+  </ul>
+
+  <footer>Généré pour un usage local — aucune donnée n'est envoyée à un serveur, tout se passe dans le navigateur.</footer>
+</div>
+</body>
+</html>

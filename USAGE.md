@@ -41,6 +41,10 @@ The lib:
   annotations, real path geometry (gradients, shadows, transforms, SVG paths)
 - **Paginates**: content taller than the viewport becomes multiple pages, with
   text lines never cut at a page boundary
+- **Manual page breaks**: put `<div class="page-break"></div>` (aliases:
+  `pagebreak`, `break-page`, or a `data-page-break` attribute) wherever the next
+  page should start — also honors inline `style="break-before: page"` /
+  `style="page-break-before: always"`. Overrides automatic slicing at that point.
 
 ## What's supported
 

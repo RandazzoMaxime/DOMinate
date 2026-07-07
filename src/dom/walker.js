@@ -104,7 +104,9 @@ export async function layout(html, { width, height }) {
     // document height so the caller can paginate.
     const contentHeight = Math.max(height, idoc.documentElement ? idoc.documentElement.scrollHeight : height);
 
-    return { boxes, width, height, contentHeight };
+    const forcedBreaks = collectForcedBreaks(idoc).filter(y => y > 0.5 && y < contentHeight - 0.5);
+
+    return { boxes, width, height, contentHeight, forcedBreaks };
   } finally {
     iframe.remove();
   }
@@ -113,6 +115,33 @@ export async function layout(html, { width, height }) {
 import { walkSvg } from '../render/svg.js';
 import { parseColor, parsePx } from './utils.js';
 export { parseColor, parsePx };
+
+/**
+ * Manual page-break markers: an author can force a new PDF page to start at a
+ * given point in the flow, without knowing anything about pixel heights.
+ * Recognized as either of:
+ *   - class="page-break" (aliases: "pagebreak", "break-page") on any element
+ *   - a data-page-break attribute
+ *   - the standard print CSS, set inline: style="break-before: page" /
+ *     style="page-break-before: always"
+ * The new page starts at the marked element's own top edge — i.e. put the
+ * marker (an empty <div class="page-break"></div> works) right before the
+ * content that should begin the next page.
+ * Returns Y coordinates (CSS px, iframe-relative), deduped.
+ */
+function collectForcedBreaks(idoc) {
+  const ys = new Set();
+  for (const el of idoc.querySelectorAll('.page-break, .pagebreak, .break-page, [data-page-break]')) {
+    ys.add(el.getBoundingClientRect().top);
+  }
+  for (const el of idoc.querySelectorAll('[style*="break-before" i], [style*="page-break-before" i]')) {
+    const s = el.style;
+    if (s.breakBefore === 'page' || s.breakBefore === 'always' || s.pageBreakBefore === 'always') {
+      ys.add(el.getBoundingClientRect().top);
+    }
+  }
+  return [...ys].sort((a, b) => a - b);
+}
 
 /** Cheap whole-document layout fingerprint: scrollHeight + ~50 sampled element rects. */
 function layoutFingerprint(idoc) {
