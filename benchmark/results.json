@@ -1,0 +1,50 @@
+{
+  "generatedAt": "2026-07-09T22:33:10.919Z",
+  "fixture": "reference/source.html",
+  "viewport": {
+    "width": 1123,
+    "height": 794
+  },
+  "iterations": 7,
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "v24.12.0",
+    "playwrightChromium": "147.0.7727.15"
+  },
+  "dominate": {
+    "coldMs": 316.6,
+    "medianMs": 279.7,
+    "p95Ms": 298.8,
+    "minMs": 266.5,
+    "samplesMs": [
+      284.6,
+      266.5,
+      274.4,
+      298.8,
+      279.7,
+      279.5,
+      289.9
+    ],
+    "pdfBytes": 445134,
+    "pixelDiffPercent": 0.554
+  },
+  "playwright": {
+    "coldMs": 255,
+    "medianMs": 13.1,
+    "p95Ms": 14.6,
+    "minMs": 12.1,
+    "samplesMs": [
+      13.3,
+      14.6,
+      12.7,
+      12.1,
+      13.1,
+      13.9,
+      12.6
+    ],
+    "pdfBytes": 137894,
+    "pixelDiffPercent": 1.706
+  },
+  "methodology": "Loaded document and fonts, generation call only; one cold call, one unmeasured warm-up, then seven steady-state samples by default."
+}

@@ -1,0 +1,42 @@
+name: Bug report
+description: Report an incorrect render or PDF semantic issue
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to create a reduced reproduction.
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal HTML/CSS reproduction
+      description: Paste or link the smallest document that reproduces the issue.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: DOMinate version, browser and OS
+    validations:
+      required: true
+  - type: checkboxes
+    id: semantics
+    attributes:
+      label: Affected PDF semantics
+      options:
+        - label: Text selection/search
+        - label: Links
+        - label: Font embedding
+        - label: Multi-page output

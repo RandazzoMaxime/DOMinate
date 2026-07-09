@@ -1,7 +1,6 @@
 // Walks a list of render boxes from src/dom/walker.js and emits PDF operators on a Page.
 //
-// Iter 2 — covers solid rectangles, text runs, and link annotations.
-// Border-radius, gradients, SVG, and font embedding are added in later iterations.
+// Handles boxes, text, gradients, SVG, images, clipping and annotations.
 
 import { CSS_TO_PDF, cssYToPdfY } from '../core/pdf.js';
 import { parseColor, parsePx } from '../dom/utils.js';

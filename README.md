@@ -1,123 +1,180 @@
 # DOMinate
 
-**From-scratch, client-side, vector-fidelity HTML → PDF.**
-No jsPDF. No pdf-lib. No html2canvas. No headless browser at runtime. No server.
+[![Release](https://img.shields.io/github/v/release/RandazzoMaxime/DOMinate?display_name=tag)](https://github.com/RandazzoMaxime/DOMinate/releases)
+[![CI](https://github.com/RandazzoMaxime/DOMinate/actions/workflows/ci.yml/badge.svg)](https://github.com/RandazzoMaxime/DOMinate/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-2ea44f.svg)](LICENSE)
+[![Runtime dependencies: 0](https://img.shields.io/badge/runtime_dependencies-0-2ea44f.svg)](package.json)
 
-DOMinate runs entirely in the browser, uses the browser's own layout engine to
-position every element exactly where Chromium would, and hand-writes a valid
-PDF 1.7 document byte-by-byte: real selectable text, real embedded fonts, real
-clickable links, real vector paths — never a rasterized screenshot glued onto
-a page.
+**Vector-first HTML → PDF, entirely in the browser.** DOMinate turns an HTML
+document into PDF bytes without a server, a headless browser at runtime, a
+third-party PDF writer, or a canvas screenshot.
 
-```js
-import { htmlToPdf } from './src/index.js';
+The result keeps the things that make a PDF useful: selectable/searchable text,
+subsetted embedded fonts, clickable links, vector paths, gradients, borders and
+SVG geometry.
 
-const bytes = await htmlToPdf(htmlString, {
-  viewport: { width: 1123, height: 794 },  // A4 landscape, CSS px
-});
-// → Uint8Array, a valid PDF 1.7 document
-```
+## Why DOMinate exists
 
-## Why
+This project started from a simple frustration: browser-side JavaScript PDF
+libraries often produced output that looked approximate, while screenshot-based
+solutions could look acceptable at one zoom level but lost text selection,
+search, accessibility and crisp vector rendering.
 
-Every existing "HTML to PDF in the browser" library either drags in a heavy
-third-party PDF writer, or rasterizes the page to a `<canvas>` and embeds a
-JPEG/PNG — which means no selectable text, no real hyperlinks, blurry output
-at any zoom level, and a much larger file. DOMinate does neither: it reuses
-the browser's CSS engine for layout (the same primitive as `fetch` or
-`DOMParser` — not a dependency) and writes PDF objects itself.
+DOMinate takes a different route. It asks the host browser for the computed
+layout, then writes the PDF objects and drawing operators itself. The browser
+handles CSS layout; DOMinate handles the PDF.
 
-## Quick start
+## HTML vs generated PDF
+
+The three images below come from the same `reference/source.html` fixture at
+1123 × 794 CSS pixels. The PDF outputs were rasterized back to 96 DPI only for
+this visual comparison—the PDFs themselves remain vector documents.
+
+| HTML in Chromium | DOMinate PDF | Playwright `page.pdf()` |
+|:---:|:---:|:---:|
+| ![HTML reference](docs/assets/html-reference.png) | ![DOMinate output](docs/assets/dominate-output.png) | ![Playwright output](docs/assets/playwright-output.png) |
+
+### Reproducible benchmark
+
+Measured on Windows x64, Node 24.12.0 and Playwright Chromium 147.0.7727.15.
+The document and fonts were loaded before timing; results show one cold call and
+seven steady-state generation calls. Lower pixel difference is better.
+
+| Converter | Cold | Warm median | Warm p95 | Difference vs HTML | PDF size |
+|---|---:|---:|---:|---:|---:|
+| **DOMinate 1.0** | 316.6 ms | 279.7 ms | 298.8 ms | **0.554%** | 434.7 KiB |
+| Playwright `page.pdf()` | 255.0 ms | **13.1 ms** | **14.6 ms** | 1.706% | **134.7 KiB** |
+
+Playwright is the speed baseline and wins decisively when a Node/headless-browser
+service is acceptable. DOMinate's value proposition is different: in this
+fixture it is closer to the screen render, and it runs inside the user's browser
+with zero runtime npm dependencies and no conversion server.
+
+Run the exact benchmark yourself:
 
 ```bash
-npm install
-npx playwright install chromium   # only needed for the test/dev tooling
-
-npm run demo       # http://localhost:5173 — drag-and-drop playground
+npm ci
+npx playwright install chromium
+npm run benchmark
 ```
 
-Or just double-click **`convert.bat`** — it starts the local server and opens
-the drag-and-drop converter for you. No command line needed. Full walkthrough
-in **[`documentation.html`](documentation.html)**.
+Machine-readable results live in [`benchmark/results.json`](benchmark/results.json).
+Numbers are a snapshot, not a universal promise; test with your own templates.
 
 ## Features
 
-- **Real text** — `BT … Tj ET` operators against embedded fonts, not pixels.
-  Ctrl+F works in any PDF reader.
-- **Real links** — `/Subtype /Link` annotations with `/A /URI`, positioned
-  exactly over the source `<a>` element.
-- **Real fonts** — TTF/OTF parsed and subset from scratch, embedded as
-  `Type0`/`CIDFontType2` with `ToUnicode`, only the faces actually used.
-- **Real vector geometry** — borders, shadows, gradients (linear + radial,
-  multi-stop), SVG paths, transforms — all PDF path/shading operators.
-- **Faithful layout** — flex, grid, tables, floats, columns, position,
-  z-index/opacity stacking contexts, overflow clipping: whatever the browser
-  computes, because the browser computes it.
-- **Pagination** — content taller than one page slices automatically without
-  ever cutting a text line in half, plus manual control:
+- Selectable and searchable text using real PDF text operators.
+- TTF/OTF parsing and lazy font embedding as `Type0` / `CIDFontType2`, with
+  `ToUnicode` maps.
+- Clickable URI and mail links using PDF link annotations.
+- Browser-computed block, flex, grid, table, float, columns and positioned layout.
+- Multi-page output, automatic line-safe cuts and explicit page breaks.
+- Solid, linear and radial backgrounds; rounded and styled borders; shadows,
+  outlines, clipping, opacity and 2D transforms.
+- JPEG passthrough, a from-scratch PNG decoder, background images and `object-fit`.
+- SVG paths, shapes, transforms, strokes, joins, caps and dash patterns.
+- Pseudo-elements, list markers, form values and common text decorations.
 
-  ```html
-  <div class="page-break"></div>
-  ```
+## Quick start
 
-  drops a page break wherever you put it (aliases: `pagebreak`, `break-page`,
-  `data-page-break`, or standard `style="break-before: page"`).
-- **Images** — JPEG passthrough, a from-scratch PNG decoder (palette/alpha →
-  soft mask), `object-fit`.
+Try the repository locally:
 
-See **[`USAGE.md`](USAGE.md)** for the full API and coverage list.
+```bash
+git clone https://github.com/RandazzoMaxime/DOMinate.git
+cd DOMinate
+npm install
+npx playwright install chromium   # development and tests only
+npm run demo
+```
+
+Open <http://localhost:5173> and drop an HTML file into the converter.
+
+To consume the GitHub release before an npm package is published:
+
+```bash
+npm install github:RandazzoMaxime/DOMinate#v1.0.0
+```
+
+The current release loads bundled fonts from `/assets/fonts`. Copy the package's
+`assets` directory into your application's public root, then call the API:
+
+```js
+import { htmlToPdf } from '@randazzomaxime/dominate';
+
+const pdf = await htmlToPdf(document.querySelector('#invoice'), {
+  pageSize: 'A4',
+  orientation: 'portrait',
+});
+
+const url = URL.createObjectURL(new Blob([pdf], { type: 'application/pdf' }));
+const link = Object.assign(document.createElement('a'), {
+  href: url,
+  download: 'invoice.pdf',
+});
+link.click();
+setTimeout(() => URL.revokeObjectURL(url), 1000);
+```
+
+See [USAGE.md](USAGE.md) for API details, pagination and the support matrix.
 
 ## Architecture
 
-```
-HTML string
-  │
-  ▼  dom/walker.js — hidden iframe, browser layout engine, deterministic settle
-flat render boxes (style + geometry + paint order + clip/transform chains)
-  │
-  ▼  render/painter.js — stable-sorted single paint pass
-PDF content stream (paths, shadings, text, images, link annotations)
-  │
-  ▼  core/pdf.js
-PDF document bytes (xref, catalog, embedded fonts, images, shadings)
-```
-
-```
-src/
-├── index.js              public API — font selection, image prefetch, pagination
-├── core/
-│   ├── pdf.js             PDF object writer, xref, axial/radial shadings
-│   ├── fonts/              sfnt.js (TTF/OTF parse) · embed.js (Type0/CIDFontType2)
-│   └── images/             jpeg.js (passthrough) · png.js (from-scratch decoder)
-├── dom/
-│   ├── walker.js          layout extraction: per-character text measurement,
-│   │                       stacking contexts, clips, transforms, page breaks
-│   └── utils.js            color/length parsing
-└── render/
-    ├── painter.js          ordered paint pass: boxes, text, images, bullets
-    └── svg.js               SVG → PDF path translation
+```text
+HTML string / HTMLElement
+        │
+        ▼
+hidden iframe + browser layout engine
+        │  computed boxes, text ranges, paint order
+        ▼
+DOMinate painter
+        │  PDF text, paths, shadings, images, annotations
+        ▼
+Uint8Array containing a PDF 1.7 document
 ```
 
-Full rationale for "browser-as-layout-engine" in **[`CLAUDE.md`](CLAUDE.md)**.
+Everything under `src/` is dependency-free. Playwright, PDF.js, pixelmatch and
+canvas packages are development-only tools used to generate references, audit
+PDF semantics and measure visual differences.
 
 ## Testing
 
 ```bash
-npm run loop      # renders every reference/*.html fixture, pixel-diffs vs
-                   # Chromium ground truth, audits links/text/fonts
-npm test           # validity suite: magic bytes, xref integrity, size sanity
+npm test        # 91 semantic/structural checks across 13 public fixtures
+npm run loop    # HTML render → PDF → 96 DPI raster → pixel diff + audits
+npm run benchmark
 ```
 
-`scripts/loop.mjs` is the convergence gate this project was built against —
-see `CHANGELOG.md` for the full iteration journal (14 fixtures, 0.729% mean
-pixel diff against native Chromium rendering, all functional gates green).
+The 13-fixture suite covers production layouts plus adversarial CSS, text, SVG,
+images, tables, transforms, pseudo-elements and pagination. The current aggregate
+visual difference is 0.643%; all link, text extraction and font-embedding gates
+pass. Remaining differences are primarily glyph rasterization/anti-aliasing,
+not missing document structure.
 
-## Constraints
+## Current limits
 
-`src/` never imports a third-party PDF/canvas-rasterization library. The full
-list of forbidden packages and disallowed shortcuts (e.g. "rasterize to
-canvas and embed as image") is in **[`CONSTRAINTS.md`](CONSTRAINTS.md)**.
+- WOFF2 decoding and variable-font axis instancing.
+- BiDi/RTL shaping and complex scripts such as Arabic and Indic.
+- CSS filters, backdrop filters, 3D transforms and CSS counters in pseudo-content.
+- Full accessibility tagging / PDF-UA conformance.
+
+DOMinate is a focused v1, not a claim to implement every browser/PDF edge case.
+Please open an issue with a reduced HTML fixture when you find one.
+
+## Contributing
+
+Ideas, bug reports, fixtures, documentation and focused pull requests are welcome.
+Start with [CONTRIBUTING.md](CONTRIBUTING.md), read the
+[Code of Conduct](CODE_OF_CONDUCT.md), and use [GitHub Discussions](https://github.com/RandazzoMaxime/DOMinate/discussions)
+for design proposals.
+
+Good first contributions include:
+
+- adding a minimal regression fixture for an unsupported CSS construct;
+- improving font/script coverage;
+- reducing a measured pixel-diff region without breaking PDF semantics;
+- improving bundler integration and the public API.
 
 ## License
 
-Private project. No license granted for external use.
+DOMinate's source code is released under the [MIT License](LICENSE). Bundled fonts
+and icons retain their own licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

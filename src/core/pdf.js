@@ -611,7 +611,7 @@ function num(n) {
  *  - Tab/LF/CR get short escapes for readability.
  *  - All other bytes (0x00..0x1F, 0x7F..0xFF) are emitted as 3-digit octal escapes (\NNN).
  *  - Non-Latin-1 codepoints (>0xFF) are replaced with '?' for now; real Unicode requires an
- *    embedded composite font (added in a later iteration's font subsystem). */
+ *    embedded composite font created by the font subsystem. */
 function escapeLiteralString(s) {
   let out = '';
   for (let i = 0; i < s.length; i++) {
