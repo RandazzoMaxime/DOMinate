@@ -1,108 +1,118 @@
 # Usage
 
-## Browser (in your app)
+## Install from the v1 GitHub release
+
+```bash
+npm install github:RandazzoMaxime/DOMinate#v1.0.0
+```
+
+DOMinate v1 loads its bundled fonts from `/assets/fonts`. Copy
+`node_modules/@randazzomaxime/dominate/assets` into the public root of your app so
+those URLs are served from the same origin.
+
+For local development of DOMinate itself:
+
+```bash
+npm install
+npx playwright install chromium
+npm run demo
+```
+
+## Convert and download
+
+```js
+import { htmlToPdf } from '@randazzomaxime/dominate';
+
+const html = `<!doctype html>
+<html>
+  <head>
+    <style>
+      body { font-family: Inter, sans-serif; padding: 32px; }
+      h1 { color: #166534; }
+    </style>
+  </head>
+  <body>
+    <h1>Invoice #1042</h1>
+    <a href="https://example.com/invoices/1042">Open online</a>
+  </body>
+</html>`;
+
+const bytes = await htmlToPdf(html, {
+  pageSize: 'A4',
+  orientation: 'portrait',
+});
+
+const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+const anchor = Object.assign(document.createElement('a'), {
+  href: url,
+  download: 'invoice-1042.pdf',
+});
+anchor.click();
+setTimeout(() => URL.revokeObjectURL(url), 1000);
+```
+
+The function resolves to a `Uint8Array` containing a PDF 1.7 document.
+
+## API
+
+```ts
+htmlToPdf(
+  input: string | HTMLElement,
+  options?: {
+    viewport?: { width: number; height: number };
+    pageSize?: 'A4';
+    orientation?: 'portrait' | 'landscape';
+  }
+): Promise<Uint8Array>
+```
+
+- `input`: a complete HTML string is recommended because it can include styles,
+  font declarations and document metadata. An `HTMLElement` is converted through
+  its `outerHTML`.
+- `viewport`: explicit page dimensions in CSS pixels. This takes precedence over
+  `pageSize` and `orientation`.
+- `pageSize`: currently `A4`; defaults to A4 landscape when no size is provided.
+- `orientation`: `portrait` or `landscape` for A4.
+
+CSS pixels are mapped to PDF points at 96 CSS DPI → 72 PDF DPI.
+
+## Pagination
+
+Content taller than the selected viewport is split across pages. DOMinate moves a
+cut upward when necessary to avoid slicing through a text line.
+
+Use an explicit page-break marker when the document needs author-controlled cuts:
 
 ```html
-<script type="module">
-  import { htmlToPdf } from './node_modules/html-to-pdf-client/src/index.js';
-
-  // Convert any HTML string into a PDF (Uint8Array).
-  const html = document.getElementById('my-doc').outerHTML;
-  const bytes = await htmlToPdf(html, {
-    viewport: { width: 794, height: 1123 },  // A4 portrait in CSS px
-  });
-
-  // Download
-  const blob = new Blob([bytes], { type: 'application/pdf' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'output.pdf';
-  a.click();
-</script>
+<section>Page one</section>
+<div class="page-break"></div>
+<section>Page two</section>
 ```
 
-## Options
+The aliases `pagebreak`, `break-page`, `[data-page-break]`, inline
+`break-before: page` and inline `page-break-before: always` are also recognized.
 
-```typescript
-htmlToPdf(input: string | HTMLElement, opts?: {
-  viewport?: { width: number, height: number },  // CSS px; defaults to A4 landscape
-  pageSize?: 'A4' | 'Letter',                     // alternative to viewport
-  orientation?: 'portrait' | 'landscape',         // alternative to viewport
-  margin?: number,                                // in mm; default 0
-}): Promise<Uint8Array>
-```
+## Supported in v1
 
-The lib:
-- Loads the HTML into a hidden iframe at `viewport` size and waits for a
-  deterministic settle (fonts loaded, no pending fetches, layout stable)
-- Walks every element, capturing computed styles + per-character Range geometry
-- Emits a vector-only PDF: real text (embedded CIDFontType2 fonts), real link
-  annotations, real path geometry (gradients, shadows, transforms, SVG paths)
-- **Paginates**: content taller than the viewport becomes multiple pages, with
-  text lines never cut at a page boundary
-- **Manual page breaks**: put `<div class="page-break"></div>` (aliases:
-  `pagebreak`, `break-page`, or a `data-page-break` attribute) wherever the next
-  page should start — also honors inline `style="break-before: page"` /
-  `style="page-break-before: always"`. Overrides automatic slicing at that point.
+- Browser-computed block, flex, grid, table, float, columns and positioned layout.
+- Real text, font weights, common Latin/Greek coverage, monospace/display faces,
+  Material Symbols ligatures, decorations and basic synthetic oblique text.
+- CSS paint order, z-index, opacity, overflow clips and 2D transforms.
+- Per-side borders, common border styles, rounded corners, shadows and outlines.
+- Solid, multi-stop linear/radial and image backgrounds.
+- JPEG, PNG with alpha, `object-fit` and repeated backgrounds.
+- SVG shapes and paths (`M/L/H/V/C/S/Q/T/A/Z`), transforms and stroke styles.
+- `::before` / `::after` string, `attr()` and quote content; list markers; common
+  form values and placeholders.
+- URI/mail links as real PDF annotations.
 
-## What's supported
+## Known limits
 
-See README.md for the full coverage list. Highlights:
+- WOFF2 decoding and variable-font axis instancing.
+- BiDi/RTL shaping and complex scripts such as Arabic and Indic.
+- CSS filters, backdrop filters, 3D transforms and `column-rule`.
+- CSS counters in pseudo-content and full paragraph-level `break-inside` control.
+- Full accessibility tagging / PDF-UA conformance.
 
-- Text: word-exact positions, real baselines, justify, decorations with
-  style/color/offset (solid/double/dotted/dashed/wavy), synthetic italics,
-  text-shadow, `white-space: pre`, `text-overflow: ellipsis`, sub/sup
-- Layout: anything the browser computes — block, flex, grid, table, floats,
-  CSS columns, inline-block, position, vertical-align, word-break
-- Paint: CSS 2.1 stacking contexts (z-index/opacity/transforms), overflow
-  clipping, CSS transforms (rotate/scale/skew/matrix, nested, origin)
-- Boxes: per-side borders (all styles incl. groove/ridge/inset/outset),
-  %/elliptical border-radius, outer+inset box-shadow, outline+offset
-- Backgrounds: multi-stop linear + radial gradients, `background-image: url()`
-  with size/position/repeat
-- Images: JPEG passthrough, full PNG decoder (palette/alpha → SMask), object-fit
-- SVG: paths (M/L/H/V/C/S/Q/T/A/Z), polygons, dasharray, caps/joins, transforms
-- Fonts: Inter, JetBrains Mono 400/500/700, Manrope 700/800, Arial/Helvetica →
-  base-14 mapping, Material Symbols icons (GSUB ligatures), lazy embedding
-- Pseudo-elements: ::before/::after with string / attr() / quote content
-- `<input>`/`<select>`/`<textarea>` placeholders + values, list markers
-
-## What's not (yet)
-
-- CSS counters in pseudo content; paragraph-level break-inside control
-- WOFF2 web fonts (bundle TTF/OTF instead); variable-font axis instancing
-- bidi/RTL shaping, complex scripts (Arabic, Indic)
-- `filter:`, `backdrop-filter:`, 3D transforms, `column-rule`
-
-## Bundled fonts
-
-| File | Size | Coverage |
-|------|------|----------|
-| `Inter-{400,500,600,700}.ttf` | ~68 KB each | Latin |
-| `Inter-{400,500,600,700}-greek.ttf` | ~16 KB each | Greek (incl. Δ) |
-| `JetBrainsMono-{Regular,500,700}.ttf` | 110–270 KB | Monospace |
-| `Manrope-{700,800}.ttf` | ~95 KB each | Display headlines |
-| `MaterialSymbolsOutlined.ttf` | 963 KB | Icon ligatures |
-
-Faces are embedded lazily — a PDF only contains the faces its content uses.
-
-## Vector fidelity guarantee
-
-The output PDF contains:
-
-- **Real text** — `BT … Tj ET` operators referencing embedded fonts, NOT
-  rasterized canvas pixels. Use Ctrl+F in a PDF reader to confirm.
-- **Real link annotations** — clickable hyperlinks with `/Subtype /Link` + `/A /URI`.
-- **Real geometry** — rectangles, paths, gradients are PDF operators (`re`, `m`, `l`,
-  `c`, `f`, `S`, `sh`), not embedded images.
-- **Embedded fonts** — parsed (SFNT), mapped to GIDs via cmap (and GSUB ligatures
-  for icon fonts), embedded as `/CIDFontType2` with `/Identity-H` + ToUnicode.
-
-There is NO fallback to "rasterize the page to a canvas, embed as image". That's the
-opposite of what this lib does.
-
-## License / authorship
-
-Built across two `/long-run` sessions (2026-05-08 and 2026-06-11/12).
-No third-party PDF libraries in `src/` — see `CONSTRAINTS.md` for the rules.
+There is intentionally no canvas/screenshot fallback. Unsupported paint is skipped
+instead of silently flattening the whole document and losing text or links.

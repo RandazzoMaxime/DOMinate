@@ -3,7 +3,7 @@
 //
 // We use the host browser's layout engine — the same engine that drew the reference
 // screenshot — so positions match Chromium's `page.pdf()` exactly when the host is
-// Chromium. See the "Architectural decision" section in CLAUDE.md.
+// Chromium. See SPEC.md for the browser-as-layout-engine architecture.
 //
 // Output is a flat list of "render boxes" suitable for the PDF emitter.
 

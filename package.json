@@ -1,13 +1,45 @@
 {
-  "name": "html-to-pdf-client",
-  "version": "0.0.0",
-  "description": "Client-side, vector-fidelity HTML→PDF library — from scratch, no third-party PDF generators.",
+  "name": "@randazzomaxime/dominate",
+  "version": "1.0.0",
+  "description": "Client-side, vector-first HTML to PDF conversion with selectable text, embedded fonts, and clickable links.",
   "type": "module",
-  "private": true,
+  "license": "MIT",
+  "author": "Maxime Randazzo",
+  "homepage": "https://github.com/RandazzoMaxime/DOMinate#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RandazzoMaxime/DOMinate.git"
+  },
+  "bugs": {
+    "url": "https://github.com/RandazzoMaxime/DOMinate/issues"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src/",
+    "assets/fonts/",
+    "licenses/",
+    "LICENSE",
+    "README.md",
+    "USAGE.md",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "html",
+    "pdf",
+    "browser",
+    "client-side",
+    "vector",
+    "selectable-text"
+  ],
   "scripts": {
     "loop": "node scripts/loop.mjs",
     "test": "node scripts/test-validity.mjs",
-    "report": "node scripts/render-report.mjs",
+    "benchmark": "node scripts/benchmark.mjs",
     "render": "node scripts/render-with-lib.mjs",
     "rasterize": "node scripts/pdf-to-png.mjs",
     "diff": "node scripts/diff.mjs",

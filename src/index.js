@@ -1,12 +1,11 @@
 // Public API for the HTML→PDF client-side library.
 //
-// Iter 2 — DOM walker (browser-as-layout-engine via hidden iframe) + painter.
+// DOM walker (browser-as-layout-engine via hidden iframe) + painter.
 // Emits real text, real boxes, real link annotations as vector PDF.
 //
-// Architectural note: see CLAUDE.md "browser-as-layout-engine". We use the host
-// browser's CSS engine to compute element positions, then emit PDF ops. This
-// preserves the "from scratch, no third-party PDF library" rule while making
-// Playwright-quality output achievable in finite engineering time.
+// We use the host browser's CSS engine to compute element positions, then emit
+// PDF operators ourselves. Layout queries are runtime browser primitives; the
+// document is never flattened into a screenshot.
 
 import { PdfDocument } from './core/pdf.js';
 import { layout } from './dom/walker.js';
