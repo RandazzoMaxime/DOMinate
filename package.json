@@ -1,9 +1,9 @@
 {
   "name": "@randazzomaxime/dominate",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Client-side, vector-first HTML to PDF conversion with selectable text, embedded fonts, and clickable links.",
   "type": "module",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "Maxime Randazzo",
   "homepage": "https://github.com/RandazzoMaxime/DOMinate#readme",
   "repository": {
@@ -21,6 +21,7 @@
     "assets/fonts/",
     "licenses/",
     "LICENSE",
+    "NOTICE",
     "README.md",
     "USAGE.md",
     "THIRD_PARTY_NOTICES.md"

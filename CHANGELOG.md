@@ -3,11 +3,22 @@
 All notable changes to DOMinate are documented here. The project follows semantic
 versioning from the first public release.
 
+## [1.0.1] - 2026-07-10
+
+### Changed
+
+- Relicensed new distributions of DOMinate under Apache License 2.0.
+- Added a `NOTICE` file so downstream distributions preserve project attribution.
+- Updated package metadata and installation examples for `v1.0.1`.
+- Replaced the converter comparison with a purpose-built DOMinate one-page
+  showcase and a direct HTML-versus-DOMinate-PDF visual.
+
 ## [1.0.0] - 2026-07-10
 
 ### Added
 
-- First public open-source release under the MIT License.
+- First public open-source release under the MIT License (superseded by the
+  Apache-2.0 license for releases from v1.0.1 onward).
 - Browser-side HTML to vector PDF conversion with zero runtime npm dependencies.
 - Selectable/searchable text, lazy embedded fonts and `ToUnicode` maps.
 - Clickable link annotations and vector CSS/SVG painting.
@@ -25,4 +36,5 @@ versioning from the first public release.
 - Aggregate 96 DPI pixel difference across the 13 public reference fixtures is 0.643%;
   all text extraction, link and font-embedding checks pass.
 
+[1.0.1]: https://github.com/RandazzoMaxime/DOMinate/releases/tag/v1.0.1
 [1.0.0]: https://github.com/RandazzoMaxime/DOMinate/releases/tag/v1.0.0
