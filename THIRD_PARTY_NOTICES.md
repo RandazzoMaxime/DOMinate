@@ -1,6 +1,6 @@
 # Third-party notices
 
-DOMinate's source code is MIT-licensed. The following bundled font assets retain
+DOMinate's source code is Apache-2.0-licensed. The following bundled font assets retain
 their original licenses.
 
 | Asset | Upstream | License |

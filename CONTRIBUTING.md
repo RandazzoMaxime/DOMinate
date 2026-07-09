@@ -53,4 +53,4 @@ test: add reduced grid overflow fixture
 ```
 
 By contributing, you agree that your contribution may be distributed under the
-project's MIT License.
+project's Apache License 2.0.
