@@ -6,20 +6,20 @@
   <title>DOMinate — HTML in. Real PDF out.</title>
   <style>
     @font-face { font-family: Inter; src: url('/assets/fonts/Inter-400.ttf'); font-weight: 400; }
+    @font-face { font-family: Inter; src: url('/assets/fonts/Inter-500.ttf'); font-weight: 500; }
     @font-face { font-family: Inter; src: url('/assets/fonts/Inter-600.ttf'); font-weight: 600; }
     @font-face { font-family: Inter; src: url('/assets/fonts/Inter-700.ttf'); font-weight: 700; }
     @font-face { font-family: JetBrains Mono; src: url('/assets/fonts/JetBrainsMono-Regular.ttf'); font-weight: 400; }
 
     :root {
-      --ink: #07111f;
-      --panel: #0d1b2d;
-      --panel-2: #11243a;
-      --line: #233d57;
-      --white: #f8fbff;
-      --muted: #9fb2c7;
-      --green: #44e08a;
-      --green-dark: #1aaa65;
-      --cyan: #52c7ea;
+      --night: #06111b;
+      --deep: #071725;
+      --panel: #081825;
+      --line: #1d6179;
+      --white: #f8fbfd;
+      --muted: #a7b9c6;
+      --cyan: #4edbff;
+      --green: #55e59a;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -27,211 +27,255 @@
     body {
       font-family: Inter, Arial, sans-serif;
       color: var(--white);
-      background: var(--ink);
+      background: var(--night);
       font-size: 14px;
-      line-height: 1.45;
     }
 
     .page {
       position: relative;
       width: 100%;
       height: 100%;
-      padding: 34px 44px 28px;
+      padding: 30px;
       overflow: hidden;
-      background: linear-gradient(145deg, #07111f 0%, #091827 58%, #0a1f2d 100%);
+      background: linear-gradient(145deg, #07131e 0%, #0a2130 52%, #0b3042 100%);
     }
-    header {
+
+    .ambient {
+      position: absolute;
+      left: 140px;
+      right: 140px;
+      bottom: -12px;
+      height: 220px;
+      opacity: .42;
+      background: linear-gradient(180deg, transparent 0%, #0b6f91 72%, #42c9e5 100%);
+      border-radius: 50% 50% 0 0;
+    }
+
+    .dotfield { position: absolute; width: 92px; height: 92px; color: var(--cyan); opacity: .58; }
+    .dots-a { right: 40px; top: 14px; }
+    .dots-b { left: 24px; bottom: 18px; }
+    .dots-c { right: 22px; bottom: 22px; transform: scale(.72); opacity: .34; }
+
+    .stage {
       position: relative;
       z-index: 1;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding-bottom: 24px;
-      border-bottom: 1px solid var(--line);
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      border: 1px solid #317a93;
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(38, 111, 139, .66) 0%, rgba(8, 31, 47, .94) 30%, #06121d 100%);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .34), inset 0 1px 0 rgba(255, 255, 255, .12);
     }
-    .brand { display: flex; align-items: center; gap: 13px; }
+
+    .stage::before {
+      content: '';
+      position: absolute;
+      left: 13%;
+      right: 13%;
+      top: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #a8edff, transparent);
+      opacity: .68;
+    }
+
+    header {
+      position: relative;
+      z-index: 4;
+      height: 88px;
+      display: grid;
+      grid-template-columns: 220px 1fr 150px;
+      align-items: center;
+      padding: 0 44px;
+    }
+
+    .brand { display: flex; align-items: center; gap: 11px; }
     .mark {
-      width: 38px;
-      height: 38px;
+      width: 31px;
+      height: 31px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 11px;
-      color: var(--ink);
-      background: linear-gradient(135deg, var(--green), #8bf3ba);
+      color: #06141d;
+      background: var(--green);
+      border-radius: 9px;
       font-weight: 800;
-      font-size: 19px;
-      box-shadow: 0 8px 24px rgba(68, 224, 138, .24);
+      font-size: 16px;
+      box-shadow: 0 0 28px rgba(85, 229, 154, .30);
     }
-    .brand-name { font-weight: 700; font-size: 20px; letter-spacing: -.02em; }
-    .brand-sub { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .16em; }
-    .header-right { display: flex; align-items: center; gap: 14px; }
-    .version { font-family: 'JetBrains Mono', monospace; color: var(--green); font-size: 11px; }
-    .license { padding: 7px 11px; border: 1px solid var(--line); border-radius: 99px; color: var(--muted); font-size: 11px; }
+    .brand-name { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
+    nav { display: flex; justify-content: center; gap: 31px; }
+    nav a { color: #d7e6ed; text-decoration: none; font-size: 11px; }
+    .version { justify-self: end; text-align: right; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .version strong { display: block; color: var(--white); font-family: 'JetBrains Mono', monospace; font-weight: 400; }
 
     .hero {
       position: relative;
-      z-index: 1;
-      display: grid;
-      grid-template-columns: 1.18fr .82fr;
-      gap: 46px;
-      padding: 38px 0 30px;
+      z-index: 3;
+      width: 760px;
+      margin: 48px auto 0;
+      text-align: center;
     }
     .eyebrow {
-      display: inline-block;
-      margin-bottom: 15px;
-      padding: 6px 10px;
-      border: 1px solid rgba(68, 224, 138, .35);
-      border-radius: 99px;
-      color: var(--green);
-      background: rgba(68, 224, 138, .08);
+      color: var(--cyan);
+      font-family: 'JetBrains Mono', monospace;
       font-size: 10px;
-      font-weight: 700;
-      letter-spacing: .14em;
+      letter-spacing: .20em;
       text-transform: uppercase;
     }
-    h1 { max-width: 610px; font-size: 49px; line-height: 1.02; letter-spacing: -.045em; }
-    h1 span { color: var(--green); }
-    .lede { max-width: 570px; margin-top: 17px; color: var(--muted); font-size: 15px; line-height: 1.62; }
-    .actions { display: flex; align-items: center; gap: 18px; margin-top: 22px; }
+    h1 {
+      margin-top: 14px;
+      font-size: 89px;
+      font-weight: 500;
+      line-height: .95;
+      letter-spacing: -.065em;
+    }
+    .tagline {
+      margin-top: 14px;
+      font-size: 25px;
+      font-weight: 400;
+      letter-spacing: -.03em;
+    }
+    .tagline span { color: var(--green); }
+    .lede {
+      width: 650px;
+      margin: 13px auto 0;
+      color: #b7c8d3;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .actions { display: flex; justify-content: center; gap: 12px; margin-top: 20px; }
     .button {
       display: inline-block;
-      padding: 11px 17px;
-      border-radius: 9px;
-      color: var(--ink);
-      background: var(--green);
-      font-weight: 700;
+      min-width: 145px;
+      padding: 10px 16px;
+      border-radius: 7px;
+      font-size: 11px;
+      font-weight: 600;
       text-decoration: none;
     }
-    .plain-link { color: var(--white); text-decoration: none; font-size: 12px; border-bottom: 1px solid var(--line); padding-bottom: 3px; }
+    .button-primary { color: #07141d; background: var(--white); }
+    .button-secondary { color: var(--white); border: 1px solid #6c91a2; background: rgba(7, 25, 38, .46); }
 
-    .pipeline {
-      align-self: end;
-      padding: 21px;
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      background: linear-gradient(150deg, rgba(17, 36, 58, .94), rgba(11, 26, 43, .94));
-      box-shadow: 0 20px 55px rgba(0, 0, 0, .24);
+    .proof {
+      position: absolute;
+      z-index: 4;
+      top: 340px;
+      left: 48px;
+      display: flex;
+      flex-direction: column;
+      gap: 13px;
     }
-    .pipeline-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .15em; margin-bottom: 14px; }
-    .step { display: flex; gap: 13px; align-items: center; }
-    .step + .step { margin-top: 9px; }
-    .step-num {
-      width: 28px;
-      height: 28px;
-      flex: 0 0 28px;
+    .proof-item { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
+    .proof-dot { width: 6px; height: 6px; border-radius: 99px; background: var(--green); box-shadow: 0 0 10px rgba(85, 229, 154, .65); }
+
+    .format {
+      position: absolute;
+      z-index: 4;
+      top: 349px;
+      right: 48px;
+      text-align: right;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      line-height: 1.75;
+    }
+    .format strong { color: var(--cyan); font-weight: 400; }
+
+    .horizon-glow {
+      position: absolute;
+      z-index: 1;
+      width: 760px;
+      height: 390px;
+      left: 50%;
+      margin-left: -380px;
+      bottom: -255px;
+      border: 3px solid #52d9ff;
+      border-radius: 50%;
+      background: #02070b;
+      box-shadow: 0 -5px 22px rgba(78, 219, 255, .34);
+    }
+    .horizon-ring {
+      position: absolute;
+      z-index: 0;
+      left: 50%;
+      border: 1px solid #21637a;
+      border-radius: 50%;
+    }
+    .ring-one { width: 800px; height: 410px; margin-left: -400px; bottom: -275px; opacity: .55; }
+    .ring-two { width: 850px; height: 440px; margin-left: -425px; bottom: -294px; opacity: .28; }
+
+    .scroll {
+      position: absolute;
+      z-index: 5;
+      left: 50%;
+      bottom: 22px;
+      width: 29px;
+      height: 29px;
+      margin-left: -14px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 8px;
-      color: var(--green);
-      background: rgba(68, 224, 138, .10);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
+      color: var(--muted);
+      border: 1px solid #557284;
+      border-radius: 99px;
+      font-size: 13px;
     }
-    .step strong { display: block; font-size: 12px; }
-    .step small { color: var(--muted); font-size: 10px; }
-
-    .feature-grid {
-      position: relative;
-      z-index: 1;
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 14px;
-    }
-    .feature {
-      min-height: 112px;
-      padding: 18px;
-      border: 1px solid var(--line);
-      border-radius: 13px;
-      background: rgba(13, 27, 45, .78);
-    }
-    .feature-tag { color: var(--green); font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .08em; }
-    .feature h2 { margin-top: 8px; font-size: 14px; }
-    .feature p { margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.5; }
-
-    .bottom {
-      position: relative;
-      z-index: 1;
-      display: grid;
-      grid-template-columns: 1.42fr .58fr;
-      gap: 14px;
-      margin-top: 14px;
-    }
-    .code {
-      padding: 16px 18px;
-      border-radius: 13px;
-      border: 1px solid var(--line);
-      background: #06101c;
-      color: #d7e6f4;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      line-height: 1.65;
-    }
-    .code .green { color: var(--green); }
-    .code .blue { color: var(--cyan); }
-    .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .metric { padding: 14px; border-radius: 13px; border: 1px solid var(--line); background: var(--panel); }
-    .metric strong { display: block; color: var(--green); font-size: 21px; line-height: 1; }
-    .metric span { display: block; margin-top: 7px; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
 
     footer {
-      position: relative;
-      z-index: 1;
+      position: absolute;
+      z-index: 5;
+      left: 44px;
+      right: 44px;
+      bottom: 23px;
       display: flex;
       justify-content: space-between;
-      margin-top: 19px;
-      padding-top: 13px;
-      border-top: 1px solid var(--line);
-      color: #7890a8;
-      font-size: 10px;
+      color: #7894a3;
+      font-size: 9px;
     }
     footer a { color: var(--green); text-decoration: none; }
   </style>
 </head>
 <body>
   <main class="page">
-    <header>
-      <div class="brand">
-        <div class="mark">D</div>
-        <div><div class="brand-name">DOMinate</div><div class="brand-sub">HTML / PDF engine</div></div>
-      </div>
-      <div class="header-right"><span class="version">v1.0.1</span><span class="license">Apache 2.0 · attribution preserved</span></div>
-    </header>
+    <div class="ambient"></div>
+    <svg class="dotfield dots-a" viewBox="0 0 92 92" aria-hidden="true">
+      <g fill="#4edbff"><circle cx="8" cy="8" r="1.5"/><circle cx="28" cy="8" r="1.5"/><circle cx="48" cy="8" r="1.5"/><circle cx="68" cy="8" r="1.5"/><circle cx="8" cy="28" r="1.5"/><circle cx="28" cy="28" r="1.5"/><circle cx="48" cy="28" r="1.5"/><circle cx="68" cy="28" r="1.5"/><circle cx="8" cy="48" r="1.5"/><circle cx="28" cy="48" r="1.5"/><circle cx="48" cy="48" r="1.5"/><circle cx="68" cy="48" r="1.5"/><circle cx="8" cy="68" r="1.5"/><circle cx="28" cy="68" r="1.5"/><circle cx="48" cy="68" r="1.5"/><circle cx="68" cy="68" r="1.5"/></g>
+    </svg>
+    <svg class="dotfield dots-b" viewBox="0 0 92 92" aria-hidden="true"><g fill="#4edbff"><circle cx="8" cy="8" r="1.5"/><circle cx="28" cy="8" r="1.5"/><circle cx="48" cy="8" r="1.5"/><circle cx="68" cy="8" r="1.5"/><circle cx="8" cy="28" r="1.5"/><circle cx="28" cy="28" r="1.5"/><circle cx="48" cy="28" r="1.5"/><circle cx="68" cy="28" r="1.5"/><circle cx="8" cy="48" r="1.5"/><circle cx="28" cy="48" r="1.5"/><circle cx="48" cy="48" r="1.5"/><circle cx="68" cy="48" r="1.5"/></g></svg>
+    <svg class="dotfield dots-c" viewBox="0 0 92 92" aria-hidden="true"><g fill="#4edbff"><circle cx="8" cy="8" r="1.5"/><circle cx="28" cy="8" r="1.5"/><circle cx="48" cy="8" r="1.5"/><circle cx="68" cy="8" r="1.5"/><circle cx="8" cy="28" r="1.5"/><circle cx="28" cy="28" r="1.5"/><circle cx="48" cy="28" r="1.5"/><circle cx="68" cy="28" r="1.5"/></g></svg>
 
-    <section class="hero">
-      <div>
-        <div class="eyebrow">Open source · client-side · vector-first</div>
-        <h1>HTML in.<br><span>Real PDF out.</span></h1>
-        <p class="lede">DOMinate converts browser-rendered HTML into structured PDF bytes without a server or screenshot fallback. Text stays selectable, links stay clickable, fonts stay embedded and vectors stay sharp.</p>
+    <section class="stage">
+      <header>
+        <div class="brand"><div class="mark">D</div><div class="brand-name">DOMinate</div></div>
+        <nav><a href="#engine">Engine</a><a href="#fidelity">Fidelity</a><a href="#opensource">Open source</a><a href="https://github.com/RandazzoMaxime/DOMinate">GitHub</a></nav>
+        <div class="version"><strong>v1.0.1</strong>Apache 2.0</div>
+      </header>
+
+      <section class="hero" id="engine">
+        <div class="eyebrow">The browser-native PDF engine</div>
+        <h1>DOMinate</h1>
+        <div class="tagline">HTML in. <span>Real PDF out.</span></div>
+        <p class="lede">Turn browser-rendered HTML into structured PDF bytes. Selectable text, embedded fonts, clickable links and sharp vector geometry—entirely client-side.</p>
         <div class="actions">
-          <a class="button" href="https://github.com/RandazzoMaxime/DOMinate">Explore on GitHub</a>
-          <a class="plain-link" href="https://github.com/RandazzoMaxime/DOMinate/blob/main/USAGE.md">Read the 5-minute guide</a>
+          <a class="button button-primary" href="https://github.com/RandazzoMaxime/DOMinate">Explore the project</a>
+          <a class="button button-secondary" href="https://github.com/RandazzoMaxime/DOMinate/blob/main/USAGE.md">Read the guide</a>
         </div>
+      </section>
+
+      <div class="proof" id="fidelity">
+        <div class="proof-item"><span class="proof-dot"></span>Selectable text</div>
+        <div class="proof-item"><span class="proof-dot"></span>Live link annotations</div>
+        <div class="proof-item"><span class="proof-dot"></span>Vector CSS and SVG</div>
       </div>
-      <aside class="pipeline">
-        <div class="pipeline-label">One browser-native pipeline</div>
-        <div class="step"><div class="step-num">01</div><div><strong>Compute the layout</strong><small>The browser resolves CSS, fonts and geometry.</small></div></div>
-        <div class="step"><div class="step-num">02</div><div><strong>Translate the paint</strong><small>Boxes, text, SVG and links become PDF operators.</small></div></div>
-        <div class="step"><div class="step-num">03</div><div><strong>Ship the bytes</strong><small>A valid PDF 1.7 document, ready to save or send.</small></div></div>
-      </aside>
-    </section>
+      <div class="format"><strong>PDF 1.7</strong><br>0 runtime deps<br>100% in-browser</div>
 
-    <section class="feature-grid">
-      <article class="feature"><div class="feature-tag">TEXT / FONT</div><h2>Selectable by design</h2><p>Real text operators, embedded TTF fonts and ToUnicode maps keep copy, search and selection intact.</p></article>
-      <article class="feature"><div class="feature-tag">CSS / SVG</div><h2>Vector where it matters</h2><p>Gradients, borders, shadows, transforms and SVG paths stay crisp at every zoom level.</p></article>
-      <article class="feature"><div class="feature-tag">LINK / PAGE</div><h2>Documents that work</h2><p>Clickable annotations, multi-page output and line-safe page cuts—not painted approximations.</p></article>
+      <div class="horizon-glow"></div>
+      <div class="horizon-ring ring-one"></div>
+      <div class="horizon-ring ring-two"></div>
+      <div class="scroll">↓</div>
+      <footer id="opensource"><span>Open source with attribution preserved.</span><a href="https://github.com/RandazzoMaxime/DOMinate">github.com/RandazzoMaxime/DOMinate</a></footer>
     </section>
-
-    <section class="bottom">
-      <div class="code"><span class="blue">import</span> { htmlToPdf } <span class="blue">from</span> <span class="green">'@randazzomaxime/dominate'</span>;<br><span class="blue">const</span> pdf = <span class="blue">await</span> htmlToPdf(document.documentElement, { pageSize: <span class="green">'A4'</span> });</div>
-      <div class="metrics">
-        <div class="metric"><strong>0</strong><span>runtime dependencies</span></div>
-        <div class="metric"><strong>100%</strong><span>inside the browser</span></div>
-      </div>
-    </section>
-
-    <footer><span>Built for invoices, reports, certificates and product documents.</span><a href="https://github.com/RandazzoMaxime/DOMinate">github.com/RandazzoMaxime/DOMinate</a></footer>
   </main>
 </body>
 </html>

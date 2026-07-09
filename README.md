@@ -43,7 +43,7 @@ steady-state generation calls. Lower pixel difference is better.
 
 | Cold | Warm median | Warm p95 | Difference vs HTML | PDF size |
 |---:|---:|---:|---:|---:|
-| 315.6 ms | 275.9 ms | 301.3 ms | 1.319% | 302.2 KiB |
+| 303.3 ms | 289.4 ms | 296.3 ms | 3.852% | 407.0 KiB |
 
 Run the exact benchmark yourself:
 
