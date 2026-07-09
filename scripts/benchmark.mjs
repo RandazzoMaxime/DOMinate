@@ -16,6 +16,10 @@ const ITERATIONS = Math.max(3, Number.parseInt(process.env.BENCH_ITERATIONS || '
 const VIEWPORT = { width: 1123, height: 794 };
 const EXPECTATIONS = {
   expectedLinks: [
+    '#engine',
+    '#fidelity',
+    '#opensource',
+    'https://github.com/RandazzoMaxime/DOMinate',
     'https://github.com/RandazzoMaxime/DOMinate',
     'https://github.com/RandazzoMaxime/DOMinate/blob/main/USAGE.md',
     'https://github.com/RandazzoMaxime/DOMinate',
@@ -24,10 +28,10 @@ const EXPECTATIONS = {
     'DOMinate',
     'HTML in.',
     'Real PDF out.',
-    'Selectable by design',
-    'Vector where it matters',
-    'Documents that work',
-    'runtime dependencies',
+    'Selectable text',
+    'Live link annotations',
+    'Vector CSS and SVG',
+    '0 runtime deps',
   ],
 };
 

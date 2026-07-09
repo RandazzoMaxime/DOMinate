@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-09T22:54:02.351Z",
+  "generatedAt": "2026-07-09T23:05:25.503Z",
   "fixture": "docs/showcase.html",
   "viewport": {
     "width": 1123,
@@ -13,22 +13,22 @@
     "captureChromium": "147.0.7727.15"
   },
   "dominate": {
-    "coldMs": 315.6,
-    "medianMs": 275.9,
-    "p95Ms": 301.3,
-    "minMs": 271.4,
+    "coldMs": 303.3,
+    "medianMs": 289.4,
+    "p95Ms": 296.3,
+    "minMs": 279.1,
     "samplesMs": [
-      271.4,
-      271.4,
-      279.9,
-      301.3,
-      275.9,
-      274.8,
-      292.5
+      289.4,
+      279.1,
+      285.4,
+      288,
+      293.6,
+      291.9,
+      296.3
     ],
-    "pdfBytes": 309404,
-    "pixelDiffPercent": 1.319,
-    "links": "3/3",
+    "pdfBytes": 416797,
+    "pixelDiffPercent": 3.852,
+    "links": "7/7",
     "text": "ok",
     "fonts": "ok"
   },
