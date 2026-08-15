@@ -37,10 +37,22 @@ const H2C = '/example/Ivonne%20-%20Template/assets/js/html2canvas.min.js';
 const JSPDF = '/example/Ivonne%20-%20Template/assets/js/jspdf.min.js';
 
 const ENGINES = [
-  { key: 'dominate', label: 'DOMinate', color: '#55e59a' },
+  { key: 'dominate', label: 'DOMinate', color: '#12b76a' },
   { key: 'html2canvas', label: 'html2canvas + jsPDF', color: '#e07a5f' },
-  { key: 'playwright', label: 'Chromium page.pdf', color: '#4edbff' },
+  { key: 'playwright', label: 'Chromium page.pdf', color: '#2563eb' },
 ];
+
+const CHART = {
+  bg: '#ffffff',
+  ink: '#1c1c1c',
+  muted: '#6b7280',
+  grid: '#e8e4dc',
+  axis: '#1c1c1c',
+  legendFill: '#f6f3ec',
+  legendStroke: '#e5dfd4',
+  titleFont: "Georgia, 'Times New Roman', Times, serif",
+  bodyFont: "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif",
+};
 
 function percentile(values, p) {
   const sorted = [...values].sort((a, b) => a - b);
@@ -94,100 +106,163 @@ function niceMax(maxV, stepHint) {
   return Math.ceil(raw / mag) * mag;
 }
 
-function barSvg(series, { title, unit, digits = 0, stepHint = 100 }) {
-  const W = 920, H = 420, padL = 70, padR = 24, padT = 48, padB = 70;
-  const innerW = W - padL - padR, innerH = H - padT - padB;
-  const groupW = innerW / series.length;
-  const barW = groupW / (ENGINES.length + 1);
-  const maxV = Math.max(...series.flatMap(s => ENGINES.map(e => s.engines[e.key] || 0)), 0.01);
-  const nice = niceMax(maxV, stepHint);
-  const y = v => padT + innerH - (v / nice) * innerH;
-
-  let bars = '';
-  series.forEach((s, gi) => {
-    const gx = padL + gi * groupW;
-    ENGINES.forEach((e, ei) => {
-      const v = s.engines[e.key] || 0;
-      const x = gx + (ei + 0.5) * barW;
-      const top = y(v);
-      const h = Math.max(0, padT + innerH - top);
-      bars += `<rect x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${(barW * 0.85).toFixed(1)}" height="${h.toFixed(1)}" fill="${e.color}" rx="3"/>`;
-      bars += `<text x="${(x + barW * 0.42).toFixed(1)}" y="${(top - 6).toFixed(1)}" text-anchor="middle" font-size="11" fill="#d7e6ed">${v.toFixed(digits)}${unit === '%' && digits ? '' : ''}</text>`;
-    });
-    bars += `<text x="${(gx + groupW / 2).toFixed(1)}" y="${H - 36}" text-anchor="middle" font-size="13" fill="#f8fbfd">${s.name}</text>`;
-  });
-
-  const ticks = 5;
-  let grid = '';
-  for (let i = 0; i <= ticks; i++) {
-    const v = (nice / ticks) * i;
-    const yy = y(v);
-    grid += `<line x1="${padL}" y1="${yy.toFixed(1)}" x2="${W - padR}" y2="${yy.toFixed(1)}" stroke="#1d6179" stroke-opacity=".35"/>`;
-    grid += `<text x="${padL - 8}" y="${(yy + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="#a7b9c6">${v.toFixed(digits)}</text>`;
-  }
-
-  const legend = ENGINES.map((e, i) => {
-    const x = padL + i * 210;
-    return `<rect x="${x}" y="16" width="12" height="12" fill="${e.color}" rx="2"/><text x="${x + 18}" y="26" font-size="12" fill="#d7e6ed">${e.label}</text>`;
-  }).join('');
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <rect width="100%" height="100%" fill="#06111b"/>
-  <text x="${padL}" y="14" font-size="15" font-weight="700" fill="#f8fbfd">${title}</text>
-  ${legend}
-  ${grid}
-  ${bars}
-  <text x="${padL - 52}" y="${padT + innerH / 2}" fill="#a7b9c6" font-size="11" transform="rotate(-90 ${padL - 52} ${padT + innerH / 2})">${unit}</text>
-</svg>
-`;
+function legendSize() {
+  const rowH = 34;
+  const pad = 20;
+  return { w: 214, h: pad * 2 + ENGINES.length * rowH - 8, rowH, pad };
 }
 
-function curveSvg(points, keys, { title, unit, digits = 0, stepHint = 100, xLabel = 'A4 pages dispatched' }) {
-  const W = 920, H = 420, padL = 70, padR = 24, padT = 48, padB = 60;
-  const innerW = W - padL - padR, innerH = H - padT - padB;
+function legendCard(x, y) {
+  const { w, h, rowH, pad } = legendSize();
+  let out = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="16" fill="${CHART.legendFill}" stroke="${CHART.legendStroke}"/>`;
+  ENGINES.forEach((e, i) => {
+    const cy = y + pad + 10 + i * rowH;
+    out += `<circle cx="${x + 24}" cy="${cy}" r="7.5" fill="${e.color}"/>`;
+    out += `<text x="${x + 42}" y="${cy + 5}" font-size="13.5" fill="${CHART.ink}" font-family="${CHART.bodyFont}">${e.label}</text>`;
+  });
+  return out;
+}
+
+function fmtTick(v, digits) {
+  if (Math.abs(v - Math.round(v)) < 1e-6) return String(Math.round(v));
+  return v.toFixed(digits);
+}
+
+function chartShell({ title, subtitle, unit, xLabel, W, H, padL, padR, padT, padB }) {
+  const plotX = padL;
+  const plotY = padT;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const yMid = plotY + plotH / 2;
+  const xMid = plotX + plotW / 2;
+  const { h: legendH } = legendSize();
+  const legendX = W - padR + 28;
+  const legendY = plotY + Math.max(0, (plotH - legendH) / 2);
+  const head = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <rect width="100%" height="100%" fill="${CHART.bg}"/>
+  <text x="${W / 2}" y="42" text-anchor="middle" font-size="26" font-weight="700" fill="${CHART.ink}" font-family="${CHART.titleFont}">${title}</text>
+  ${subtitle ? `<text x="${W / 2}" y="68" text-anchor="middle" font-size="14" fill="${CHART.muted}" font-family="${CHART.bodyFont}">${subtitle}</text>` : ''}
+  <text x="${padL - 62}" y="${yMid}" text-anchor="middle" fill="${CHART.ink}" font-size="13" font-family="${CHART.bodyFont}" transform="rotate(-90 ${padL - 62} ${yMid})">${unit}</text>
+  ${xLabel ? `<text x="${xMid}" y="${H - 16}" text-anchor="middle" font-size="14" font-weight="600" fill="${CHART.ink}" font-family="${CHART.bodyFont}">${xLabel}</text>` : ''}
+  ${legendCard(legendX, legendY)}`;
+  return { head, plotX, plotY, plotW, plotH, close: '</svg>\n' };
+}
+
+function yGrid({ plotX, plotY, plotW, plotH, nice, digits, ticks = 5 }) {
+  let out = `<line x1="${plotX}" y1="${plotY}" x2="${plotX}" y2="${plotY + plotH}" stroke="${CHART.axis}" stroke-width="1.4"/>`;
+  for (let i = 0; i <= ticks; i++) {
+    const v = (nice / ticks) * i;
+    const yy = plotY + plotH - (v / nice) * plotH;
+    out += `<line x1="${plotX}" y1="${yy.toFixed(1)}" x2="${plotX + plotW}" y2="${yy.toFixed(1)}" stroke="${i === 0 ? CHART.axis : CHART.grid}" stroke-width="${i === 0 ? 1.4 : 1}"/>`;
+    out += `<text x="${plotX - 12}" y="${(yy + 4).toFixed(1)}" text-anchor="end" font-size="12" fill="${CHART.muted}" font-family="${CHART.bodyFont}">${fmtTick(v, digits)}</text>`;
+  }
+  return out;
+}
+
+function barSvg(series, { title, subtitle, unit, digits = 0, stepHint = 100 }) {
+  const W = 1100, H = 580, padL = 104, padR = 252, padT = 100, padB = 78;
+  const { head, plotX, plotY, plotW, plotH, close } = chartShell({
+    title, subtitle, unit, xLabel: '', W, H, padL, padR, padT, padB,
+  });
+  const groupW = plotW / series.length;
+  const barW = groupW / (ENGINES.length + 1.6);
+  const maxV = Math.max(...series.flatMap(s => ENGINES.map(e => s.engines[e.key] || 0)), 0.01);
+  const nice = niceMax(maxV, stepHint);
+  const y = v => plotY + plotH - (v / nice) * plotH;
+
+  let bars = yGrid({ plotX, plotY, plotW, plotH, nice, digits });
+  series.forEach((s, gi) => {
+    const gx = plotX + gi * groupW;
+    const cluster = ENGINES.length * barW + (ENGINES.length - 1) * 8;
+    const start = gx + (groupW - cluster) / 2;
+    ENGINES.forEach((e, ei) => {
+      const v = s.engines[e.key] || 0;
+      const x = start + ei * (barW + 8);
+      const top = y(v);
+      const h = Math.max(0, plotY + plotH - top);
+      bars += `<rect x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="${e.color}" rx="4"/>`;
+      bars += `<text x="${(x + barW / 2).toFixed(1)}" y="${(top - 8).toFixed(1)}" text-anchor="middle" font-size="12" font-weight="600" fill="${CHART.ink}" font-family="${CHART.bodyFont}">${v.toFixed(digits)}</text>`;
+    });
+    bars += `<text x="${(gx + groupW / 2).toFixed(1)}" y="${plotY + plotH + 28}" text-anchor="middle" font-size="13.5" fill="${CHART.ink}" font-family="${CHART.bodyFont}">${s.name}</text>`;
+  });
+
+  return `${head}
+  ${bars}
+${close}`;
+}
+
+function curveSvg(points, keys, { title, subtitle, unit, digits = 0, stepHint = 100, xLabel = 'A4 pages dispatched' }) {
+  const W = 1100, H = 580, padL = 104, padR = 252, padT = 100, padB = 86;
+  const { head, plotX, plotY, plotW, plotH, close } = chartShell({
+    title, subtitle, unit, xLabel, W, H, padL, padR, padT, padB,
+  });
   const xs = points.map(p => p.pages);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const maxV = Math.max(...points.flatMap(p => keys.map(k => p[k] || 0)), 0.01);
   const nice = niceMax(maxV, stepHint);
-  const x = v => padL + ((v - minX) / (maxX - minX || 1)) * innerW;
-  const y = v => padT + innerH - (v / nice) * innerH;
+  const inset = 36;
+  const x = v => plotX + inset + ((v - minX) / (maxX - minX || 1)) * (plotW - inset * 2);
+  const y = v => plotY + plotH - (v / nice) * plotH;
 
-  let grid = '';
-  for (let i = 0; i <= 5; i++) {
-    const v = (nice / 5) * i;
-    const yy = y(v);
-    grid += `<line x1="${padL}" y1="${yy.toFixed(1)}" x2="${W - padR}" y2="${yy.toFixed(1)}" stroke="#1d6179" stroke-opacity=".35"/>`;
-    grid += `<text x="${padL - 8}" y="${(yy + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="#a7b9c6">${v.toFixed(digits)}</text>`;
-  }
+  let grid = yGrid({ plotX, plotY, plotW, plotH, nice, digits });
   for (const p of points) {
-    grid += `<text x="${x(p.pages).toFixed(1)}" y="${H - 28}" text-anchor="middle" font-size="13" fill="#f8fbfd">${p.pages}p</text>`;
+    const xx = x(p.pages);
+    grid += `<line x1="${xx.toFixed(1)}" y1="${plotY}" x2="${xx.toFixed(1)}" y2="${plotY + plotH}" stroke="${CHART.grid}"/>`;
+    grid += `<text x="${xx.toFixed(1)}" y="${plotY + plotH + 26}" text-anchor="middle" font-size="13" fill="${CHART.ink}" font-family="${CHART.bodyFont}">${p.pages}</text>`;
   }
 
-  const lines = ENGINES.map(e => {
+  const lines = [...ENGINES].reverse().map(e => {
     const key = keys.find(k => k === e.key || k === `${e.key}Diff`);
     if (!key) return '';
     const d = points.map((p, i) => `${i ? 'L' : 'M'} ${x(p.pages).toFixed(1)} ${y(p[key] || 0).toFixed(1)}`).join(' ');
-    const dots = points.map(p => `<circle cx="${x(p.pages).toFixed(1)}" cy="${y(p[key] || 0).toFixed(1)}" r="4.5" fill="${e.color}"/>`).join('');
-    return `<path d="${d}" fill="none" stroke="${e.color}" stroke-width="2.4"/>${dots}`;
+    const dots = points.map(p => {
+      const cx = x(p.pages).toFixed(1);
+      const cy = y(p[key] || 0).toFixed(1);
+      return `<circle cx="${cx}" cy="${cy}" r="6.5" fill="${e.color}" stroke="${CHART.bg}" stroke-width="2"/>`;
+    }).join('');
+    return `<path d="${d}" fill="none" stroke="${e.color}" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
   }).join('');
 
-  const legend = ENGINES.map((e, i) => {
-    const lx = padL + i * 210;
-    return `<rect x="${lx}" y="16" width="12" height="12" fill="${e.color}" rx="2"/><text x="${lx + 18}" y="26" font-size="12" fill="#d7e6ed">${e.label}</text>`;
-  }).join('');
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <rect width="100%" height="100%" fill="#06111b"/>
-  <text x="${padL}" y="14" font-size="15" font-weight="700" fill="#f8fbfd">${title}</text>
-  ${legend}
+  return `${head}
   ${grid}
   ${lines}
-  <text x="${padL - 52}" y="${padT + innerH / 2}" fill="#a7b9c6" font-size="11" transform="rotate(-90 ${padL - 52} ${padT + innerH / 2})">${unit}</text>
-  <text x="${padL + innerW / 2}" y="${H - 10}" text-anchor="middle" font-size="12" fill="#a7b9c6">${xLabel}</text>
-</svg>
-`;
+${close}`;
+}
+
+async function writeCharts(payload) {
+  const curve = payload.curve;
+  await writeFile(resolve(ASSETS, 'bench-bar.svg'), barSvg(payload.bar, {
+    title: 'Warm convert time',
+    subtitle: 'Median of 5 warm calls — lower is better',
+    unit: 'milliseconds',
+    digits: 0,
+    stepHint: 20,
+  }));
+  await writeFile(resolve(ASSETS, 'bench-diff.svg'), barSvg(
+    payload.bar.map(s => ({ name: s.name, engines: s.diff })),
+    {
+      title: 'Worst-page pixel-diff vs HTML',
+      subtitle: '96 DPI · pixelmatch 0.1 — lower is better',
+      unit: 'percent',
+      digits: 2,
+      stepHint: 2,
+    },
+  ));
+  await writeFile(resolve(ASSETS, 'bench-curve.svg'), curveSvg(curve, ['dominate', 'html2canvas', 'playwright'], {
+    title: 'Warm convert time vs page count',
+    subtitle: 'SOW fixture — lower is better',
+    unit: 'milliseconds',
+    digits: 0,
+    stepHint: 20,
+  }));
+  await writeFile(resolve(ASSETS, 'bench-curve-diff.svg'), curveSvg(curve, ['dominateDiff', 'html2canvasDiff', 'playwrightDiff'], {
+    title: 'Worst-page pixel-diff vs page count',
+    subtitle: 'SOW fixture · 96 DPI — lower is better',
+    unit: 'percent',
+    digits: 2,
+    stepHint: 2,
+  }));
 }
 
 async function timeSamples(fn) {
@@ -232,6 +307,12 @@ async function worstPageDiff(shot, pdfBytes, viewport, tag) {
 async function main() {
   await mkdir(ASSETS, { recursive: true });
   await mkdir(OUT, { recursive: true });
+  if (process.argv.includes('--charts-only')) {
+    const payload = JSON.parse(await readFile(resolve(OUT, 'compare.json'), 'utf8'));
+    await writeCharts(payload);
+    console.log('rewrote SVGs from benchmark/compare.json');
+    return;
+  }
   const { server, port } = await startServer();
   const origin = `http://127.0.0.1:${port}`;
   const browser = await chromium.launch({ args: ['--disable-lcd-text'] });
@@ -399,19 +480,7 @@ async function main() {
     };
 
     await writeFile(resolve(OUT, 'compare.json'), `${JSON.stringify(payload, null, 2)}\n`);
-    await writeFile(resolve(ASSETS, 'bench-bar.svg'), barSvg(payload.bar, {
-      title: 'Warm convert time (ms) — lower is better', unit: 'milliseconds', digits: 0, stepHint: 20,
-    }));
-    await writeFile(resolve(ASSETS, 'bench-diff.svg'), barSvg(
-      payload.bar.map(s => ({ name: s.name, engines: s.diff })),
-      { title: 'Worst-page pixel-diff vs HTML (%) — lower is better', unit: 'percent', digits: 2, stepHint: 2 },
-    ));
-    await writeFile(resolve(ASSETS, 'bench-curve.svg'), curveSvg(curve, ['dominate', 'html2canvas', 'playwright'], {
-      title: 'Warm convert time vs page count — SOW fixture', unit: 'milliseconds', digits: 0, stepHint: 20,
-    }));
-    await writeFile(resolve(ASSETS, 'bench-curve-diff.svg'), curveSvg(curve, ['dominateDiff', 'html2canvasDiff', 'playwrightDiff'], {
-      title: 'Worst-page pixel-diff vs HTML (%) — SOW fixture', unit: 'percent', digits: 2, stepHint: 2,
-    }));
+    await writeCharts(payload);
     console.log(JSON.stringify(payload, null, 2));
   } finally {
     await browser.close();
