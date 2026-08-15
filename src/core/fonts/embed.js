@@ -182,8 +182,10 @@ export function measureText(font, str, sizePt) {
   return (w / upe) * sizePt;
 }
 
+const HEX2 = new Array(256);
+for (let i = 0; i < 256; i++) HEX2[i] = i.toString(16).padStart(2, '0');
 function hex16(n) {
-  return ((n >>> 8) & 0xff).toString(16).padStart(2, '0') + (n & 0xff).toString(16).padStart(2, '0');
+  return HEX2[(n >>> 8) & 0xff] + HEX2[n & 0xff];
 }
 
 async function deflate(u8) {
