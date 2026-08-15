@@ -67,15 +67,26 @@ Same HTML, same machine. Two scores, both lower-is-better:
 - **Pixel-diff** — worst page, Chromium HTML screenshot vs PDF raster at 96 DPI
   (`pixelmatch` threshold 0.1), same protocol as `npm run loop`.
 
-DOMinate writes a vector PDF in the browser. `html2canvas` + jsPDF flattens the
-page to a JPEG (no selectable text). Chromium `page.pdf()` is a headless print
-pipeline — not a drop-in client library.
+DOMinate writes a vector PDF in the browser. The raster repos
+([html2canvas](https://github.com/niklasvh/html2canvas) +
+[jsPDF](https://github.com/parallax/jsPDF),
+[html2pdf.js](https://github.com/eKoopmans/html2pdf.js),
+[html-to-image](https://github.com/bubkoo/html-to-image)) flatten the page to a
+JPEG (no selectable text). [jsPDF.html()](https://github.com/parallax/jsPDF)
+is the official HTML plugin (html2canvas internally) and emitted an extra blank
+page on Landing and SOW — that page scores 100%. Playwright and
+[Puppeteer](https://github.com/puppeteer/puppeteer) `page.pdf()` are the same
+headless Chromium print pipeline, not drop-in client libraries.
 
 | | Landing time | Landing diff | Invoice time | Invoice diff | SOW 4p time | SOW 4p worst-page diff |
 |---|---:|---:|---:|---:|---:|---:|
-| **DOMinate** | 16.5 ms | **1.243%** | 17.1 ms | **0.432%** | 32.4 ms | **1.714%** |
-| html2canvas + jsPDF | 95 ms | 80.5% | 85 ms | 68.7% | 121 ms | 73.8% |
-| Chromium `page.pdf()` | 30.2 ms | 61.3% | 5.0 ms | 0.732% | 8.4 ms | 2.077% |
+| **DOMinate** | 16.3 ms | **1.243%** | 30.6 ms | **0.432%** | 46.0 ms | **1.714%** |
+| html2canvas + jsPDF | 92 ms | 80.4% | 105 ms | 68.7% | 138 ms | 73.8% |
+| html2pdf.js | 110 ms | 83.9% | 147 ms | 68.7% | 165 ms | 73.8% |
+| html-to-image + jsPDF | 93 ms | 83.9% | 178 ms | 68.5% | 219 ms | 73.8% |
+| jsPDF.html() | 122 ms | 100% | 145 ms | 69.0% | 185 ms | 100% |
+| Playwright `page.pdf()` | 30.0 ms | 61.3% | 6.5 ms | 0.732% | 9.9 ms | 2.077% |
+| Puppeteer `page.pdf()` | 117 ms | 61.3% | 167 ms | 0.732% | 256 ms | 2.077% |
 
 ![Bar chart: warm convert time](docs/assets/bench-bar.svg)
 
@@ -101,6 +112,7 @@ Run the exact benchmark yourself:
 npm ci
 npx playwright install chromium
 npm run benchmark
+npm run compare
 ```
 
 Machine-readable results live in [`benchmark/results.json`](benchmark/results.json).

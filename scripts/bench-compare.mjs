@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// Competitive convert bench: DOMinate vs html2canvas+jsPDF vs Chromium page.pdf.
+// Competitive convert bench: DOMinate vs popular HTML→PDF repos.
 // Reports warm time AND worst-page pixel-diff vs the live HTML screenshot
 // (same protocol as scripts/loop.mjs). Writes JSON + bar/curve SVGs.
 
 import { chromium } from 'playwright';
+import puppeteer from 'puppeteer-core';
 import { createServer } from 'node:http';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname, extname, resolve } from 'node:path';
@@ -33,13 +34,21 @@ const MIME = {
   '.pdf': 'application/pdf',
 };
 
-const H2C = '/example/Ivonne%20-%20Template/assets/js/html2canvas.min.js';
-const JSPDF = '/example/Ivonne%20-%20Template/assets/js/jspdf.min.js';
+const LIB = {
+  html2canvas: '/node_modules/html2canvas/dist/html2canvas.min.js',
+  jspdf: '/node_modules/jspdf/dist/jspdf.umd.min.js',
+  htmlToImage: '/node_modules/html-to-image/dist/html-to-image.js',
+  html2pdf: '/node_modules/html2pdf.js/dist/html2pdf.bundle.min.js',
+};
 
 const ENGINES = [
   { key: 'dominate', label: 'DOMinate', color: '#12b76a' },
   { key: 'html2canvas', label: 'html2canvas + jsPDF', color: '#e07a5f' },
-  { key: 'playwright', label: 'Chromium page.pdf', color: '#2563eb' },
+  { key: 'html2pdf', label: 'html2pdf.js', color: '#c026d3', dash: '8 4' },
+  { key: 'htmltoimage', label: 'html-to-image + jsPDF', color: '#f59e0b', dash: '2 4' },
+  { key: 'jspdfhtml', label: 'jsPDF.html()', color: '#8b5cf6' },
+  { key: 'playwright', label: 'Playwright page.pdf', color: '#2563eb' },
+  { key: 'puppeteer', label: 'Puppeteer page.pdf', color: '#0ea5e9', dash: '6 3' },
 ];
 
 const CHART = {
@@ -97,9 +106,13 @@ function withBase(html, baseUrl) {
 
 function niceMax(maxV, stepHint) {
   if (maxV <= 0) return stepHint;
-  const raw = maxV * 1.15;
+  if (maxV <= 100 && stepHint <= 5) {
+    const step = maxV > 50 ? 20 : maxV > 20 ? 10 : 5;
+    return Math.min(100, Math.max(step, Math.ceil((maxV * 1.08) / step) * step));
+  }
+  const raw = maxV * 1.12;
   const mag = 10 ** Math.floor(Math.log10(raw));
-  for (const m of [1, 2, 2.5, 5, 10]) {
+  for (const m of [1, 1.5, 2, 2.5, 5, 10]) {
     const step = m * mag;
     if (step * 2 >= raw) return Math.ceil(raw / step) * step || stepHint;
   }
@@ -107,9 +120,9 @@ function niceMax(maxV, stepHint) {
 }
 
 function legendSize() {
-  const rowH = 34;
-  const pad = 20;
-  return { w: 214, h: pad * 2 + ENGINES.length * rowH - 8, rowH, pad };
+  const rowH = 30;
+  const pad = 18;
+  return { w: 236, h: pad * 2 + ENGINES.length * rowH - 8, rowH, pad };
 }
 
 function legendCard(x, y) {
@@ -117,6 +130,9 @@ function legendCard(x, y) {
   let out = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="16" fill="${CHART.legendFill}" stroke="${CHART.legendStroke}"/>`;
   ENGINES.forEach((e, i) => {
     const cy = y + pad + 10 + i * rowH;
+    if (e.dash) {
+      out += `<line x1="${x + 12}" y1="${cy}" x2="${x + 36}" y2="${cy}" stroke="${e.color}" stroke-width="2.4" stroke-dasharray="${e.dash}" stroke-linecap="round"/>`;
+    }
     out += `<circle cx="${x + 24}" cy="${cy}" r="7.5" fill="${e.color}"/>`;
     out += `<text x="${x + 42}" y="${cy + 5}" font-size="13.5" fill="${CHART.ink}" font-family="${CHART.bodyFont}">${e.label}</text>`;
   });
@@ -161,7 +177,7 @@ function yGrid({ plotX, plotY, plotW, plotH, nice, digits, ticks = 5 }) {
 }
 
 function barSvg(series, { title, subtitle, unit, digits = 0, stepHint = 100 }) {
-  const W = 1100, H = 580, padL = 104, padR = 252, padT = 100, padB = 78;
+  const W = 1280, H = 680, padL = 108, padR = 276, padT = 104, padB = 78;
   const { head, plotX, plotY, plotW, plotH, close } = chartShell({
     title, subtitle, unit, xLabel: '', W, H, padL, padR, padT, padB,
   });
@@ -181,8 +197,8 @@ function barSvg(series, { title, subtitle, unit, digits = 0, stepHint = 100 }) {
       const x = start + ei * (barW + 8);
       const top = y(v);
       const h = Math.max(0, plotY + plotH - top);
-      bars += `<rect x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="${e.color}" rx="4"/>`;
-      bars += `<text x="${(x + barW / 2).toFixed(1)}" y="${(top - 8).toFixed(1)}" text-anchor="middle" font-size="12" font-weight="600" fill="${CHART.ink}" font-family="${CHART.bodyFont}">${v.toFixed(digits)}</text>`;
+      bars += `<rect x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="${e.color}" rx="3"/>`;
+      bars += `<text x="${(x + barW / 2).toFixed(1)}" y="${(top - 7).toFixed(1)}" text-anchor="middle" font-size="${digits >= 2 ? 9 : 10}" font-weight="600" fill="${CHART.ink}" font-family="${CHART.bodyFont}">${v.toFixed(digits)}</text>`;
     });
     bars += `<text x="${(gx + groupW / 2).toFixed(1)}" y="${plotY + plotH + 28}" text-anchor="middle" font-size="13.5" fill="${CHART.ink}" font-family="${CHART.bodyFont}">${s.name}</text>`;
   });
@@ -193,7 +209,7 @@ ${close}`;
 }
 
 function curveSvg(points, keys, { title, subtitle, unit, digits = 0, stepHint = 100, xLabel = 'A4 pages dispatched' }) {
-  const W = 1100, H = 580, padL = 104, padR = 252, padT = 100, padB = 86;
+  const W = 1280, H = 680, padL = 108, padR = 276, padT = 104, padB = 86;
   const { head, plotX, plotY, plotW, plotH, close } = chartShell({
     title, subtitle, unit, xLabel, W, H, padL, padR, padT, padB,
   });
@@ -212,16 +228,21 @@ function curveSvg(points, keys, { title, subtitle, unit, digits = 0, stepHint = 
     grid += `<text x="${xx.toFixed(1)}" y="${plotY + plotH + 26}" text-anchor="middle" font-size="13" fill="${CHART.ink}" font-family="${CHART.bodyFont}">${p.pages}</text>`;
   }
 
-  const lines = [...ENGINES].reverse().map(e => {
+  const drawOrder = [...ENGINES].sort((a, b) => {
+    const rank = e => (e.key === 'dominate' ? 4 : e.dash ? 2 : 1);
+    return rank(a) - rank(b);
+  });
+  const lines = drawOrder.map(e => {
     const key = keys.find(k => k === e.key || k === `${e.key}Diff`);
     if (!key) return '';
     const d = points.map((p, i) => `${i ? 'L' : 'M'} ${x(p.pages).toFixed(1)} ${y(p[key] || 0).toFixed(1)}`).join(' ');
+    const dash = e.dash ? ` stroke-dasharray="${e.dash}"` : '';
     const dots = points.map(p => {
       const cx = x(p.pages).toFixed(1);
       const cy = y(p[key] || 0).toFixed(1);
       return `<circle cx="${cx}" cy="${cy}" r="6.5" fill="${e.color}" stroke="${CHART.bg}" stroke-width="2"/>`;
     }).join('');
-    return `<path d="${d}" fill="none" stroke="${e.color}" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
+    return `<path d="${d}" fill="none" stroke="${e.color}" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round"${dash}/>${dots}`;
   }).join('');
 
   return `${head}
@@ -249,14 +270,14 @@ async function writeCharts(payload) {
       stepHint: 2,
     },
   ));
-  await writeFile(resolve(ASSETS, 'bench-curve.svg'), curveSvg(curve, ['dominate', 'html2canvas', 'playwright'], {
+  await writeFile(resolve(ASSETS, 'bench-curve.svg'), curveSvg(curve, ENGINES.map(e => e.key), {
     title: 'Warm convert time vs page count',
     subtitle: 'SOW fixture — lower is better',
     unit: 'milliseconds',
     digits: 0,
     stepHint: 20,
   }));
-  await writeFile(resolve(ASSETS, 'bench-curve-diff.svg'), curveSvg(curve, ['dominateDiff', 'html2canvasDiff', 'playwrightDiff'], {
+  await writeFile(resolve(ASSETS, 'bench-curve-diff.svg'), curveSvg(curve, ENGINES.map(e => `${e.key}Diff`), {
     title: 'Worst-page pixel-diff vs page count',
     subtitle: 'SOW fixture · 96 DPI — lower is better',
     unit: 'percent',
@@ -281,6 +302,10 @@ async function worstPageDiff(shot, pdfBytes, viewport, tag) {
   const pdfPath = resolve(OUT, `_cmp-${tag}.pdf`);
   await writeFile(pdfPath, pdfBytes);
   const all = await rasterizeAll(pdfPath, { dpi: 96 });
+  const htmlSize = await shot.evaluate(() => ({
+    width: Math.max(document.documentElement.scrollWidth, document.body?.scrollWidth || 0, 1),
+    height: Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight || 0, 1),
+  }));
   let worst = { percent: 0, page: 1, pages: [] };
   for (const page of all.pages) {
     const pdfPng = resolve(OUT, `_cmp-${tag}-p${page.index}.png`);
@@ -288,10 +313,21 @@ async function worstPageDiff(shot, pdfBytes, viewport, tag) {
     const diffPng = resolve(OUT, `_cmp-${tag}-d${page.index}.png`);
     await writeFile(pdfPng, page.png);
     const y = (page.index - 1) * viewport.height;
+    if (y >= htmlSize.height) {
+      const row = { page: page.index, percent: 100, diffPx: 0, totalPx: 0, extraPage: true };
+      worst.pages.push(row);
+      if (row.percent > worst.percent) {
+        worst.percent = row.percent;
+        worst.page = page.index;
+      }
+      continue;
+    }
+    const clipH = Math.min(viewport.height, htmlSize.height - y);
+    const clipW = Math.min(viewport.width, htmlSize.width);
     await shot.screenshot({
       path: htmlPng,
       fullPage: true,
-      clip: { x: 0, y, width: viewport.width, height: viewport.height },
+      clip: { x: 0, y, width: clipW, height: clipH },
     });
     const diff = await diffPngs(htmlPng, pdfPng, diffPng);
     const row = { page: page.index, percent: Number(diff.percent.toFixed(3)), diffPx: diff.diffPx, totalPx: diff.totalPx };
@@ -316,6 +352,11 @@ async function main() {
   const { server, port } = await startServer();
   const origin = `http://127.0.0.1:${port}`;
   const browser = await chromium.launch({ args: ['--disable-lcd-text'] });
+  const pptr = await puppeteer.launch({
+    executablePath: chromium.executablePath(),
+    headless: true,
+    args: ['--disable-lcd-text'],
+  });
 
   const landingRel = 'example/templatemo_550_diagoona/index.html';
   const invoiceRel = 'example/Ivonne - Template/hotel-booking-invoice.html';
@@ -358,8 +399,39 @@ async function main() {
       }
       await page.evaluate(() => import('/src/index.js'));
       if (!process.env.BENCH_FAST) {
-        await page.addScriptTag({ url: `${origin}${H2C}` });
-        await page.addScriptTag({ url: `${origin}${JSPDF}` });
+        await page.addScriptTag({ url: `${origin}${LIB.html2canvas}` });
+        await page.addScriptTag({ url: `${origin}${LIB.jspdf}` });
+        await page.addScriptTag({ url: `${origin}${LIB.htmlToImage}` });
+        await page.evaluate(() => {
+          window.__h2c = window.html2canvas;
+          window.__jspdf = window.jspdf;
+        });
+        await page.addScriptTag({ url: `${origin}${LIB.html2pdf}` });
+        await page.evaluate(() => {
+          window.html2pdfLib = window.html2pdf;
+          window.html2canvas = window.__h2c;
+          window.jspdf = window.__jspdf;
+        });
+      }
+      await page.evaluate(() => document.fonts.ready);
+      await new Promise(r => setTimeout(r, 80));
+      return page;
+    }
+
+    async function openPuppeteerFixture(rel, viewport, keepSections) {
+      const page = await pptr.newPage();
+      await page.setViewport(viewport);
+      await page.goto(`${origin}/${rel.replace(/\\/g, '/')}`, { waitUntil: 'networkidle0' });
+      if (keepSections != null) {
+        await page.evaluate((n) => {
+          for (let i = n + 1; i <= 4; i++) {
+            const el = document.getElementById('sec-' + i);
+            if (el) el.style.display = 'none';
+          }
+          document.querySelectorAll('.page-break').forEach((el, idx) => {
+            if (idx >= n - 1) el.remove();
+          });
+        }, keepSections);
       }
       await page.evaluate(() => document.fonts.ready);
       await new Promise(r => setTimeout(r, 80));
@@ -390,7 +462,86 @@ async function main() {
       return Buffer.from(base64, 'base64');
     }
 
+    async function html2pdfPdf(page, viewport) {
+      const base64 = await page.evaluate(async ({ vw, vh }) => {
+        const worker = window.html2pdfLib || window.html2pdf;
+        const opt = {
+          margin: 0,
+          image: { type: 'jpeg', quality: 0.85 },
+          html2canvas: { scale: 1, useCORS: true, logging: false, windowWidth: vw, windowHeight: vh },
+          jsPDF: { unit: 'px', format: [vw, vh], orientation: vh >= vw ? 'portrait' : 'landscape' },
+          pagebreak: { mode: ['css', 'legacy'] },
+        };
+        const datauri = await worker().set(opt).from(document.documentElement).outputPdf('datauristring');
+        return String(datauri).split(',').pop();
+      }, { vw: viewport.width, vh: viewport.height });
+      return Buffer.from(base64, 'base64');
+    }
+
+    async function htmlToImagePdf(page, viewport) {
+      const base64 = await page.evaluate(async ({ vw, vh }) => {
+        const el = document.documentElement;
+        const dataUrl = await window.htmlToImage.toJpeg(el, {
+          quality: 0.85,
+          pixelRatio: 1,
+          backgroundColor: '#ffffff',
+          width: el.scrollWidth,
+          height: el.scrollHeight,
+        });
+        const img = new Image();
+        img.src = dataUrl;
+        await img.decode();
+        const JsPDF = window.jspdf.jsPDF;
+        const pdf = new JsPDF({ unit: 'px', format: [vw, vh], orientation: vh >= vw ? 'portrait' : 'landscape' });
+        let y = 0;
+        let first = true;
+        while (y < img.height - 1) {
+          if (!first) pdf.addPage([vw, vh], vh >= vw ? 'portrait' : 'landscape');
+          first = false;
+          const slice = document.createElement('canvas');
+          slice.width = vw;
+          slice.height = Math.min(vh, img.height - y);
+          slice.getContext('2d').drawImage(img, 0, y, vw, slice.height, 0, 0, vw, slice.height);
+          pdf.addImage(slice.toDataURL('image/jpeg', 0.85), 'JPEG', 0, 0, vw, slice.height);
+          y += vh;
+        }
+        return pdf.output('datauristring').split(',')[1];
+      }, { vw: viewport.width, vh: viewport.height });
+      return Buffer.from(base64, 'base64');
+    }
+
+    async function jspdfHtmlPdf(page, viewport) {
+      const base64 = await page.evaluate(async ({ vw, vh }) => {
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({
+          unit: 'px',
+          format: [vw, vh],
+          orientation: vh >= vw ? 'portrait' : 'landscape',
+        });
+        await pdf.html(document.documentElement, {
+          margin: 0,
+          autoPaging: 'slice',
+          html2canvas: { scale: 1, useCORS: true, logging: false, windowWidth: vw },
+          width: vw,
+          windowWidth: vw,
+          x: 0,
+          y: 0,
+        });
+        return pdf.output('datauristring').split(',')[1];
+      }, { vw: viewport.width, vh: viewport.height });
+      return Buffer.from(base64, 'base64');
+    }
+
     async function playwrightPdf(page, viewport) {
+      return page.pdf({
+        width: `${viewport.width}px`,
+        height: `${viewport.height}px`,
+        printBackground: true,
+        margin: { top: '0', right: '0', bottom: '0', left: '0' },
+      });
+    }
+
+    async function puppeteerPdf(page, viewport) {
       return page.pdf({
         width: `${viewport.width}px`,
         height: `${viewport.height}px`,
@@ -401,36 +552,51 @@ async function main() {
 
     async function measure(rel, viewport, keepSections, tag) {
       const page = await openFixture(rel, viewport, keepSections);
-      const dTime = await timeSamples(() => dominatePdf(rel, viewport));
-      const pTime = await timeSamples(() => playwrightPdf(page, viewport));
-      const hTime = process.env.BENCH_FAST
-        ? { medianMs: 0, last: null }
-        : await timeSamples(() => html2canvasPdf(page, viewport));
+      const pptrPage = process.env.BENCH_FAST ? null : await openPuppeteerFixture(rel, viewport, keepSections);
 
-      const dPdf = dTime.last;
-      const pPdf = pTime.last;
-      const hPdf = hTime.last;
-
-      const dDiff = await worstPageDiff(page, dPdf, viewport, `${tag}-dom`);
-      const pDiff = await worstPageDiff(page, pPdf, viewport, `${tag}-pw`);
-      const hDiff = hPdf
-        ? await worstPageDiff(page, hPdf, viewport, `${tag}-h2c`)
-        : { worstPercent: 0, pageCount: 0, worstPage: 0, pages: [] };
-      await page.close();
-
-      return {
-        time: {
-          dominate: dTime.medianMs,
-          html2canvas: hTime.medianMs,
-          playwright: pTime.medianMs,
-        },
-        diff: {
-          dominate: dDiff.worstPercent,
-          html2canvas: hDiff.worstPercent,
-          playwright: pDiff.worstPercent,
-        },
-        detail: { dominate: dDiff, html2canvas: hDiff, playwright: pDiff },
+      const runners = {
+        dominate: () => dominatePdf(rel, viewport),
+        playwright: () => playwrightPdf(page, viewport),
       };
+      if (!process.env.BENCH_FAST) {
+        runners.html2canvas = () => html2canvasPdf(page, viewport);
+        runners.html2pdf = () => html2pdfPdf(page, viewport);
+        runners.htmltoimage = () => htmlToImagePdf(page, viewport);
+        runners.jspdfhtml = () => jspdfHtmlPdf(page, viewport);
+        runners.puppeteer = () => puppeteerPdf(pptrPage, viewport);
+      }
+
+      const timed = {};
+      for (const e of ENGINES) {
+        if (!runners[e.key]) {
+          timed[e.key] = { medianMs: 0, last: null };
+          continue;
+        }
+        try {
+          process.stderr.write(`  ${tag} ${e.key} time…\n`);
+          timed[e.key] = await timeSamples(runners[e.key]);
+        } catch (error) {
+          throw new Error(`${e.key} failed on ${tag}: ${error.message}`);
+        }
+      }
+
+      const time = {};
+      const diff = {};
+      const detail = {};
+      for (const e of ENGINES) {
+        time[e.key] = timed[e.key].medianMs;
+        if (!timed[e.key].last) {
+          diff[e.key] = 0;
+          detail[e.key] = { worstPercent: 0, pageCount: 0, worstPage: 0, pages: [] };
+          continue;
+        }
+        process.stderr.write(`  ${tag} ${e.key} diff…\n`);
+        detail[e.key] = await worstPageDiff(page, timed[e.key].last, viewport, `${tag}-${e.key}`);
+        diff[e.key] = detail[e.key].worstPercent;
+      }
+      await page.close();
+      if (pptrPage) await pptrPage.close();
+      return { time, diff, detail };
     }
 
     const landingVp = { width: 1280, height: 800 };
@@ -451,15 +617,12 @@ async function main() {
       );
       await writeFile(resolve(ROOT, 'example', `._sow-${pages}.html`), hidden);
       const m = await measure(`example/._sow-${pages}.html`, reportVp, pages, `sow${pages}`);
-      curve.push({
-        pages,
-        dominate: m.time.dominate,
-        html2canvas: m.time.html2canvas,
-        playwright: m.time.playwright,
-        dominateDiff: m.diff.dominate,
-        html2canvasDiff: m.diff.html2canvas,
-        playwrightDiff: m.diff.playwright,
-      });
+      const row = { pages };
+      for (const e of ENGINES) {
+        row[e.key] = m.time[e.key];
+        row[`${e.key}Diff`] = m.diff[e.key];
+      }
+      curve.push(row);
     }
 
     const payload = {
@@ -467,9 +630,13 @@ async function main() {
       iterations: ITERATIONS,
       protocol: 'HTML screenshot vs PDF raster at 96 DPI, pixelmatch threshold 0.1; worst page retained.',
       notes: {
-        dominate: 'Vector PDF, selectable text, in-browser htmlToPdf',
-        html2canvas: 'Raster screenshot sliced into jsPDF pages (no selectable text)',
-        playwright: 'Headless Chromium page.pdf — not a drop-in browser library',
+        dominate: 'Vector PDF, selectable text, in-browser htmlToPdf — https://github.com/RandazzoMaxime/DOMinate',
+        html2canvas: 'Raster screenshot sliced into jsPDF pages — https://github.com/niklasvh/html2canvas + https://github.com/parallax/jsPDF',
+        html2pdf: 'Client wrapper around html2canvas + jsPDF — https://github.com/eKoopmans/html2pdf.js',
+        htmltoimage: 'DOM snapshot via html-to-image, wrapped in jsPDF — https://github.com/bubkoo/html-to-image',
+        jspdfhtml: 'Official jsPDF.html() plugin (html2canvas internally) — https://github.com/parallax/jsPDF',
+        playwright: 'Headless Chromium page.pdf via Playwright — not a drop-in browser library',
+        puppeteer: 'Headless Chromium page.pdf via Puppeteer — https://github.com/puppeteer/puppeteer',
       },
       bar: [
         { name: 'Landing', engines: landing.time, diff: landing.diff, detail: landing.detail },
@@ -484,6 +651,7 @@ async function main() {
     console.log(JSON.stringify(payload, null, 2));
   } finally {
     await browser.close();
+    await pptr.close();
     await new Promise(resolveClosed => server.close(resolveClosed));
   }
 }

@@ -41,6 +41,7 @@
     "loop": "node scripts/loop.mjs",
     "test": "node scripts/test-validity.mjs && node scripts/test-live-text.mjs",
     "benchmark": "node scripts/benchmark.mjs",
+    "compare": "node scripts/bench-compare.mjs",
     "render": "node scripts/render-with-lib.mjs",
     "rasterize": "node scripts/pdf-to-png.mjs",
     "diff": "node scripts/diff.mjs",
@@ -48,11 +49,16 @@
   },
   "devDependencies": {
     "@napi-rs/canvas": "^0.1.65",
+    "html-to-image": "^1.11.13",
+    "html2canvas": "^1.4.1",
+    "html2pdf.js": "^0.14.0",
+    "jspdf": "^4.2.1",
     "kleur": "^4.1.5",
     "pdfjs-dist": "^4.10.38",
     "pixelmatch": "^7.1.0",
     "playwright": "^1.49.0",
-    "pngjs": "^7.0.0"
+    "pngjs": "^7.0.0",
+    "puppeteer-core": "^25.7.0"
   },
   "engines": {
     "node": ">=20"
