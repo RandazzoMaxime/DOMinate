@@ -5,8 +5,8 @@
   },
   "screenshotScale": 1,
   "expectedLinks": [
-    "https://helix.corsica/typo",
-    "https://helix.corsica/torture"
+    "https://dominate.dev/typo",
+    "https://dominate.dev/torture"
   ],
   "expectedTextFragments": [
     "Typographic Torture Sheet",

@@ -32,7 +32,7 @@ HTML stays local and is not published.
 
 | | Landing | Invoice | SOW (4 pages) |
 |---|---:|---:|---:|
-| Worst page pixel-diff vs HTML | 1.233% | 0.432% | 1.714% |
+| Worst page pixel-diff vs HTML | 1.224% | 0.444% | 1.714% |
 | Pages dispatched | 1 | 1 | 4 |
 
 ### Landing — HTML vs DOMinate PDF

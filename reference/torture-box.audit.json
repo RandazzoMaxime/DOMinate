@@ -5,8 +5,8 @@
   },
   "screenshotScale": 1,
   "expectedLinks": [
-    "https://helix.corsica/torture/box",
-    "https://helix.corsica/torture"
+    "https://dominate.dev/torture/box",
+    "https://dominate.dev/torture"
   ],
   "expectedTextFragments": [
     "BOX MODEL TORTURE",

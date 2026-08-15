@@ -5,8 +5,8 @@
   },
   "screenshotScale": 1,
   "expectedLinks": [
-    "https://helix.corsica/ledger/session-a",
-    "https://helix.corsica/ledger/raw"
+    "https://dominate.dev/ledger/session-a",
+    "https://dominate.dev/ledger/raw"
   ],
   "expectedTextFragments": [
     "Observation Ledger",
