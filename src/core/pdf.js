@@ -291,7 +291,10 @@ class IndirectObject {
 /** PDF name token wrapper. Use the helper `name('Foo')` to mark strings as PDF names. */
 class PdfName { constructor(s) { this.s = s; } }
 function name(s) { return new PdfName(s); }
-export { name };
+/** Pre-serialized PDF tokens (arrays, CMaps) so toBytes skips a tree walk. */
+class PdfRaw { constructor(s) { this.s = s; } }
+function raw(s) { return new PdfRaw(s); }
+export { name, raw, PdfRaw };
 
 /** Stream wrapper. */
 export class PdfStream {
@@ -559,6 +562,8 @@ function writeValue(out, v) {
     out.pushString(`${v.id} ${v.gen} R`);
   } else if (v instanceof PdfName) {
     out.pushString('/' + v.s);
+  } else if (v instanceof PdfRaw) {
+    out.pushString(v.s);
   } else if (v instanceof PdfStream) {
     out.pushString('<<');
     let first = true;

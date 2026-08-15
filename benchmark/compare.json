@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-15T17:39:11.670Z",
+  "generatedAt": "2026-08-15T17:50:58.816Z",
   "iterations": 5,
   "protocol": "HTML screenshot vs PDF raster at 96 DPI, pixelmatch threshold 0.1; worst page retained.",
   "notes": {
@@ -11,9 +11,9 @@
     {
       "name": "Invoice (1 page)",
       "engines": {
-        "dominate": 32,
-        "html2canvas": 92.1,
-        "playwright": 5.1
+        "dominate": 1.9,
+        "html2canvas": 92.8,
+        "playwright": 4.3
       },
       "diff": {
         "dominate": 0.432,
@@ -65,9 +65,9 @@
     {
       "name": "SOW (4 pages)",
       "engines": {
-        "dominate": 54.5,
-        "html2canvas": 120.9,
-        "playwright": 7.4
+        "dominate": 4.6,
+        "html2canvas": 124.2,
+        "playwright": 7.5
       },
       "diff": {
         "dominate": 1.714,
@@ -174,36 +174,36 @@
   "curve": [
     {
       "pages": 1,
-      "dominate": 17.6,
-      "html2canvas": 87.4,
-      "playwright": 5.2,
+      "dominate": 1.4,
+      "html2canvas": 83.1,
+      "playwright": 3.2,
       "dominateDiff": 0.802,
       "html2canvasDiff": 72.075,
       "playwrightDiff": 1.564
     },
     {
       "pages": 2,
-      "dominate": 35.4,
-      "html2canvas": 103.9,
-      "playwright": 6.4,
+      "dominate": 2.7,
+      "html2canvas": 98,
+      "playwright": 5.1,
       "dominateDiff": 1.714,
       "html2canvasDiff": 72.413,
       "playwrightDiff": 2.077
     },
     {
       "pages": 3,
-      "dominate": 40.3,
-      "html2canvas": 113,
-      "playwright": 7.3,
+      "dominate": 3.7,
+      "html2canvas": 111.2,
+      "playwright": 7.6,
       "dominateDiff": 1.714,
       "html2canvasDiff": 73.832,
       "playwrightDiff": 2.077
     },
     {
       "pages": 4,
-      "dominate": 39.2,
-      "html2canvas": 125.7,
-      "playwright": 7.1,
+      "dominate": 5,
+      "html2canvas": 128,
+      "playwright": 6.6,
       "dominateDiff": 1.714,
       "html2canvasDiff": 73.832,
       "playwrightDiff": 2.077

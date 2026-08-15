@@ -8,7 +8,7 @@
 // document is never flattened into a screenshot.
 
 import { PdfDocument } from './core/pdf.js';
-import { layout } from './dom/walker.js';
+import { layout, layoutElement } from './dom/walker.js';
 import { paint } from './render/painter.js';
 import { embedTrueTypeFont } from './core/fonts/embed.js';
 import { parseGsubLigatures } from './core/fonts/sfnt.js';
@@ -31,6 +31,8 @@ function decodeBase64Font(b64) {
 
 /** Per-URL font fetch cache (Promise) so warm conversions skip the network. */
 const _fontBytes = new Map();
+/** Decoded image bytes, reused across documents (not a cached PDF). */
+const _imageBytes = new Map();
 
 /** Font bytes from standalone embed, else HTTP fetch. */
 function fetchFontBytes(url) {
@@ -103,11 +105,16 @@ export async function htmlToPdf(input, opts = {}) {
     pageHeightPdfUnits: viewport.height * 0.75,
   });
 
-  const html = typeof input === 'string' ? input : input.outerHTML;
-  const { boxes, contentHeight, forcedBreaks } = await layout(html, {
-    ...viewport,
-    baseUrl: opts.baseUrl,
-  });
+  const live = typeof input !== 'string' && input && input.nodeType === 1;
+  const _t0 = opts.profile ? performance.now() : 0;
+  const { boxes, contentHeight, forcedBreaks } = live
+    ? layoutElement(input, viewport)
+    : await layout(typeof input === 'string' ? input : input.outerHTML, {
+      ...viewport,
+      baseUrl: opts.baseUrl,
+    });
+  const _tLayout = opts.profile ? performance.now() : 0;
+  const _mark = (k, from) => { if (opts.profile) globalThis.__dominateProfile = { ...(globalThis.__dominateProfile || {}), [k]: Number((performance.now() - from).toFixed(2)) }; };
 
   // Scan the render boxes to find which faces the document ACTUALLY needs, so we
   // only embed those (a full embed of all 11 bundled faces costs ~450 KB per PDF).
@@ -209,9 +216,13 @@ export async function htmlToPdf(input, opts = {}) {
     if (hit) return hit;
     const pending = (async () => {
       try {
-        const r = await fetch(url, { mode: 'cors' });
-        if (!r.ok) return null;
-        const u8 = new Uint8Array(await r.arrayBuffer());
+        let u8 = _imageBytes.get(url);
+        if (!u8) {
+          const r = await fetch(url, { mode: 'cors' });
+          if (!r.ok) return null;
+          u8 = new Uint8Array(await r.arrayBuffer());
+          _imageBytes.set(url, u8);
+        }
         if (u8[0] === 0xFF && u8[1] === 0xD8) return embedJpeg(doc, u8);
         if (u8[0] === 0x89 && u8[1] === 0x50) return embedPng(doc, u8);
       } catch { /* offline, CORS, or unsupported encoding — skip */ }
@@ -220,6 +231,8 @@ export async function htmlToPdf(input, opts = {}) {
     imageCache.set(url, pending);
     return pending;
   };
+  const _tFonts = opts.profile ? performance.now() : 0;
+  _mark('fontsMs', _tLayout);
   const bgUrl = (value) => {
     if (!value) return null;
     const m = /url\(["']?([^"')]+)["']?\)/.exec(value);
@@ -298,8 +311,22 @@ export async function htmlToPdf(input, opts = {}) {
       .map(b => (top === 0 ? b : shiftBoxForPage(b, top)));
     paint(doc, fontMap, page, pageBoxes);
   }
+  const _tPaint = opts.profile ? performance.now() : 0;
 
-  return doc.toBytes();
+  const bytes = doc.toBytes();
+  if (opts.profile) {
+    const _tEnd = performance.now();
+    globalThis.__dominateProfile = {
+      layoutMs: Number((_tLayout - _t0).toFixed(2)),
+      fontsMs: Number((_tFonts - _tLayout).toFixed(2)),
+      imagesMs: Number((_tPaint - _tFonts).toFixed(2)),
+      paintMs: Number((_tPaint - _tFonts).toFixed(2)),
+      toBytesMs: Number((_tEnd - _tPaint).toFixed(2)),
+      totalMs: Number((_tEnd - _t0).toFixed(2)),
+      boxes: boxes.length,
+    };
+  }
+  return bytes;
 }
 
 /** Does the box (or its decoration) touch the band [top, top+H)? */

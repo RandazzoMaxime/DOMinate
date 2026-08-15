@@ -6,7 +6,7 @@
 //   { alias, baseFont, objRef, kind: 'embeddedTrueType', font: <parsed sfnt>, ... }
 
 import { parseSfnt } from './sfnt.js';
-import { name as pdfName, PdfStream } from '../pdf.js';
+import { name as pdfName, PdfStream, raw } from '../pdf.js';
 
 const FLATE_DECODE = 'FlateDecode';
 
@@ -34,7 +34,43 @@ export async function embedTrueTypeFont(doc, fontBytes, baseFontName) {
   if (!prepared) {
     const parsed = parseSfnt(bytes);
     const compressed = await deflate(parsed.bytes);
-    prepared = { parsed, compressed };
+    const upe = parsed.unitsPerEm;
+    const scale = 1000 / upe;
+    const widthsArr = [];
+    let runStart = -1;
+    let runWidths = [];
+    for (let g = 0; g < parsed.numGlyphs; g++) {
+      const w = parsed.widths[g] * scale;
+      const wRounded = Math.round(w * 10000) / 10000;
+      if (runStart < 0) { runStart = g; runWidths = [wRounded]; }
+      else runWidths.push(wRounded);
+    }
+    if (runStart >= 0) widthsArr.push(runStart, runWidths);
+    let wPdf = '[';
+    for (let i = 0; i < widthsArr.length; i++) {
+      if (i) wPdf += ' ';
+      const item = widthsArr[i];
+      if (Array.isArray(item)) {
+        wPdf += '[';
+        for (let j = 0; j < item.length; j++) {
+          if (j) wPdf += ' ';
+          wPdf += item[j];
+        }
+        wPdf += ']';
+      } else wPdf += item;
+    }
+    wPdf += ']';
+    prepared = {
+      parsed,
+      compressed,
+      scale,
+      widthsArr: raw(wPdf),
+      dw: Math.round(parsed.widths[0] * scale) || 500,
+      toUnicode: buildToUnicodeCMap(parsed.unicodeToGid),
+      bbox: parsed.bbox.map(v => Math.round(v * scale)),
+      ascent: Math.round(parsed.ascent * scale),
+      descent: Math.round(parsed.descent * scale),
+    };
     _preparedFonts.set(cacheKey, prepared);
   }
   const { parsed, compressed } = prepared;
@@ -47,35 +83,20 @@ export async function embedTrueTypeFont(doc, fontBytes, baseFontName) {
     },
   ));
 
-  // FontDescriptor
-  const upe = parsed.unitsPerEm;
-  const scale = 1000 / upe;
   const fontDescriptor = doc._allocObject({
     Type: pdfName('FontDescriptor'),
     FontName: pdfName(baseFontName),
-    Flags: 32,  // bit 6 = Nonsymbolic; for Latin-only fonts this is the right value
-    FontBBox: parsed.bbox.map(v => Math.round(v * scale)),
+    Flags: 32,
+    FontBBox: prepared.bbox,
     ItalicAngle: 0,
-    Ascent: Math.round(parsed.ascent * scale),
-    Descent: Math.round(parsed.descent * scale),
-    CapHeight: Math.round(parsed.ascent * scale * 0.7),  // approximation
-    StemV: 80,  // approximation; not visually critical
+    Ascent: prepared.ascent,
+    Descent: prepared.descent,
+    CapHeight: Math.round(prepared.ascent * 0.7),
+    StemV: 80,
     FontFile2: fontFile,
   });
 
-  // Build a /W array. PDF allows fractional widths — keep four decimals to preserve
-  // glyph-advance precision. Inter's average glyph advance is ~600 in 1000-unit em;
-  // sub-pixel fidelity at 11 px font requires ~0.0005 unit precision (= 4 decimals).
-  const widthsArr = [];
-  let runStart = -1;
-  let runWidths = [];
-  for (let g = 0; g < parsed.numGlyphs; g++) {
-    const w = parsed.widths[g] * scale;
-    const wRounded = Math.round(w * 10000) / 10000;
-    if (runStart < 0) { runStart = g; runWidths = [wRounded]; }
-    else runWidths.push(wRounded);
-  }
-  if (runStart >= 0) widthsArr.push(runStart, runWidths);
+  const widthsArr = prepared.widthsArr;
 
   // CIDFont (descendant)
   const cidFont = doc._allocObject({
@@ -90,15 +111,13 @@ export async function embedTrueTypeFont(doc, fontBytes, baseFontName) {
     FontDescriptor: fontDescriptor,
     CIDToGIDMap: pdfName('Identity'),
     W: widthsArr,
-    DW: Math.round(parsed.widths[0] * scale) || 500,
+    DW: prepared.dw,
   });
 
-  // Build a ToUnicode CMap so text extraction works (PDF text selection / search).
-  const toUnicodeCMap = buildToUnicodeCMap(parsed.unicodeToGid);
-  const toUnicodeStream = doc._allocObject(new PdfStream(
-    new TextEncoder().encode(toUnicodeCMap),
-    {},
-  ));
+  if (!prepared.toUnicodeBytes) {
+    prepared.toUnicodeBytes = new TextEncoder().encode(prepared.toUnicode);
+  }
+  const toUnicodeStream = doc._allocObject(new PdfStream(prepared.toUnicodeBytes, {}));
 
   // Type 0 font (the public face of the font)
   const alias = 'F' + (++doc._fontAliasCounter);

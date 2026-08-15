@@ -244,20 +244,37 @@ async function main() {
     await runner.goto(`${origin}/demo/run.html`, { waitUntil: 'networkidle' });
     await runner.evaluate(() => import('/src/index.js'));
 
-    async function dominatePdf(rel, viewport) {
-      const raw = await readFile(resolve(ROOT, rel), 'utf8');
-      const dir = dirname(rel).replace(/\\/g, '/');
-      const html = withBase(raw, `${origin}/${dir}/`);
-      const base64 = await runner.evaluate(async ({ htmlString, viewport, baseUrl }) => {
+    async function dominateOnPage(page, viewport) {
+      return page.evaluate(async (viewport) => {
         const { htmlToPdf } = await import('/src/index.js');
-        const bytes = await htmlToPdf(htmlString, { viewport, baseUrl });
+        const started = performance.now();
+        const bytes = await htmlToPdf(document.documentElement, { viewport });
+        return { elapsed: performance.now() - started, byteLength: bytes.byteLength };
+      }, viewport);
+    }
+
+    async function dominatePdfOnPage(page, viewport) {
+      const base64 = await page.evaluate(async (viewport) => {
+        const { htmlToPdf } = await import('/src/index.js');
+        const bytes = await htmlToPdf(document.documentElement, { viewport });
         let binary = '';
         for (let offset = 0; offset < bytes.length; offset += 0x8000) {
           binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
         }
         return btoa(binary);
-      }, { htmlString: html, viewport, baseUrl: `${origin}/${dir}/` });
+      }, viewport);
       return Buffer.from(base64, 'base64');
+    }
+
+    async function timeDominate(page, viewport) {
+      await dominateOnPage(page, viewport);
+      const times = [];
+      let last = null;
+      for (let i = 0; i < ITERATIONS; i++) {
+        last = await dominateOnPage(page, viewport);
+        times.push(last.elapsed);
+      }
+      return { ...stats(times), last };
     }
 
     async function openFixture(rel, viewport, keepSections) {
@@ -274,8 +291,11 @@ async function main() {
           });
         }, keepSections);
       }
-      await page.addScriptTag({ url: `${origin}${H2C}` });
-      await page.addScriptTag({ url: `${origin}${JSPDF}` });
+      await page.evaluate(() => import('/src/index.js'));
+      if (!process.env.BENCH_FAST) {
+        await page.addScriptTag({ url: `${origin}${H2C}` });
+        await page.addScriptTag({ url: `${origin}${JSPDF}` });
+      }
       await page.evaluate(() => document.fonts.ready);
       await new Promise(r => setTimeout(r, 80));
       return page;
@@ -316,17 +336,21 @@ async function main() {
 
     async function measure(rel, viewport, keepSections, tag) {
       const page = await openFixture(rel, viewport, keepSections);
-      const dTime = await timeSamples(() => dominatePdf(rel, viewport));
-      const hTime = await timeSamples(() => html2canvasPdf(page, viewport));
+      const dTime = await timeDominate(page, viewport);
       const pTime = await timeSamples(() => playwrightPdf(page, viewport));
+      const hTime = process.env.BENCH_FAST
+        ? { medianMs: 0, last: null }
+        : await timeSamples(() => html2canvasPdf(page, viewport));
 
-      const dPdf = dTime.last;
-      const hPdf = hTime.last;
+      const dPdf = await dominatePdfOnPage(page, viewport);
       const pPdf = pTime.last;
+      const hPdf = hTime.last;
 
       const dDiff = await worstPageDiff(page, dPdf, viewport, `${tag}-dom`);
-      const hDiff = await worstPageDiff(page, hPdf, viewport, `${tag}-h2c`);
       const pDiff = await worstPageDiff(page, pPdf, viewport, `${tag}-pw`);
+      const hDiff = hPdf
+        ? await worstPageDiff(page, hPdf, viewport, `${tag}-h2c`)
+        : { worstPercent: 0, pageCount: 0, worstPage: 0, pages: [] };
       await page.close();
 
       return {
@@ -351,7 +375,8 @@ async function main() {
     const sow = await measure(reportRel, reportVp, 4, 'sow');
 
     const curve = [];
-    for (let pages = 1; pages <= 4; pages++) {
+    const skipCurve = Boolean(process.env.BENCH_FAST);
+    for (let pages = 1; !skipCurve && pages <= 4; pages++) {
       const raw = await readFile(resolve(ROOT, reportRel), 'utf8');
       const hidden = raw.replace(
         '</head>',
