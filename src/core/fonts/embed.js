@@ -16,12 +16,28 @@ const FLATE_DECODE = 'FlateDecode';
  * @param {string} baseFontName  — used as /BaseFont and /FontName (must be a valid PDF name)
  * @returns {Promise<{alias, baseFont, objRef, kind, font}>}
  */
-export async function embedTrueTypeFont(doc, fontBytes, baseFontName) {
-  const parsed = parseSfnt(fontBytes);
+const _preparedFonts = new Map();
 
-  // Compress the font bytes via the browser's CompressionStream API. PDF /FontFile2
-  // accepts uncompressed TTF too; compression just shrinks the output.
-  const compressed = await deflate(parsed.bytes);
+function preparedFontKey(bytes, baseFontName) {
+  const n = bytes.byteLength;
+  let h = n * 2654435761 >>> 0;
+  const step = Math.max(1, (n / 64) | 0);
+  for (let i = 0; i < n; i += step) h = (Math.imul(h, 16777619) ^ bytes[i]) >>> 0;
+  h = (Math.imul(h, 16777619) ^ bytes[n - 1]) >>> 0;
+  return `${baseFontName}:${n}:${h.toString(16)}`;
+}
+
+export async function embedTrueTypeFont(doc, fontBytes, baseFontName) {
+  const bytes = fontBytes instanceof Uint8Array ? fontBytes : new Uint8Array(fontBytes);
+  const cacheKey = preparedFontKey(bytes, baseFontName);
+  let prepared = _preparedFonts.get(cacheKey);
+  if (!prepared) {
+    const parsed = parseSfnt(bytes);
+    const compressed = await deflate(parsed.bytes);
+    prepared = { parsed, compressed };
+    _preparedFonts.set(cacheKey, prepared);
+  }
+  const { parsed, compressed } = prepared;
 
   const fontFile = doc._allocObject(new PdfStream(
     compressed,

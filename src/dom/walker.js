@@ -28,7 +28,16 @@
  * @param {{ width: number, height: number }} viewport CSS px
  * @returns {Promise<{ boxes: RenderBox[], width: number, height: number }>}
  */
-export async function layout(html, { width, height }) {
+function injectBase(html, baseUrl) {
+  if (!baseUrl) return html;
+  const href = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+  const tag = `<base href="${href}">`;
+  if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, m => m + tag);
+  if (/<html[^>]*>/i.test(html)) return html.replace(/<html[^>]*>/i, m => `${m}<head>${tag}</head>`);
+  return tag + html;
+}
+
+export async function layout(html, { width, height, baseUrl } = {}) {
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');
   // Position off-screen but keep it laid out at the real size — CSS sizing rules
@@ -47,7 +56,7 @@ export async function layout(html, { width, height }) {
   try {
     const idoc = iframe.contentDocument;
     idoc.open();
-    idoc.write(html);
+    idoc.write(injectBase(html, baseUrl));
     idoc.close();
 
     // Wait for the iframe's load event (resolves after all <script> and <link> tags have
@@ -63,35 +72,32 @@ export async function layout(html, { width, height }) {
     if (idoc.fonts && idoc.fonts.ready) {
       await Promise.race([
         idoc.fonts.ready,
-        new Promise(r => setTimeout(r, 3000)),
+        new Promise(r => setTimeout(r, 1500)),
       ]);
     }
     // Two rAFs to ensure post-font-load reflow has settled.
     await new Promise(r => requestAnimationFrame(() => r()));
     await new Promise(r => requestAnimationFrame(() => r()));
     // Async CSSOM mutators (Tailwind-CDN JIT, lazily-triggered @font-face loads)
-    // keep reflowing the document AFTER the load event — and a style injection can
-    // TRIGGER new font fetches, which reflow again on arrival. Loop until, in the
-    // same tick: fonts.ready has resolved, no font is loading, the resource-entry
-    // count is unchanged AND the layout fingerprint is unchanged for 2 consecutive
-    // ticks. Capped at 6s.
+    // keep reflowing the document AFTER the load event. Two consecutive stable
+    // fingerprints end the wait. Fast path when nothing is still loading.
     {
       const win = idoc.defaultView;
-      // The resource-timing buffer caps at 250 entries by default; saturated buffers
-      // would freeze resCount and let the settle loop pass during a late fetch.
       try { win.performance.setResourceTimingBufferSize(100000); } catch { /* optional */ }
+      const anyLoading = () => idoc.fonts ? [...idoc.fonts].some(f => f.status === 'loading') : false;
       let prevFp = '', prevRes = -1, stableTicks = 0;
-      for (let tick = 0; tick < 60 && stableTicks < 2; tick++) {
-        if (idoc.fonts && idoc.fonts.ready) {
-          await Promise.race([idoc.fonts.ready, new Promise(r => setTimeout(r, 1500))]);
+      const maxTicks = anyLoading() ? 60 : 8;
+      for (let tick = 0; tick < maxTicks && stableTicks < 2; tick++) {
+        if (idoc.fonts && idoc.fonts.status === 'loading') {
+          await Promise.race([idoc.fonts.ready, new Promise(r => setTimeout(r, 400))]);
         }
-        const loading = idoc.fonts ? [...idoc.fonts].some(f => f.status === 'loading') : false;
+        const loading = anyLoading();
         const resCount = win.performance ? win.performance.getEntriesByType('resource').length : 0;
         const fp = layoutFingerprint(idoc);
         if (!loading && fp === prevFp && resCount === prevRes) stableTicks++;
         else stableTicks = 0;
         prevFp = fp; prevRes = resCount;
-        if (stableTicks < 2) await new Promise(r => setTimeout(r, 100));
+        if (stableTicks < 2) await new Promise(r => setTimeout(r, loading ? 50 : 16));
       }
     }
 
@@ -679,46 +685,66 @@ function pushWordBoxes(node, idoc, boxes, style, el) {
   }
 
   const metrics = fontMetricsFor(idoc, style);
-  let word = null;  // { text, left, right, top, bottom }
   let lastBox = null;
-  const flush = () => {
-    if (word && word.text) {
-      const bb = {
-        kind: 'text',
-        x: word.left, y: word.top, w: word.right - word.left, h: word.bottom - word.top,
-        style, tag, el, text: word.text, metrics,
-      };
-      // Bridge text-decoration across the inter-word gap: Chromium underlines/strikes
-      // the spaces too, but we emit one box per word. decoR extends the previous
-      // word's decoration up to this word's start when both sit on the same line.
-      if (lastBox && Math.abs(lastBox.y - bb.y) < 2 && bb.x > lastBox.x) lastBox.decoR = bb.x;
-      lastBox = bb;
-      boxes.push(bb);
-    }
-    word = null;
+  const emit = (text, r) => {
+    if (!text || !r || (r.width === 0 && r.height === 0)) return;
+    const bb = {
+      kind: 'text',
+      x: r.left, y: r.top, w: r.right - r.left, h: r.bottom - r.top,
+      style, tag, el, text, metrics,
+    };
+    if (lastBox && Math.abs(lastBox.y - bb.y) < 2 && bb.x > lastBox.x) lastBox.decoR = bb.x;
+    lastBox = bb;
+    boxes.push(bb);
   };
 
-  for (let i = 0; i < raw.length; i++) {
-    const ch = raw[i];
-    if (/\s/.test(ch)) { flush(); continue; }   // any whitespace separates words
-    range.setStart(node, i);
-    range.setEnd(node, i + 1);
-    const rects = range.getClientRects();
-    if (!rects.length) { flush(); continue; }
-    const r = rects[0];
-    if (r.width === 0 && r.height === 0) { flush(); continue; }
-    // New line if the char's top differs from the current word's top.
-    if (word && Math.abs(r.top - word.top) > 2) flush();
-    if (!word) {
-      word = { text: ch, left: r.left, right: r.right, top: r.top, bottom: r.bottom };
-    } else {
-      word.text += ch;
-      word.right = Math.max(word.right, r.right);
-      word.left = Math.min(word.left, r.left);
-      word.bottom = Math.max(word.bottom, r.bottom);
+  const measureChars = (from, to) => {
+    let word = null;
+    const flush = () => {
+      if (word && word.text) emit(word.text, { left: word.left, right: word.right, top: word.top, bottom: word.bottom });
+      word = null;
+    };
+    for (let i = from; i < to; i++) {
+      const ch = raw[i];
+      if (/\s/.test(ch)) { flush(); continue; }
+      range.setStart(node, i);
+      range.setEnd(node, i + 1);
+      const rects = range.getClientRects();
+      if (!rects.length) { flush(); continue; }
+      const r = rects[0];
+      if (r.width === 0 && r.height === 0) { flush(); continue; }
+      if (word && Math.abs(r.top - word.top) > 2) flush();
+      if (!word) word = { text: ch, left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+      else {
+        word.text += ch;
+        word.right = Math.max(word.right, r.right);
+        word.left = Math.min(word.left, r.left);
+        word.bottom = Math.max(word.bottom, r.bottom);
+      }
     }
+    flush();
+  };
+
+  // Fast path: one Range per word. Wrapping words fall back to per-character.
+  const ls = style.letterSpacing;
+  const letterSpaced = ls && ls !== 'normal' && Number.parseFloat(ls) !== 0;
+  if (!letterSpaced) {
+    let i = 0;
+    while (i < raw.length) {
+      if (/\s/.test(raw[i])) { i++; continue; }
+      let j = i + 1;
+      while (j < raw.length && !/\s/.test(raw[j])) j++;
+      range.setStart(node, i);
+      range.setEnd(node, j);
+      const rects = range.getClientRects();
+      if (rects.length === 1) emit(raw.slice(i, j), rects[0]);
+      else measureChars(i, j);
+      i = j;
+    }
+    return;
   }
-  flush();
+
+  measureChars(0, raw.length);
 }
 
 /**

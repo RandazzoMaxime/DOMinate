@@ -18,35 +18,63 @@ import { embedPng } from './core/images/png.js';
 const A4_LANDSCAPE_CSS = { width: 1123, height: 794 };
 const A4_PORTRAIT_CSS  = { width: 794,  height: 1123 };
 
-// One-shot fetch of bundled Inter weights (Latin + Greek subsets). Cached.
-let _interFontPromise = null;
-async function loadInter() {
-  if (!_interFontPromise) {
-    _interFontPromise = (async () => {
-      const fetchOne = (url) => fetch(url).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null);
-      const [w400, w500, w600, w700, w400g, w500g, w600g, w700g] = await Promise.all([
-        fetchOne('/assets/fonts/Inter-400.ttf'),
-        fetchOne('/assets/fonts/Inter-500.ttf'),
-        fetchOne('/assets/fonts/Inter-600.ttf'),
-        fetchOne('/assets/fonts/Inter-700.ttf'),
-        fetchOne('/assets/fonts/Inter-400-greek.ttf'),
-        fetchOne('/assets/fonts/Inter-500-greek.ttf'),
-        fetchOne('/assets/fonts/Inter-600-greek.ttf'),
-        fetchOne('/assets/fonts/Inter-700-greek.ttf'),
-      ]);
-      const [jbMono, jbMono500, jbMono700] = await Promise.all([
-        fetchOne('/assets/fonts/JetBrainsMono-Regular.ttf'),
-        fetchOne('/assets/fonts/JetBrainsMono-500.ttf'),
-        fetchOne('/assets/fonts/JetBrainsMono-700.ttf'),
-      ]);
-    return {
-      latin: { 400: w400, 500: w500, 600: w600, 700: w700 },
-      greek: { 400: w400g, 500: w500g, 600: w600g, 700: w700g },
-      jbMono, jbMono500, jbMono700,
-    };
-    })();
+/** @type {Record<string, string>|undefined} */
+const BUNDLED_FONTS = globalThis.__DOMINATE_BUNDLED_FONTS__;
+
+function decodeBase64Font(b64) {
+  const bin = atob(b64);
+  const buf = new ArrayBuffer(bin.length);
+  const view = new Uint8Array(buf);
+  for (let i = 0; i < bin.length; i++) view[i] = bin.charCodeAt(i);
+  return buf;
+}
+
+/** Per-URL font fetch cache (Promise) so warm conversions skip the network. */
+const _fontBytes = new Map();
+
+/** Font bytes from standalone embed, else HTTP fetch. */
+function fetchFontBytes(url) {
+  const hit = _fontBytes.get(url);
+  if (hit) return hit;
+  const pending = (async () => {
+    const embedded = BUNDLED_FONTS?.[url];
+    if (embedded) return decodeBase64Font(embedded);
+    try {
+      const r = await fetch(url);
+      return r.ok ? r.arrayBuffer() : null;
+    } catch {
+      return null;
+    }
+  })();
+  _fontBytes.set(url, pending);
+  return pending;
+}
+
+/** Fetch only the faces this document actually uses. */
+async function loadInter(needWeights, needGreek, needMono) {
+  const latin = {};
+  const greek = {};
+  const jobs = [];
+  for (const w of [400, 500, 600, 700]) {
+    if (needWeights.has(w) || w === 400) {
+      jobs.push(fetchFontBytes(`/assets/fonts/Inter-${w}.ttf`).then(b => { latin[w] = b; }));
+    }
+    if (needGreek.has(w)) {
+      jobs.push(fetchFontBytes(`/assets/fonts/Inter-${w}-greek.ttf`).then(b => { greek[w] = b; }));
+    }
   }
-  return _interFontPromise;
+  let jbMono = null, jbMono500 = null, jbMono700 = null;
+  if (needMono.size) {
+    jobs.push(fetchFontBytes('/assets/fonts/JetBrainsMono-Regular.ttf').then(b => { jbMono = b; }));
+    if (needMono.has(500)) {
+      jobs.push(fetchFontBytes('/assets/fonts/JetBrainsMono-500.ttf').then(b => { jbMono500 = b; }));
+    }
+    if (needMono.has(700) || needMono.has(600)) {
+      jobs.push(fetchFontBytes('/assets/fonts/JetBrainsMono-700.ttf').then(b => { jbMono700 = b; }));
+    }
+  }
+  await Promise.all(jobs);
+  return { latin, greek, jbMono, jbMono500, jbMono700 };
 }
 
 /**
@@ -55,6 +83,7 @@ async function loadInter() {
  * @param {{width: number, height: number}} [opts.viewport]  CSS px — explicit override
  * @param {'A4'} [opts.pageSize]
  * @param {'portrait'|'landscape'} [opts.orientation]
+ * @param {string} [opts.baseUrl]  resolve relative CSS/images against this URL
  * @returns {Promise<Uint8Array>}
  */
 export async function htmlToPdf(input, opts = {}) {
@@ -75,7 +104,10 @@ export async function htmlToPdf(input, opts = {}) {
   });
 
   const html = typeof input === 'string' ? input : input.outerHTML;
-  const { boxes, contentHeight, forcedBreaks } = await layout(html, viewport);
+  const { boxes, contentHeight, forcedBreaks } = await layout(html, {
+    ...viewport,
+    baseUrl: opts.baseUrl,
+  });
 
   // Scan the render boxes to find which faces the document ACTUALLY needs, so we
   // only embed those (a full embed of all 11 bundled faces costs ~450 KB per PDF).
@@ -97,7 +129,7 @@ export async function htmlToPdf(input, opts = {}) {
   }
 
   // Embed Inter weights (Latin + Greek subsets) when bundled. Falls back to Helvetica.
-  const inters = await loadInter();
+  const inters = await loadInter(needWeights, needGreek, needMono);
   /** @type {*} */
   let fontMap;
   if (inters && inters.latin && inters.latin[400]) {
@@ -128,8 +160,8 @@ export async function htmlToPdf(input, opts = {}) {
     let man700 = null, man800 = null;
     if (needManrope) {
       const [b700, b800] = await Promise.all([
-        fetch('/assets/fonts/Manrope-700.ttf').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null),
-        fetch('/assets/fonts/Manrope-800.ttf').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null),
+        fetchFontBytes('/assets/fonts/Manrope-700.ttf'),
+        fetchFontBytes('/assets/fonts/Manrope-800.ttf'),
       ]);
       man700 = b700 ? await embedTrueTypeFont(doc, b700, 'Manrope-Bold') : null;
       man800 = b800 ? await embedTrueTypeFont(doc, b800, 'Manrope-ExtraBold') : null;
@@ -171,37 +203,44 @@ export async function htmlToPdf(input, opts = {}) {
   // Pre-fetch image boxes and embed each one. We attach the embedded XObject handle
   // directly onto the box so the (sync) painter can just `drawImage`. Also resolves
   // CSS background-image: url(...) on plain boxes.
-  const imageCache = new Map();  // url → embedded handle (or null after a failure)
-  const fetchAndEmbed = async (url) => {
-    if (imageCache.has(url)) return imageCache.get(url);
-    let handle = null;
-    try {
-      const r = await fetch(url, { mode: 'cors' });
-      if (r.ok) {
+  const imageCache = new Map();  // url → Promise<handle|null>
+  const fetchAndEmbed = (url) => {
+    const hit = imageCache.get(url);
+    if (hit) return hit;
+    const pending = (async () => {
+      try {
+        const r = await fetch(url, { mode: 'cors' });
+        if (!r.ok) return null;
         const u8 = new Uint8Array(await r.arrayBuffer());
-        if (u8[0] === 0xFF && u8[1] === 0xD8) handle = embedJpeg(doc, u8);
-        else if (u8[0] === 0x89 && u8[1] === 0x50) handle = await embedPng(doc, u8);
-      }
-    } catch { /* offline, CORS, or unsupported encoding — skip */ }
-    imageCache.set(url, handle);
-    return handle;
+        if (u8[0] === 0xFF && u8[1] === 0xD8) return embedJpeg(doc, u8);
+        if (u8[0] === 0x89 && u8[1] === 0x50) return embedPng(doc, u8);
+      } catch { /* offline, CORS, or unsupported encoding — skip */ }
+      return null;
+    })();
+    imageCache.set(url, pending);
+    return pending;
   };
-  for (const b of boxes) {
+  const bgUrl = (value) => {
+    if (!value) return null;
+    const m = /url\(["']?([^"')]+)["']?\)/.exec(value);
+    return m ? m[1] : null;
+  };
+  await Promise.all(boxes.map(async (b) => {
     if (b.kind === 'image' && b.src) {
       b.embedded = await fetchAndEmbed(b.src);
-    } else if (b.kind === 'box' && b.style.backgroundImage && b.style.backgroundImage.startsWith('url(')) {
-      const m = /^url\(["']?([^"')]+)["']?\)$/.exec(b.style.backgroundImage.trim());
-      if (m) b.bgEmbedded = await fetchAndEmbed(m[1]);
+    } else if (b.kind === 'box') {
+      const src = bgUrl(b.style.backgroundImage);
+      if (src && !src.startsWith('data:')) b.bgEmbedded = await fetchAndEmbed(src);
     }
-  }
+  }));
 
   // Icon fonts (Material Symbols): glyph names resolve through GSUB ligatures.
   // Embedded lazily — only when the page actually contains icon-font runs.
   if (boxes.some(b => b.iconFont)) {
     try {
-      const r = await fetch('/assets/fonts/MaterialSymbolsOutlined.ttf');
-      if (r.ok) {
-        const iconBytes = new Uint8Array(await r.arrayBuffer());
+      const iconBuf = await fetchFontBytes('/assets/fonts/MaterialSymbolsOutlined.ttf');
+      if (iconBuf) {
+        const iconBytes = new Uint8Array(iconBuf);
         fontMap.icons = await embedTrueTypeFont(doc, iconBytes, 'MaterialSymbolsOutlined');
         fontMap.icons.ligatures = parseGsubLigatures(iconBytes);
       }

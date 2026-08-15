@@ -38,7 +38,8 @@ const EXPECTATIONS = {
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'application/javascript; charset=utf-8',
   '.mjs': 'application/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
-  '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.svg': 'image/svg+xml',
+  '.woff': 'font/woff', '.eot': 'application/vnd.ms-fontobject',
   '.json': 'application/json', '.ttf': 'font/ttf', '.otf': 'font/otf',
   '.woff2': 'font/woff2', '.pdf': 'application/pdf',
 };

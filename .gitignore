@@ -9,3 +9,9 @@ benchmark/*.png
 .claude/
 AGENTS.md
 CLAUDE.md
+
+# Third-party HTML fixtures stay local — never publish source templates.
+example/
+
+# Pixel-diff overlays for local validation only (README publishes HTML/PDF pairs).
+docs/assets/example-*-diff.png

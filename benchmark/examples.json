@@ -1,0 +1,27 @@
+{
+  "maxDiffPct": 12,
+  "results": [
+    {
+      "name": "landing",
+      "elapsedMs": 222.2,
+      "pdfBytes": 237337,
+      "diffPercent": 1.146,
+      "diffPx": 11730,
+      "totalPx": 1024000,
+      "width": 1280,
+      "height": 800,
+      "pass": true
+    },
+    {
+      "name": "invoice",
+      "elapsedMs": 87.4,
+      "pdfBytes": 178210,
+      "diffPercent": 0.432,
+      "diffPx": 4112,
+      "totalPx": 952800,
+      "width": 794,
+      "height": 1200,
+      "pass": true
+    }
+  ]
+}
