@@ -11,6 +11,22 @@ const require = createRequire(import.meta.url);
 // pdfjs-dist legacy build is most node-friendly
 const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
 
+export async function pdfPageCount(pdfBytes) {
+  const data = Buffer.isBuffer(pdfBytes)
+    ? new Uint8Array(pdfBytes)
+    : pdfBytes instanceof Uint8Array
+      ? pdfBytes
+      : new Uint8Array(pdfBytes);
+  const loadingTask = pdfjsLib.getDocument({
+    data,
+    standardFontDataUrl: dirname(require.resolve('pdfjs-dist/package.json')) + '/standard_fonts/',
+  });
+  const pdf = await loadingTask.promise;
+  const n = pdf.numPages;
+  await pdf.destroy();
+  return n;
+}
+
 export async function rasterizeAll(pdfPath, { dpi = 96 } = {}) {
   const data = new Uint8Array(await readFile(pdfPath));
   const loadingTask = pdfjsLib.getDocument({

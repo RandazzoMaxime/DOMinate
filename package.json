@@ -42,6 +42,8 @@
     "test": "node scripts/test-validity.mjs && node scripts/test-live-text.mjs",
     "benchmark": "node scripts/benchmark.mjs",
     "compare": "node scripts/bench-compare.mjs",
+    "dataset": "node scripts/bench-dataset.mjs",
+    "dataset:fetch": "node scripts/fetch-dataset.mjs",
     "render": "node scripts/render-with-lib.mjs",
     "rasterize": "node scripts/pdf-to-png.mjs",
     "diff": "node scripts/diff.mjs",

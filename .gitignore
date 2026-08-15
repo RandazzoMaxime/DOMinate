@@ -13,6 +13,10 @@ CLAUDE.md
 # Third-party HTML fixtures stay local — never publish source templates.
 example/
 example/._sow-*.html
+example/dataset/
+
+# Local web-HTML dataset bench (no images, no source HTML on GitHub).
+benchmark/dataset.json
 
 # Pixel-diff overlays for local validation only (README publishes HTML/PDF pairs).
 docs/assets/example-*-diff.png
