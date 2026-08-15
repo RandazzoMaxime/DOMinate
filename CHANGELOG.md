@@ -3,6 +3,24 @@
 All notable changes to DOMinate are documented here. The project follows semantic
 versioning from the first public release.
 
+## [1.1.0] - 2026-08-15
+
+### Added
+
+- Live GitHub Pages converter: drop one HTML file, a batch, or a folder, convert
+  in the browser, download PDF or a zip. Nothing is uploaded.
+- Competitive bench against html2canvas+jsPDF, html2pdf.js, html-to-image,
+  jsPDF.html(), Playwright `page.pdf()` and Puppeteer `page.pdf()`.
+- Local web-HTML dataset bench (`npm run dataset`) on 13 fixtures, including
+  50+ page books. Source HTML stays gitignored and is never published.
+
+### Changed
+
+- Single-page documents skip unused pagination cuts.
+- Public showcase invoice and SOW no longer mention other products.
+
+[1.1.0]: https://github.com/RandazzoMaxime/DOMinate/releases/tag/v1.1.0
+
 ## [1.0.1] - 2026-07-10
 
 ### Changed

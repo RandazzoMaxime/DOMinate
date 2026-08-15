@@ -3,7 +3,7 @@
 ## Install from the v1 GitHub release
 
 ```bash
-npm install github:RandazzoMaxime/DOMinate#v1.0.1
+npm install github:RandazzoMaxime/DOMinate#v1.1.0
 ```
 
 DOMinate v1 loads its bundled fonts from `/assets/fonts`. Copy
