@@ -4,8 +4,11 @@
 [![CI](https://github.com/RandazzoMaxime/DOMinate/actions/workflows/ci.yml/badge.svg)](https://github.com/RandazzoMaxime/DOMinate/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache--2.0-2ea44f.svg)](LICENSE)
 [![Runtime dependencies: 0](https://img.shields.io/badge/runtime_dependencies-0-2ea44f.svg)](package.json)
+[![Live converter](https://img.shields.io/badge/live-drop%20HTML%20%E2%86%92%20PDF-111111.svg)](https://randazzomaxime.github.io/DOMinate/)
 
-**Vector-first HTML → PDF, entirely in the browser.** DOMinate turns an HTML
+**Vector-first HTML → PDF, entirely in the browser.** Drop one file or a batch
+on the [live converter](https://randazzomaxime.github.io/DOMinate/) — nothing is
+uploaded. DOMinate turns an HTML
 document into PDF bytes without a server, a headless browser at runtime, a
 third-party PDF writer, or a canvas screenshot.
 

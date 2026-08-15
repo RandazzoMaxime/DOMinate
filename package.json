@@ -41,6 +41,7 @@
     "loop": "node scripts/loop.mjs",
     "test": "node scripts/test-validity.mjs && node scripts/test-live-text.mjs",
     "benchmark": "node scripts/benchmark.mjs",
+    "pages:build": "node scripts/build-pages.mjs",
     "compare": "node scripts/bench-compare.mjs",
     "dataset": "node scripts/bench-dataset.mjs",
     "dataset:fetch": "node scripts/fetch-dataset.mjs",
@@ -51,6 +52,7 @@
   },
   "devDependencies": {
     "@napi-rs/canvas": "^0.1.65",
+    "esbuild": "^0.25.12",
     "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
     "html2pdf.js": "^0.14.0",

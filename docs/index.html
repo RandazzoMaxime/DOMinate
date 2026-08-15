@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DOMinate — HTML to PDF</title>
+  <meta name="description" content="Drop HTML files and convert them to vector PDFs in the browser. No server." />
+  <style>
+    :root {
+      color-scheme: light;
+      --ambient:
+        radial-gradient(1150px 800px at 8% -10%, rgba(255,255,255,1) 0%, transparent 60%),
+        radial-gradient(880px 700px at 100% 2%, rgba(255,255,255,.9) 0%, transparent 56%),
+        radial-gradient(1000px 880px at 86% 104%, rgba(0,0,0,.075) 0%, transparent 62%),
+        linear-gradient(155deg, #fcfcfc, #e9e9e9);
+      --ink: #0a0a0a;
+      --ink-2: #5c5c5c;
+      --ink-3: #8e8e8e;
+      --glass: rgba(255,255,255,.70);
+      --glass-2: rgba(255,255,255,.48);
+      --glass-3: rgba(255,255,255,.90);
+      --line: rgba(0,0,0,.09);
+      --line-2: rgba(0,0,0,.06);
+      --accent: #0a0a0a;
+      --accent-soft: rgba(10,10,10,.06);
+      --on-accent: #ffffff;
+      --ok: #2c7d5c;
+      --crit: #c4342a;
+      --badge: #262626;
+      --badge-ink: #fafafa;
+      --sh-s: 0 1px 2px rgba(0,0,0,.05);
+      --sh-m: 0 4px 16px -8px rgba(0,0,0,.22);
+      --page: #f0f0f0;
+      --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+      --mono: "Cascadia Mono", "Cascadia Code", ui-monospace, Consolas, monospace;
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --ambient:
+        radial-gradient(1150px 800px at 8% -10%, rgba(255,255,255,.075) 0%, transparent 60%),
+        radial-gradient(880px 700px at 100% 2%, rgba(255,255,255,.04) 0%, transparent 56%),
+        radial-gradient(1000px 880px at 86% 104%, rgba(255,255,255,.05) 0%, transparent 62%),
+        linear-gradient(155deg, #0c0c0c, #000000);
+      --ink: #f4f4f4;
+      --ink-2: #a2a2a2;
+      --ink-3: #6e6e6e;
+      --glass: rgba(255,255,255,.048);
+      --glass-2: rgba(255,255,255,.030);
+      --glass-3: rgba(255,255,255,.080);
+      --line: rgba(255,255,255,.11);
+      --line-2: rgba(255,255,255,.07);
+      --accent: #fafafa;
+      --accent-soft: rgba(255,255,255,.10);
+      --on-accent: #0a0a0a;
+      --ok: #4fbe92;
+      --crit: #f0655a;
+      --badge: #303030;
+      --badge-ink: #f4f4f4;
+      --sh-s: 0 1px 2px rgba(0,0,0,.50);
+      --sh-m: 0 4px 18px -8px rgba(0,0,0,.80);
+      --page: #000000;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 13px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    [hidden] { display: none !important; }
+    :where(button, a) { font: inherit; color: inherit; }
+    :where(button) { background: none; border: 0; cursor: pointer; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+    .shell { min-height: 100%; background: var(--ambient); }
+    .layout {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 216px minmax(0, 1fr);
+    }
+    @media (max-width: 820px) {
+      .layout { grid-template-columns: 1fr; }
+      .side { border-right: 0; border-bottom: 1px solid var(--line); }
+    }
+
+    .side {
+      display: flex; flex-direction: column; gap: 6px;
+      padding: 18px 12px 14px;
+      background: var(--glass);
+      backdrop-filter: blur(26px) saturate(150%);
+      -webkit-backdrop-filter: blur(26px) saturate(150%);
+      border-right: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 18px; }
+    .mark {
+      width: 26px; height: 26px; border-radius: 8px;
+      display: grid; place-items: center;
+      background: var(--accent); color: var(--on-accent);
+      font-weight: 750; font-size: 13px;
+    }
+    .brand b { font-size: 16px; font-weight: 650; letter-spacing: -.015em; }
+    .navlbl {
+      font-size: 9.5px; font-weight: 700; letter-spacing: .13em;
+      text-transform: uppercase; color: var(--ink-3); padding: 0 10px 7px;
+    }
+    .nav { display: flex; flex-direction: column; gap: 3px; }
+    .navtab {
+      display: flex; align-items: center; gap: 10px; width: 100%;
+      padding: 9px 10px; border-radius: 11px; color: var(--ink-2);
+      border: 1px solid transparent; text-align: left;
+    }
+    .navtab svg { flex: none; opacity: .75; }
+    .navtab:hover { background: var(--glass-2); color: var(--ink); }
+    .navtab[aria-selected="true"] {
+      background: var(--glass-3); color: var(--ink); font-weight: 600;
+      border-color: var(--line); box-shadow: var(--sh-s);
+    }
+    .navtab em {
+      font-style: normal; margin-left: auto; font-family: var(--mono);
+      font-size: 10.5px; color: var(--ink-3);
+      background: var(--glass-2); padding: 1px 6px; border-radius: 6px;
+    }
+    .side-foot { margin-top: auto; display: flex; flex-direction: column; gap: 9px; padding-top: 14px; }
+    .lanchip {
+      display: flex; align-items: center; gap: 8px; padding: 9px 10px;
+      border-radius: 11px; background: var(--glass-2); border: 1px solid var(--line-2);
+    }
+    .dot {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: none;
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent);
+    }
+    .lanchip b { display: block; font-family: var(--mono); font-size: 11px; font-weight: 600; }
+    .lanchip small { display: block; font-size: 9.5px; color: var(--ink-3); }
+    .themerow {
+      display: flex; align-items: center; gap: 10px; padding: 7px 10px;
+      border-radius: 11px; background: var(--glass-2); border: 1px solid var(--line-2);
+    }
+    .themerow .nl { flex: 1; font-size: 11.5px; color: var(--ink-2); }
+    .sw {
+      position: relative; width: 42px; height: 24px; border-radius: 999px;
+      background: var(--glass-3); border: 1px solid var(--line);
+    }
+    .sw[aria-checked="true"] { background: var(--accent); border-color: transparent; }
+    .knob {
+      position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
+      border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.30);
+      transition: transform .18s cubic-bezier(.3,.8,.4,1);
+    }
+    .sw[aria-checked="true"] .knob { transform: translateX(18px); background: var(--on-accent); }
+
+    .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+    .topbar { display: flex; align-items: center; gap: 14px; padding: 16px 20px 12px; flex-wrap: wrap; }
+    .ptitle { font-size: 19px; font-weight: 650; letter-spacing: -.015em; }
+    .topact { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .btn {
+      display: flex; align-items: center; gap: 7px; padding: 8px 13px;
+      border-radius: 11px; background: var(--glass-3); border: 1px solid var(--line);
+      color: var(--ink-2); box-shadow: var(--sh-s); white-space: nowrap;
+    }
+    .btn:hover { color: var(--accent); border-color: var(--accent); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn.pri { background: var(--accent); border-color: transparent; color: var(--on-accent); box-shadow: var(--sh-m); }
+    .btn.pri:hover { color: var(--on-accent); opacity: .86; }
+    select.btn { appearance: none; padding-right: 28px; }
+    .view { flex: 1; min-height: 0; overflow: auto; padding: 4px 20px 28px; }
+
+    .drop {
+      border: 1px dashed var(--line);
+      border-radius: 16px;
+      background: var(--glass);
+      box-shadow: var(--sh-s);
+      padding: 42px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .14s, transform .14s, box-shadow .14s;
+    }
+    .drop:hover, .drop.over {
+      transform: translateY(-2px);
+      box-shadow: var(--sh-m);
+      border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+    }
+    .drop b { display: block; font-size: 15px; margin: 8px 0 4px; }
+    .drop p { color: var(--ink-3); font-size: 12.5px; margin: 0; }
+
+    .queue { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      gap: 12px; align-items: center;
+      padding: 12px 14px; border-radius: 14px;
+      background: var(--glass); border: 1px solid var(--line); box-shadow: var(--sh-s);
+    }
+    @media (max-width: 720px) {
+      .row { grid-template-columns: 1fr auto; }
+      .row .meta, .row .st { grid-column: 1 / -1; }
+    }
+    .row .name { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .row .meta { color: var(--ink-3); font-size: 11.5px; font-family: var(--mono); }
+    .st {
+      font-family: var(--mono); font-size: 11px; font-weight: 650;
+      padding: 3px 8px; border-radius: 999px; background: var(--glass-2); color: var(--ink-2);
+    }
+    .st.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+    .st.err { color: var(--crit); background: color-mix(in srgb, var(--crit) 12%, transparent); }
+    .st.run { color: var(--ink); }
+
+    .about {
+      max-width: 56ch; color: var(--ink-2); font-size: 13px; line-height: 1.65;
+      background: var(--glass); border: 1px solid var(--line); border-radius: 16px;
+      padding: 22px 22px 18px; box-shadow: var(--sh-s);
+    }
+    .about h2 { margin: 0 0 8px; font-size: 16px; color: var(--ink); }
+    .about a { text-decoration: underline; text-underline-offset: 2px; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="layout">
+      <aside class="side">
+        <div class="brand"><span class="mark">D</span><b>DOMinate</b></div>
+        <div class="navlbl">Workspace</div>
+        <nav class="nav">
+          <button class="navtab" data-view="convert" aria-selected="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+            Convert
+            <em id="count-em">0</em>
+          </button>
+          <button class="navtab" data-view="about" aria-selected="false">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+            About
+          </button>
+        </nav>
+        <div class="side-foot">
+          <div class="lanchip">
+            <span class="dot"></span>
+            <div>
+              <b>client-side</b>
+              <small>nothing uploaded</small>
+            </div>
+          </div>
+          <div class="themerow">
+            <span class="nl">Dark</span>
+            <button class="sw" id="theme" role="switch" aria-checked="false" aria-label="Dark theme"><span class="knob"></span></button>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="ptitle" id="ptitle">Convert</div>
+          <div class="topact" id="convert-actions">
+            <select class="btn" id="page" aria-label="Page format">
+              <option value="portrait">A4 portrait</option>
+              <option value="landscape">A4 landscape</option>
+            </select>
+            <button class="btn" id="clear" disabled>Clear</button>
+            <button class="btn" id="all" disabled>Download all</button>
+            <button class="btn pri" id="run" disabled>Convert</button>
+          </div>
+        </header>
+
+        <section class="view" id="view-convert" style="display:block">
+          <div class="drop" id="drop" tabindex="0" role="button" aria-label="Drop HTML files">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 16V4"/><path d="m8 8 4-4 4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+            <b>Drop HTML here</b>
+            <p>One file, several files, or a folder. Conversion stays in this browser.</p>
+            <input id="file" type="file" accept=".html,.htm,text/html" multiple hidden />
+          </div>
+          <div class="queue" id="queue"></div>
+        </section>
+
+        <section class="view" id="view-about" hidden>
+          <div class="about">
+            <h2>DOMinate</h2>
+            <p>Vector-first HTML → PDF, entirely in the browser. The file never leaves the machine. Text stays selectable, fonts are subsetted, links stay clickable.</p>
+            <p><a href="https://github.com/RandazzoMaxime/DOMinate">Source on GitHub</a></p>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script type="module">
+    import { htmlToPdf } from './app/dominate.js';
+
+    const THEME_KEY = 'dominate-pages-theme';
+    const queue = [];
+    const $ = (id) => document.getElementById(id);
+    const drop = $('drop');
+    const fileInput = $('file');
+    const list = $('queue');
+    const runBtn = $('run');
+    const allBtn = $('all');
+    const clearBtn = $('clear');
+
+    function setTheme(dark) {
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      $('theme').setAttribute('aria-checked', dark ? 'true' : 'false');
+      localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light');
+    }
+    setTheme(localStorage.getItem(THEME_KEY) === 'dark');
+    $('theme').addEventListener('click', () => {
+      setTheme(document.documentElement.dataset.theme !== 'dark');
+    });
+
+    document.querySelectorAll('.navtab').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const view = tab.dataset.view;
+        document.querySelectorAll('.navtab').forEach((t) => t.setAttribute('aria-selected', t === tab ? 'true' : 'false'));
+        $('view-convert').hidden = view !== 'convert';
+        $('view-convert').style.display = view === 'convert' ? 'block' : 'none';
+        $('view-about').hidden = view !== 'about';
+        $('ptitle').textContent = view === 'about' ? 'About' : 'Convert';
+        $('convert-actions').hidden = view !== 'convert';
+      });
+    });
+
+    function isHtmlName(name) {
+      return /\.html?$/i.test(name);
+    }
+
+    async function collectFromEntry(entry, prefix, out) {
+      const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isFile) {
+        await new Promise((resolve, reject) => {
+          entry.file((file) => { out.push({ path, file }); resolve(); }, reject);
+        });
+        return;
+      }
+      if (entry.isDirectory) {
+        const reader = entry.createReader();
+        const batch = () => new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+        let entries;
+        while ((entries = await batch()).length) {
+          for (const child of entries) await collectFromEntry(child, path, out);
+        }
+      }
+    }
+
+    async function ingest(fileList, items) {
+      const bag = [];
+      if (items && items.length) {
+        const entries = [];
+        for (const item of items) {
+          const entry = item.webkitGetAsEntry && item.webkitGetAsEntry();
+          if (entry) entries.push(entry);
+        }
+        if (entries.length) {
+          for (const entry of entries) await collectFromEntry(entry, '', bag);
+        }
+      }
+      if (!bag.length && fileList) {
+        for (const file of fileList) {
+          bag.push({ path: file.webkitRelativePath || file.name, file });
+        }
+      }
+      const htmls = bag.filter((x) => isHtmlName(x.path));
+      const assets = new Map(bag.map((x) => [x.path.replace(/\\/g, '/'), x.file]));
+      for (const item of htmls) {
+        const text = await item.file.text();
+        queue.push({
+          id: crypto.randomUUID(),
+          name: item.path.split('/').pop(),
+          path: item.path,
+          html: rewriteRelative(text, item.path, assets),
+          bytes: item.file.size,
+          status: 'ready',
+          ms: null,
+          pdf: null,
+          error: null,
+        });
+      }
+      render();
+    }
+
+    function rewriteRelative(html, htmlPath, assets) {
+      const dir = htmlPath.includes('/') ? htmlPath.slice(0, htmlPath.lastIndexOf('/') + 1) : '';
+      const blobs = new Map();
+      const urlFor = (rel) => {
+        const clean = rel.split('#')[0].split('?')[0];
+        if (!clean || /^(https?:|data:|blob:|\/\/|#|mailto:|javascript:)/i.test(clean)) return null;
+        const resolved = new URL(clean, `https://local/${dir}`).pathname.slice(1);
+        const file = assets.get(resolved);
+        if (!file) return null;
+        if (!blobs.has(resolved)) blobs.set(resolved, URL.createObjectURL(file));
+        return blobs.get(resolved);
+      };
+      return html.replace(/(src|href)=["']([^"']+)["']/gi, (all, attr, val) => {
+        const next = urlFor(val);
+        return next ? `${attr}="${next}"` : all;
+      }).replace(/url\((['"]?)([^'")]+)\1\)/gi, (all, q, val) => {
+        const next = urlFor(val);
+        return next ? `url(${q}${next}${q})` : all;
+      });
+    }
+
+    function fmtKb(n) { return `${(n / 1024).toFixed(1)} KiB`; }
+
+    function render() {
+      $('count-em').textContent = String(queue.length);
+      runBtn.disabled = !queue.some((j) => j.status === 'ready' || j.status === 'err');
+      allBtn.disabled = !queue.some((j) => j.pdf);
+      clearBtn.disabled = !queue.length;
+      list.innerHTML = queue.map((j) => {
+        const st = j.status === 'ok' ? 'ok' : j.status === 'err' ? 'err' : j.status === 'run' ? 'run' : '';
+        const label = j.status === 'ok' ? `${j.ms.toFixed(0)} ms` : j.status === 'err' ? 'failed' : j.status === 'run' ? 'converting' : 'queued';
+        const dl = j.pdf
+          ? `<button class="btn" data-dl="${j.id}">PDF</button>`
+          : `<span class="meta">${fmtKb(j.bytes)}</span>`;
+        return `<article class="row">
+          <div class="name" title="${j.path}">${j.name}</div>
+          <div class="meta">${j.pdf ? fmtKb(j.pdf.byteLength) : fmtKb(j.bytes)}</div>
+          <span class="st ${st}">${label}</span>
+          ${dl}
+        </article>`;
+      }).join('');
+      list.querySelectorAll('[data-dl]').forEach((btn) => {
+        btn.addEventListener('click', () => downloadOne(btn.dataset.dl));
+      });
+    }
+
+    function downloadOne(id) {
+      const job = queue.find((j) => j.id === id);
+      if (!job?.pdf) return;
+      const url = URL.createObjectURL(new Blob([job.pdf], { type: 'application/pdf' }));
+      Object.assign(document.createElement('a'), {
+        href: url,
+        download: job.name.replace(/\.html?$/i, '.pdf'),
+      }).click();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+
+    function crc32(u8) {
+      let c = ~0;
+      for (let i = 0; i < u8.length; i++) {
+        c ^= u8[i];
+        for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
+      }
+      return ~c >>> 0;
+    }
+
+    function zipStore(files) {
+      const enc = new TextEncoder();
+      const u16 = (n) => [n & 255, (n >> 8) & 255];
+      const u32 = (n) => [n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255];
+      const parts = [];
+      const centrals = [];
+      let offset = 0;
+      for (const f of files) {
+        const name = enc.encode(f.name);
+        const data = f.data;
+        const crc = crc32(data);
+        const head = Uint8Array.from([
+          0x50, 0x4b, 0x03, 0x04, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          ...u32(crc), ...u32(data.length), ...u32(data.length),
+          ...u16(name.length), 0, 0,
+        ]);
+        parts.push(head, name, data);
+        const central = Uint8Array.from([
+          0x50, 0x4b, 0x01, 0x02, 20, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          ...u32(crc), ...u32(data.length), ...u32(data.length),
+          ...u16(name.length), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          ...u32(offset),
+        ]);
+        centrals.push(central, name);
+        offset += head.length + name.length + data.length;
+      }
+      const centerSize = centrals.reduce((s, x) => s + x.length, 0);
+      const end = Uint8Array.from([
+        0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0,
+        ...u16(files.length), ...u16(files.length),
+        ...u32(centerSize), ...u32(offset), 0, 0,
+      ]);
+      const out = new Uint8Array(offset + centerSize + end.length);
+      let p = 0;
+      for (const part of [...parts, ...centrals, end]) {
+        out.set(part, p);
+        p += part.length;
+      }
+      return out;
+    }
+
+    async function convertAll() {
+      const page = $('page').value;
+      runBtn.disabled = true;
+      for (const job of queue) {
+        if (job.pdf && job.status === 'ok') continue;
+        job.status = 'run';
+        render();
+        try {
+          const t0 = performance.now();
+          job.pdf = await htmlToPdf(job.html, { pageSize: 'A4', orientation: page });
+          job.ms = performance.now() - t0;
+          job.status = 'ok';
+        } catch (error) {
+          job.status = 'err';
+          job.error = error.message || String(error);
+        }
+        render();
+      }
+    }
+
+    drop.addEventListener('click', () => fileInput.click());
+    drop.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
+    fileInput.addEventListener('change', async () => {
+      await ingest(fileInput.files, null);
+      fileInput.value = '';
+    });
+    ['dragenter', 'dragover'].forEach((type) => {
+      drop.addEventListener(type, (e) => { e.preventDefault(); drop.classList.add('over'); });
+    });
+    drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    drop.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      drop.classList.remove('over');
+      await ingest(e.dataTransfer.files, e.dataTransfer.items);
+    });
+
+    runBtn.addEventListener('click', convertAll);
+    clearBtn.addEventListener('click', () => { queue.length = 0; render(); });
+    allBtn.addEventListener('click', () => {
+      const done = queue.filter((j) => j.pdf);
+      if (done.length === 1) return downloadOne(done[0].id);
+      const zip = zipStore(done.map((j) => ({
+        name: j.name.replace(/\.html?$/i, '.pdf'),
+        data: j.pdf,
+      })));
+      const url = URL.createObjectURL(new Blob([zip], { type: 'application/zip' }));
+      Object.assign(document.createElement('a'), { href: url, download: 'dominate-pdfs.zip' }).click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    });
+  </script>
+</body>
+</html>
