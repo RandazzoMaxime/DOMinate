@@ -1,0 +1,53 @@
+{
+  "generatedAt": "2026-08-15T17:32:46.970Z",
+  "iterations": 5,
+  "notes": {
+    "dominate": "Vector PDF, selectable text, in-browser htmlToPdf",
+    "html2canvas": "Raster screenshot sliced into jsPDF pages (no selectable text)",
+    "playwright": "Headless Chromium page.pdf — not a drop-in browser library"
+  },
+  "bar": [
+    {
+      "name": "Invoice (1 page)",
+      "engines": {
+        "dominate": 16.3,
+        "html2canvas": 82.1,
+        "playwright": 4.6
+      }
+    },
+    {
+      "name": "SOW (4 pages)",
+      "engines": {
+        "dominate": 32.2,
+        "html2canvas": 122.4,
+        "playwright": 6.6
+      }
+    }
+  ],
+  "curve": [
+    {
+      "pages": 1,
+      "dominate": 16.6,
+      "html2canvas": 77.6,
+      "playwright": 6.1
+    },
+    {
+      "pages": 2,
+      "dominate": 31.3,
+      "html2canvas": 93.7,
+      "playwright": 7
+    },
+    {
+      "pages": 3,
+      "dominate": 32.2,
+      "html2canvas": 109.7,
+      "playwright": 7.1
+    },
+    {
+      "pages": 4,
+      "dominate": 36.4,
+      "html2canvas": 121.9,
+      "playwright": 6.6
+    }
+  ]
+}

@@ -1,19 +1,17 @@
 #!/usr/bin/env node
-// Convert the two local DOMinate-themed examples and validate visual parity.
+// Convert local DOMinate-themed examples and validate visual parity.
 // HTML fixtures stay in example/ (gitignored). Published artifacts are PNGs.
 //
-// For each page:
-//   1. screenshot the live HTML (ground truth)
-//   2. htmlToPdf → PDF
-//   3. rasterize page 1 at 96 DPI
-//   4. pixelmatch HTML vs PDF (same protocol as scripts/loop.mjs)
+// Multi-page documents: rasterize every PDF page and pixel-diff it against
+// the matching HTML band (same protocol as scripts/loop.mjs).
 
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
 import { mkdir, readFile, stat, writeFile, copyFile } from 'node:fs/promises';
 import { dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { rasterize } from './pdf-to-png.mjs';
+import { PNG } from 'pngjs';
+import { rasterize, rasterizeAll } from './pdf-to-png.mjs';
 import { diffPngs } from './diff.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -41,14 +39,15 @@ const MIME = {
 
 const EXAMPLES = [
   {
-    name: 'landing',
-    rel: 'example/templatemo_550_diagoona/index.html',
-    viewport: { width: 1280, height: 800 },
-  },
-  {
     name: 'invoice',
     rel: 'example/Ivonne - Template/hotel-booking-invoice.html',
     viewport: { width: 794, height: 1200 },
+  },
+  {
+    name: 'report',
+    rel: 'example/dominate-sow.html',
+    viewport: { width: 794, height: 1123 },
+    multipage: true,
   },
 ];
 
@@ -82,6 +81,25 @@ async function startServer() {
   return { server, port: server.address().port };
 }
 
+function stitchVertical(pngBuffers) {
+  const decoded = pngBuffers.map(buf => PNG.sync.read(buf));
+  const width = Math.max(...decoded.map(p => p.width));
+  const gap = 16;
+  const height = decoded.reduce((s, p) => s + p.height, 0) + gap * (decoded.length - 1);
+  const out = new PNG({ width, height });
+  out.data.fill(230);
+  let y = 0;
+  for (const p of decoded) {
+    for (let row = 0; row < p.height; row++) {
+      const src = row * p.width * 4;
+      const dst = ((y + row) * width) * 4;
+      p.data.copy(out.data, dst, src, src + p.width * 4);
+    }
+    y += p.height + gap;
+  }
+  return PNG.sync.write(out);
+}
+
 async function main() {
   await mkdir(ASSETS, { recursive: true });
   await mkdir(OUT, { recursive: true });
@@ -113,9 +131,9 @@ async function main() {
       await shot.goto(pageUrl, { waitUntil: 'networkidle' });
       await shot.evaluate(() => document.fonts.ready);
       await new Promise(r => setTimeout(r, 150));
+
       const htmlPng = resolve(ASSETS, `example-${ex.name}-html.png`);
       await shot.screenshot({ path: htmlPng, fullPage: false });
-      await shot.close();
 
       const raw = await readFile(htmlPath, 'utf8');
       const dir = dirname(ex.rel).replace(/\\/g, '/');
@@ -137,29 +155,75 @@ async function main() {
       const pdfPath = resolve(OUT, `example-${ex.name}.pdf`);
       await writeFile(pdfPath, pdfBytes);
 
+      const all = await rasterizeAll(pdfPath, { dpi: 96 });
       const pdfPng = resolve(ASSETS, `example-${ex.name}-pdf.png`);
-      await rasterize(pdfPath, pdfPng, { dpi: 96 });
+      await writeFile(pdfPng, all.pages[0].png);
 
-      const diffPath = resolve(OUT, `example-${ex.name}.diff.png`);
-      const diff = await diffPngs(htmlPng, pdfPng, diffPath);
-      await copyFile(diffPath, resolve(ASSETS, `example-${ex.name}-diff.png`));
+      const pageDiffs = [];
+      if (ex.multipage && all.pages.length > 1) {
+        const pagePngs = [];
+        for (const page of all.pages) {
+          const pagePdfPath = resolve(ASSETS, `example-${ex.name}-pdf-${page.index}.png`);
+          await writeFile(pagePdfPath, page.png);
+          pagePngs.push(page.png);
 
+          const y = (page.index - 1) * ex.viewport.height;
+          const htmlBand = resolve(OUT, `example-${ex.name}-html-p${page.index}.png`);
+          await shot.screenshot({
+            path: htmlBand,
+            fullPage: true,
+            clip: {
+              x: 0,
+              y,
+              width: ex.viewport.width,
+              height: ex.viewport.height,
+            },
+          });
+          const diffPath = resolve(OUT, `example-${ex.name}-p${page.index}.diff.png`);
+          const diff = await diffPngs(htmlBand, pagePdfPath, diffPath);
+          pageDiffs.push({
+            page: page.index,
+            diffPercent: Number(diff.percent.toFixed(3)),
+            diffPx: diff.diffPx,
+            totalPx: diff.totalPx,
+            pass: diff.percent < MAX_DIFF_PCT,
+          });
+          console.log(
+            `${ex.name.padEnd(8)}  p${page.index}  diff ${diff.percent.toFixed(3).padStart(7)}%  `
+            + `${diff.percent < MAX_DIFF_PCT ? 'PASS' : 'FAIL'}`,
+          );
+        }
+        await writeFile(resolve(ASSETS, `example-${ex.name}-pages.png`), stitchVertical(pagePngs));
+      } else {
+        await rasterize(pdfPath, pdfPng, { dpi: 96 });
+        const diffPath = resolve(OUT, `example-${ex.name}.diff.png`);
+        const diff = await diffPngs(htmlPng, pdfPng, diffPath);
+        await copyFile(diffPath, resolve(ASSETS, `example-${ex.name}-diff.png`));
+        pageDiffs.push({
+          page: 1,
+          diffPercent: Number(diff.percent.toFixed(3)),
+          diffPx: diff.diffPx,
+          totalPx: diff.totalPx,
+          pass: diff.percent < MAX_DIFF_PCT,
+        });
+      }
+
+      await shot.close();
+
+      const worst = pageDiffs.reduce((a, b) => (b.diffPercent > a.diffPercent ? b : a));
       const row = {
         name: ex.name,
         elapsedMs: Number(generated.elapsed.toFixed(1)),
         pdfBytes: pdfBytes.byteLength,
-        diffPercent: Number(diff.percent.toFixed(3)),
-        diffPx: diff.diffPx,
-        totalPx: diff.totalPx,
-        width: diff.width,
-        height: diff.height,
-        pass: diff.percent < MAX_DIFF_PCT,
+        pageCount: all.pageCount,
+        diffPercent: worst.diffPercent,
+        pages: pageDiffs,
+        pass: pageDiffs.every(p => p.pass),
       };
       results.push(row);
       console.log(
         `${ex.name.padEnd(8)}  html→pdf ${row.elapsedMs.toFixed(1).padStart(7)} ms  `
-        + `diff ${row.diffPercent.toFixed(3).padStart(7)}% `
-        + `(${row.diffPx}/${row.totalPx})  ${row.pass ? 'PASS' : 'FAIL'}`,
+        + `${row.pageCount}p  worst-diff ${row.diffPercent.toFixed(3)}%  ${row.pass ? 'PASS' : 'FAIL'}`,
       );
     }
   } finally {

@@ -2,25 +2,58 @@
   "maxDiffPct": 12,
   "results": [
     {
-      "name": "landing",
-      "elapsedMs": 222.2,
-      "pdfBytes": 237337,
-      "diffPercent": 1.146,
-      "diffPx": 11730,
-      "totalPx": 1024000,
-      "width": 1280,
-      "height": 800,
+      "name": "invoice",
+      "elapsedMs": 51.4,
+      "pdfBytes": 178210,
+      "pageCount": 1,
+      "diffPercent": 0.432,
+      "pages": [
+        {
+          "page": 1,
+          "diffPercent": 0.432,
+          "diffPx": 4112,
+          "totalPx": 952800,
+          "pass": true
+        }
+      ],
       "pass": true
     },
     {
-      "name": "invoice",
-      "elapsedMs": 87.4,
-      "pdfBytes": 178210,
-      "diffPercent": 0.432,
-      "diffPx": 4112,
-      "totalPx": 952800,
-      "width": 794,
-      "height": 1200,
+      "name": "report",
+      "elapsedMs": 67.2,
+      "pdfBytes": 402025,
+      "pageCount": 4,
+      "diffPercent": 1.714,
+      "pages": [
+        {
+          "page": 1,
+          "diffPercent": 0.802,
+          "diffPx": 7148,
+          "totalPx": 891662,
+          "pass": true
+        },
+        {
+          "page": 2,
+          "diffPercent": 1.714,
+          "diffPx": 15285,
+          "totalPx": 891662,
+          "pass": true
+        },
+        {
+          "page": 3,
+          "diffPercent": 0.807,
+          "diffPx": 7198,
+          "totalPx": 891662,
+          "pass": true
+        },
+        {
+          "page": 4,
+          "diffPercent": 0.548,
+          "diffPx": 4883,
+          "totalPx": 891662,
+          "pass": true
+        }
+      ],
       "pass": true
     }
   ]

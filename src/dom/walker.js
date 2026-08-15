@@ -37,11 +37,17 @@ function injectBase(html, baseUrl) {
   return tag + html;
 }
 
-export async function layout(html, { width, height, baseUrl } = {}) {
+/** Reused off-screen iframe — creating one per call dominates warm convert time. */
+let _layoutFrame = null;
+
+function layoutFrame(width, height) {
+  if (_layoutFrame && _layoutFrame.contentDocument) {
+    _layoutFrame.style.width = width + 'px';
+    _layoutFrame.style.height = height + 'px';
+    return _layoutFrame;
+  }
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');
-  // Position off-screen but keep it laid out at the real size — CSS sizing rules
-  // depend on the *iframe's* viewport, so we set width/height precisely.
   iframe.style.cssText = `
     position: fixed;
     left: -10000px;
@@ -52,6 +58,12 @@ export async function layout(html, { width, height, baseUrl } = {}) {
     visibility: hidden;
   `;
   document.body.appendChild(iframe);
+  _layoutFrame = iframe;
+  return iframe;
+}
+
+export async function layout(html, { width, height, baseUrl } = {}) {
+  const iframe = layoutFrame(width, height);
 
   try {
     const idoc = iframe.contentDocument;
@@ -75,29 +87,29 @@ export async function layout(html, { width, height, baseUrl } = {}) {
         new Promise(r => setTimeout(r, 1500)),
       ]);
     }
-    // Two rAFs to ensure post-font-load reflow has settled.
+    // One rAF after fonts.ready. The 6s settle loop only runs when a face is
+    // still loading or a script (Tailwind CDN) may still mutate the CSSOM.
     await new Promise(r => requestAnimationFrame(() => r()));
-    await new Promise(r => requestAnimationFrame(() => r()));
-    // Async CSSOM mutators (Tailwind-CDN JIT, lazily-triggered @font-face loads)
-    // keep reflowing the document AFTER the load event. Two consecutive stable
-    // fingerprints end the wait. Fast path when nothing is still loading.
     {
       const win = idoc.defaultView;
-      try { win.performance.setResourceTimingBufferSize(100000); } catch { /* optional */ }
       const anyLoading = () => idoc.fonts ? [...idoc.fonts].some(f => f.status === 'loading') : false;
-      let prevFp = '', prevRes = -1, stableTicks = 0;
-      const maxTicks = anyLoading() ? 60 : 8;
-      for (let tick = 0; tick < maxTicks && stableTicks < 2; tick++) {
-        if (idoc.fonts && idoc.fonts.status === 'loading') {
-          await Promise.race([idoc.fonts.ready, new Promise(r => setTimeout(r, 400))]);
+      const scripts = idoc.scripts ? idoc.scripts.length : 0;
+      if (anyLoading() || scripts > 0) {
+        try { win.performance.setResourceTimingBufferSize(100000); } catch { /* optional */ }
+        let prevFp = '', prevRes = -1, stableTicks = 0;
+        const maxTicks = anyLoading() ? 60 : 8;
+        for (let tick = 0; tick < maxTicks && stableTicks < 2; tick++) {
+          if (idoc.fonts && idoc.fonts.status === 'loading') {
+            await Promise.race([idoc.fonts.ready, new Promise(r => setTimeout(r, 400))]);
+          }
+          const loading = anyLoading();
+          const resCount = win.performance ? win.performance.getEntriesByType('resource').length : 0;
+          const fp = layoutFingerprint(idoc);
+          if (!loading && fp === prevFp && resCount === prevRes) stableTicks++;
+          else stableTicks = 0;
+          prevFp = fp; prevRes = resCount;
+          if (stableTicks < 2) await new Promise(r => setTimeout(r, loading ? 50 : 16));
         }
-        const loading = anyLoading();
-        const resCount = win.performance ? win.performance.getEntriesByType('resource').length : 0;
-        const fp = layoutFingerprint(idoc);
-        if (!loading && fp === prevFp && resCount === prevRes) stableTicks++;
-        else stableTicks = 0;
-        prevFp = fp; prevRes = resCount;
-        if (stableTicks < 2) await new Promise(r => setTimeout(r, loading ? 50 : 16));
       }
     }
 
@@ -113,8 +125,12 @@ export async function layout(html, { width, height, baseUrl } = {}) {
     const forcedBreaks = collectForcedBreaks(idoc).filter(y => y > 0.5 && y < contentHeight - 0.5);
 
     return { boxes, width, height, contentHeight, forcedBreaks };
-  } finally {
-    iframe.remove();
+  } catch (err) {
+    if (_layoutFrame) {
+      try { _layoutFrame.remove(); } catch { /* already gone */ }
+      _layoutFrame = null;
+    }
+    throw err;
   }
 }
 

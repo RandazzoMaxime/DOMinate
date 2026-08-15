@@ -11,28 +11,36 @@ const require = createRequire(import.meta.url);
 // pdfjs-dist legacy build is most node-friendly
 const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
 
-export async function rasterize(pdfPath, pngPath, { dpi = 96 } = {}) {
+export async function rasterizeAll(pdfPath, { dpi = 96 } = {}) {
   const data = new Uint8Array(await readFile(pdfPath));
   const loadingTask = pdfjsLib.getDocument({
     data,
     standardFontDataUrl: dirname(require.resolve('pdfjs-dist/package.json')) + '/standard_fonts/',
   });
   const pdf = await loadingTask.promise;
-  const page = await pdf.getPage(1);
+  const scale = dpi / 72;
+  const pages = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const viewport = page.getViewport({ scale });
+    const canvas = new Canvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
+    const ctx = canvas.getContext('2d');
+    await page.render({ canvasContext: ctx, viewport, canvasFactory: nodeCanvasFactory(Canvas) }).promise;
+    pages.push({
+      index: i,
+      width: canvas.width,
+      height: canvas.height,
+      png: canvas.toBuffer('image/png'),
+    });
+  }
+  return { pageCount: pdf.numPages, pages };
+}
 
-  // NOTE: 2x supersampling + high-quality downsample was explored twice (against
-  // LCD refs in May, against grayscale refs in June) and regressed both times —
-  // pdfjs's direct 1x AA is closer to Skia's glyph rasterization than a box filter.
-  const scale = dpi / 72; // pdfjs default is 72 DPI
-  const viewport = page.getViewport({ scale });
-  const canvas = new Canvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
-  const ctx = canvas.getContext('2d');
-
-  await page.render({ canvasContext: ctx, viewport, canvasFactory: nodeCanvasFactory(Canvas) }).promise;
-  const buf = canvas.toBuffer('image/png');
-  await writeFile(pngPath, buf);
-
-  return { width: canvas.width, height: canvas.height };
+export async function rasterize(pdfPath, pngPath, { dpi = 96 } = {}) {
+  const { pages } = await rasterizeAll(pdfPath, { dpi });
+  const page = pages[0];
+  await writeFile(pngPath, page.png);
+  return { width: page.width, height: page.height, pageCount: pages.length };
 }
 
 function nodeCanvasFactory(CanvasCtor) {
