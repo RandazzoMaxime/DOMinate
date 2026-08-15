@@ -14,6 +14,7 @@ import { embedTrueTypeFont } from './core/fonts/embed.js';
 import { parseGsubLigatures } from './core/fonts/sfnt.js';
 import { embedJpeg } from './core/images/jpeg.js';
 import { embedPng } from './core/images/png.js';
+import { parseColor } from './dom/utils.js';
 
 const A4_LANDSCAPE_CSS = { width: 1123, height: 794 };
 const A4_PORTRAIT_CSS  = { width: 794,  height: 1123 };
@@ -115,7 +116,7 @@ export async function htmlToPdf(input, opts = {}) {
       ...viewport,
       baseUrl: opts.baseUrl,
     });
-  const { boxes, contentHeight, forcedBreaks } = laid;
+  const { boxes, contentHeight, forcedBreaks, pageBackground } = laid;
   const _tLayout = opts.profile ? performance.now() : 0;
 
   // Scan the render boxes to find which faces the document ACTUALLY needs, so we
@@ -306,21 +307,37 @@ export async function htmlToPdf(input, opts = {}) {
     }
     cuts.push(cut);
   }
+  const canvasColor = pageBackground || pageCanvasColor(boxes);
   for (let k = 0; k < cuts.length; k++) {
     const page = doc.addPage();
     const top = cuts[k];
     const span = (k + 1 < cuts.length ? cuts[k + 1] : contentHeight) - top;
-    // Clip the page to its band so content pushed to the next page never bleeds
-    // into this one's bottom whitespace (PDF units, y-up).
-    if (span < pageH - 0.5) {
-      page._push(`0 ${(pageH - span) * 0.75} ${viewport.width * 0.75} ${span * 0.75} re W n\n`);
+    // html/body canvas color is a page-level fill (CSS print), not a box that
+    // stops at the last line — otherwise later pages (and the leftover band
+    // under a short last page) flash white.
+    if (canvasColor) {
+      page.setFillRgb(canvasColor.r, canvasColor.g, canvasColor.b);
+      page.fillRect(0, 0, viewport.width * 0.75, pageH * 0.75);
     }
+    // Clip the content band so a straddling box cannot bleed into the
+    // leftover (and so the leftover stays the canvas color). Restore
+    // afterwards and re-stamp the leftover strip — some rasterizers
+    // treat W as if it masked earlier fills.
+    const clipH = Math.min(span, pageH);
+    const leftover = (pageH - clipH) * 0.75;
+    page.saveState();
+    page._push(`0 ${leftover} ${viewport.width * 0.75} ${clipH * 0.75} re W n\n`);
     const pageBoxes = fitsOnePage
       ? boxes
       : boxes
         .filter(b => boxIntersectsBand(b, top, span))
         .map(b => (top === 0 ? b : shiftBoxForPage(b, top)));
     paint(doc, fontMap, page, pageBoxes);
+    page.restoreState();
+    if (canvasColor && leftover > 0.4) {
+      page.setFillRgb(canvasColor.r, canvasColor.g, canvasColor.b);
+      page.fillRect(0, 0, viewport.width * 0.75, leftover);
+    }
   }
   const _tPaint = opts.profile ? performance.now() : 0;
 
@@ -343,6 +360,24 @@ export async function htmlToPdf(input, opts = {}) {
     };
   }
   return bytes;
+}
+
+/** Opaque html/body background — this is the CSS canvas, painted on every page. */
+function pageCanvasColor(boxes) {
+  let html = null;
+  let body = null;
+  for (const b of boxes) {
+    if (b.kind !== 'box') continue;
+    if (b.tag === 'html') html = b;
+    else if (b.tag === 'body') body = b;
+  }
+  const pick = (b) => {
+    if (!b?.style) return null;
+    const c = parseColor(b.style.backgroundColor);
+    if (!c || c.a === 0) return null;
+    return c;
+  };
+  return pick(body) || pick(html);
 }
 
 /** Does the box (or its decoration) touch the band [top, top+H)? */

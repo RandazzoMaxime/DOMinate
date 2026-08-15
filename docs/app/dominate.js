@@ -493,6 +493,11 @@ var Page = class {
     this._push(`${num(tw)} Tw
 `);
   }
+  /** Horizontal scaling as a percentage (100 = no stretch). PDF Tz. */
+  setHorizontalScale(pct) {
+    this._push(`${num(pct)} Tz
+`);
+  }
   /** Show a string. The string is escaped as a PDF literal string. */
   showText(s) {
     this._push(`(${escapeLiteralString(s)}) Tj
@@ -1177,6 +1182,7 @@ function layoutFrame(width, height) {
   if (_layoutFrame && _layoutFrame.contentDocument) {
     _layoutFrame.style.width = width + "px";
     _layoutFrame.style.height = height + "px";
+    _layoutFrame.style.colorScheme = "light";
     return _layoutFrame;
   }
   const iframe = document.createElement("iframe");
@@ -1189,6 +1195,7 @@ function layoutFrame(width, height) {
     height: ${height}px;
     border: 0;
     visibility: hidden;
+    color-scheme: light;
   `;
   document.body.appendChild(iframe);
   _layoutFrame = iframe;
@@ -1258,12 +1265,14 @@ async function layout(html, { width, height, baseUrl } = {}) {
     const contentHeight = Math.max(height, idoc.documentElement ? idoc.documentElement.scrollHeight : height);
     const forcedBreaks = collectForcedBreaks(idoc).filter((y) => y > 0.5 && y < contentHeight - 0.5);
     const tWalk = performance.now();
+    const pageBackground = computedPageBackground(idoc);
     return {
       boxes,
       width,
       height,
       contentHeight,
       forcedBreaks,
+      pageBackground,
       _profile: {
         writeMs: Number((tWrite - t0).toFixed(2)),
         loadMs: Number((tLoad - tWrite).toFixed(2)),
@@ -1299,7 +1308,17 @@ function layoutElement(root, { width, height } = {}) {
   const h = height || (idoc.defaultView ? idoc.defaultView.innerHeight : 0);
   const contentHeight = Math.max(h, idoc.documentElement ? idoc.documentElement.scrollHeight : h);
   const forcedBreaks = collectForcedBreaks(idoc).filter((y) => y > 0.5 && y < contentHeight - 0.5);
-  return { boxes, width: w, height: h, contentHeight, forcedBreaks };
+  return { boxes, width: w, height: h, contentHeight, forcedBreaks, pageBackground: computedPageBackground(idoc) };
+}
+function computedPageBackground(idoc) {
+  const win = idoc.defaultView;
+  if (!win) return null;
+  for (const el of [idoc.body, idoc.documentElement]) {
+    if (!el) continue;
+    const c = parseColor(win.getComputedStyle(el).backgroundColor);
+    if (c && c.a !== 0) return c;
+  }
+  return null;
 }
 function collectForcedBreaks(idoc) {
   const ys = /* @__PURE__ */ new Set();
@@ -3262,6 +3281,23 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
     } else {
       page.setTextPos(atX, atY);
     }
+    if (b.w > 0.5 && fontHandle.kind === "embeddedTrueType") {
+      const sizePdf = fontSizeCss * CSS_TO_PDF;
+      let adv = 0;
+      let nChars = 0;
+      for (const run of runs) {
+        if (run.font.kind === "embeddedTrueType") adv += measureText(run.font, run.text, sizePdf);
+        nChars += [...run.text].length;
+      }
+      if (letterSpacingCss && nChars > 1) adv += letterSpacingCss * CSS_TO_PDF * (nChars - 1);
+      const target = b.w * CSS_TO_PDF;
+      if (adv > 0.5 && Math.abs(target - adv) > 0.6) {
+        const ratio = target / adv;
+        if (ratio > 0.55 && ratio < 1.7 && Math.abs(ratio - 1) > 0.025) {
+          page.setHorizontalScale(ratio * 100);
+        }
+      }
+    }
     for (const run of runs) {
       page.setFont(run.font, fontSizeCss * CSS_TO_PDF);
       if (run.font.kind === "embeddedTrueType") {
@@ -4150,7 +4186,7 @@ async function htmlToPdf(input, opts = {}) {
     ...viewport,
     baseUrl: opts.baseUrl
   });
-  const { boxes, contentHeight, forcedBreaks } = laid;
+  const { boxes, contentHeight, forcedBreaks, pageBackground } = laid;
   const _tLayout = opts.profile ? performance.now() : 0;
   const bucketOf = (w) => w >= 700 ? 700 : w >= 600 ? 600 : w >= 500 ? 500 : 400;
   const needWeights = /* @__PURE__ */ new Set([400]);
@@ -4317,16 +4353,27 @@ async function htmlToPdf(input, opts = {}) {
     }
     cuts.push(cut);
   }
+  const canvasColor = pageBackground || pageCanvasColor(boxes);
   for (let k = 0; k < cuts.length; k++) {
     const page = doc.addPage();
     const top = cuts[k];
     const span = (k + 1 < cuts.length ? cuts[k + 1] : contentHeight) - top;
-    if (span < pageH - 0.5) {
-      page._push(`0 ${(pageH - span) * 0.75} ${viewport.width * 0.75} ${span * 0.75} re W n
-`);
+    if (canvasColor) {
+      page.setFillRgb(canvasColor.r, canvasColor.g, canvasColor.b);
+      page.fillRect(0, 0, viewport.width * 0.75, pageH * 0.75);
     }
+    const clipH = Math.min(span, pageH);
+    const leftover = (pageH - clipH) * 0.75;
+    page.saveState();
+    page._push(`0 ${leftover} ${viewport.width * 0.75} ${clipH * 0.75} re W n
+`);
     const pageBoxes = fitsOnePage ? boxes : boxes.filter((b) => boxIntersectsBand(b, top, span)).map((b) => top === 0 ? b : shiftBoxForPage(b, top));
     paint(doc, fontMap, page, pageBoxes);
+    page.restoreState();
+    if (canvasColor && leftover > 0.4) {
+      page.setFillRgb(canvasColor.r, canvasColor.g, canvasColor.b);
+      page.fillRect(0, 0, viewport.width * 0.75, leftover);
+    }
   }
   const _tPaint = opts.profile ? performance.now() : 0;
   const bytes = doc.toBytes();
@@ -4348,6 +4395,22 @@ async function htmlToPdf(input, opts = {}) {
     };
   }
   return bytes;
+}
+function pageCanvasColor(boxes) {
+  let html = null;
+  let body = null;
+  for (const b of boxes) {
+    if (b.kind !== "box") continue;
+    if (b.tag === "html") html = b;
+    else if (b.tag === "body") body = b;
+  }
+  const pick = (b) => {
+    if (!b?.style) return null;
+    const c = parseColor(b.style.backgroundColor);
+    if (!c || c.a === 0) return null;
+    return c;
+  };
+  return pick(body) || pick(html);
 }
 function boxIntersectsBand(b, top, H) {
   if (b.kind === "svg-line" || b.kind === "svg-path" || b.kind === "svg-ellipse") return true;

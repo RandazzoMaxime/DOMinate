@@ -201,18 +201,16 @@
 
     .queue { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
     .row {
-      display: grid;
-      grid-template-columns: 1fr auto auto auto;
-      gap: 12px; align-items: center;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
       padding: 12px 14px; border-radius: 14px;
       background: var(--glass); border: 1px solid var(--line); box-shadow: var(--sh-s);
     }
-    @media (max-width: 720px) {
-      .row { grid-template-columns: 1fr auto; }
-      .row .meta, .row .st { grid-column: 1 / -1; }
+    .row .file {
+      min-width: 0; flex: 1 1 180px;
+      display: flex; align-items: center; gap: 10px;
     }
     .row .name { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .row .meta { color: var(--ink-3); font-size: 11.5px; font-family: var(--mono); }
+    .row .meta { color: var(--ink-3); font-size: 11.5px; font-family: var(--mono); margin-left: auto; }
     .st {
       font-family: var(--mono); font-size: 11px; font-weight: 650;
       padding: 3px 8px; border-radius: 999px; background: var(--glass-2); color: var(--ink-2);
@@ -220,6 +218,12 @@
     .st.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
     .st.err { color: var(--crit); background: color-mix(in srgb, var(--crit) 12%, transparent); }
     .st.run { color: var(--ink); }
+    .btn.dl {
+      flex: none;
+      background: var(--ok); border-color: transparent; color: #fff;
+      font-weight: 650; padding: 7px 12px;
+    }
+    .btn.dl:hover { color: #fff; opacity: .88; border-color: transparent; }
 
     .about {
       max-width: none; color: var(--ink-2); font-size: 13px; line-height: 1.65;
@@ -267,6 +271,7 @@
           <div class="ptitle" id="ptitle">Convert</div>
           <div class="topact" id="convert-actions">
             <select class="btn" id="page" aria-label="Page format">
+              <option value="screen">Screen 1200</option>
               <option value="portrait">A4 portrait</option>
               <option value="landscape">A4 landscape</option>
             </select>
@@ -413,6 +418,24 @@
 
     function fmtKb(n) { return `${(n / 1024).toFixed(1)} KiB`; }
 
+    function pdfName(job) {
+      const base = String(job.name || 'document.html').split(/[/\\]/).pop();
+      return base.replace(/\.html?$/i, '.pdf') || 'document.pdf';
+    }
+
+    function saveBlob(data, filename, mime) {
+      const url = URL.createObjectURL(new Blob([data], { type: mime }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.rel = 'noopener';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+
     function render() {
       $('count-em').textContent = String(queue.length);
       runBtn.disabled = !queue.some((j) => j.status === 'ready' || j.status === 'err');
@@ -422,13 +445,16 @@
         const st = j.status === 'ok' ? 'ok' : j.status === 'err' ? 'err' : j.status === 'run' ? 'run' : '';
         const label = j.status === 'ok' ? `${j.ms.toFixed(0)} ms` : j.status === 'err' ? 'failed' : j.status === 'run' ? 'converting' : 'queued';
         const dl = j.pdf
-          ? `<button class="btn" data-dl="${j.id}">PDF</button>`
-          : `<span class="meta">${fmtKb(j.bytes)}</span>`;
+          ? `<button class="btn dl" type="button" data-dl="${j.id}">Download PDF</button>`
+          : '';
+        const size = j.pdf ? fmtKb(j.pdf.byteLength) : fmtKb(j.bytes);
         return `<article class="row">
-          <div class="name" title="${j.path}">${j.name}</div>
-          <div class="meta">${j.pdf ? fmtKb(j.pdf.byteLength) : fmtKb(j.bytes)}</div>
+          <div class="file">
+            <div class="name" title="${j.path}">${j.name}</div>
+            ${dl}
+          </div>
           <span class="st ${st}">${label}</span>
-          ${dl}
+          <div class="meta">${size}</div>
         </article>`;
       }).join('');
       list.querySelectorAll('[data-dl]').forEach((btn) => {
@@ -439,12 +465,7 @@
     function downloadOne(id) {
       const job = queue.find((j) => j.id === id);
       if (!job?.pdf) return;
-      const url = URL.createObjectURL(new Blob([job.pdf], { type: 'application/pdf' }));
-      Object.assign(document.createElement('a'), {
-        href: url,
-        download: job.name.replace(/\.html?$/i, '.pdf'),
-      }).click();
-      setTimeout(() => URL.revokeObjectURL(url), 1500);
+      saveBlob(job.pdf, pdfName(job), 'application/pdf');
     }
 
     function crc32(u8) {
@@ -506,7 +527,10 @@
         render();
         try {
           const t0 = performance.now();
-          job.pdf = await htmlToPdf(job.html, { pageSize: 'A4', orientation: page });
+          const opts = page === 'screen'
+            ? { viewport: { width: 1200, height: 1697 } }
+            : { pageSize: 'A4', orientation: page };
+          job.pdf = await htmlToPdf(job.html, opts);
           job.ms = performance.now() - t0;
           job.status = 'ok';
         } catch (error) {
@@ -539,12 +563,10 @@
       const done = queue.filter((j) => j.pdf);
       if (done.length === 1) return downloadOne(done[0].id);
       const zip = zipStore(done.map((j) => ({
-        name: j.name.replace(/\.html?$/i, '.pdf'),
+        name: pdfName(j),
         data: j.pdf,
       })));
-      const url = URL.createObjectURL(new Blob([zip], { type: 'application/zip' }));
-      Object.assign(document.createElement('a'), { href: url, download: 'dominate-pdfs.zip' }).click();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      saveBlob(zip, 'dominate-pdfs.zip', 'application/zip');
     });
   </script>
 </body>

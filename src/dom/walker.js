@@ -44,6 +44,7 @@ function layoutFrame(width, height) {
   if (_layoutFrame && _layoutFrame.contentDocument) {
     _layoutFrame.style.width = width + 'px';
     _layoutFrame.style.height = height + 'px';
+    _layoutFrame.style.colorScheme = 'light';
     return _layoutFrame;
   }
   const iframe = document.createElement('iframe');
@@ -56,6 +57,7 @@ function layoutFrame(width, height) {
     height: ${height}px;
     border: 0;
     visibility: hidden;
+    color-scheme: light;
   `;
   document.body.appendChild(iframe);
   _layoutFrame = iframe;
@@ -134,9 +136,10 @@ export async function layout(html, { width, height, baseUrl } = {}) {
 
     const forcedBreaks = collectForcedBreaks(idoc).filter(y => y > 0.5 && y < contentHeight - 0.5);
     const tWalk = performance.now();
+    const pageBackground = computedPageBackground(idoc);
 
     return {
-      boxes, width, height, contentHeight, forcedBreaks,
+      boxes, width, height, contentHeight, forcedBreaks, pageBackground,
       _profile: {
         writeMs: Number((tWrite - t0).toFixed(2)),
         loadMs: Number((tLoad - tWrite).toFixed(2)),
@@ -175,7 +178,18 @@ export function layoutElement(root, { width, height } = {}) {
   const h = height || (idoc.defaultView ? idoc.defaultView.innerHeight : 0);
   const contentHeight = Math.max(h, idoc.documentElement ? idoc.documentElement.scrollHeight : h);
   const forcedBreaks = collectForcedBreaks(idoc).filter(y => y > 0.5 && y < contentHeight - 0.5);
-  return { boxes, width: w, height: h, contentHeight, forcedBreaks };
+  return { boxes, width: w, height: h, contentHeight, forcedBreaks, pageBackground: computedPageBackground(idoc) };
+}
+
+function computedPageBackground(idoc) {
+  const win = idoc.defaultView;
+  if (!win) return null;
+  for (const el of [idoc.body, idoc.documentElement]) {
+    if (!el) continue;
+    const c = parseColor(win.getComputedStyle(el).backgroundColor);
+    if (c && c.a !== 0) return c;
+  }
+  return null;
 }
 
 import { walkSvg } from '../render/svg.js';

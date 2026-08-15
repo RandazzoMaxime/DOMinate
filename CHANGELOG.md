@@ -3,6 +3,21 @@
 All notable changes to DOMinate are documented here. The project follows semantic
 versioning from the first public release.
 
+## Unreleased
+
+### Fixed
+
+- Words laid out in condensed system fonts (Segoe, Bahnschrift, …) no longer
+  overflow into the next word when painted with Inter — inter-word gaps stay.
+- `html`/`body` canvas color is stamped on every PDF page, so leftover bands
+  after a line-safe cut stay the page color instead of flashing white.
+- Converter download uses a real filename (`*.pdf`) instead of the browser
+  default `download`, and the button sits next to the file name.
+
+### Changed
+
+- Live converter defaults to a 1200px screen viewport (A4 remains a choice).
+
 ## [1.1.0] - 2026-08-15
 
 ### Added

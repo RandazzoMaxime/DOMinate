@@ -912,6 +912,26 @@ function paintText(page, fontMap, b, pageHeightPdf, doc) {
     } else {
       page.setTextPos(atX, atY);
     }
+    // Fit the painted advance to Chromium's word box. Documents laid out in
+    // Segoe/Bahnschrift/etc. overflow when we draw Inter, which eats the
+    // inter-word gap. Skip tiny mismatches so Inter-on-Inter stays 1:1.
+    if (b.w > 0.5 && fontHandle.kind === 'embeddedTrueType') {
+      const sizePdf = fontSizeCss * CSS_TO_PDF;
+      let adv = 0;
+      let nChars = 0;
+      for (const run of runs) {
+        if (run.font.kind === 'embeddedTrueType') adv += measureText(run.font, run.text, sizePdf);
+        nChars += [...run.text].length;
+      }
+      if (letterSpacingCss && nChars > 1) adv += letterSpacingCss * CSS_TO_PDF * (nChars - 1);
+      const target = b.w * CSS_TO_PDF;
+      if (adv > 0.5 && Math.abs(target - adv) > 0.6) {
+        const ratio = target / adv;
+        if (ratio > 0.55 && ratio < 1.7 && Math.abs(ratio - 1) > 0.025) {
+          page.setHorizontalScale(ratio * 100);
+        }
+      }
+    }
     for (const run of runs) {
       page.setFont(run.font, fontSizeCss * CSS_TO_PDF);
       if (run.font.kind === 'embeddedTrueType') {

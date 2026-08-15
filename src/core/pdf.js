@@ -491,6 +491,8 @@ class Page {
   setCharSpacing(tc) { this._push(`${num(tc)} Tc\n`); }
   /** Set the word-spacing parameter Tw. */
   setWordSpacing(tw) { this._push(`${num(tw)} Tw\n`); }
+  /** Horizontal scaling as a percentage (100 = no stretch). PDF Tz. */
+  setHorizontalScale(pct) { this._push(`${num(pct)} Tz\n`); }
   /** Show a string. The string is escaped as a PDF literal string. */
   showText(s) { this._push(`(${escapeLiteralString(s)}) Tj\n`); }
 
