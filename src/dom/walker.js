@@ -134,28 +134,21 @@ export async function layout(html, { width, height, baseUrl } = {}) {
   }
 }
 
-/** Live-document walk cache. Invalidated when the layout fingerprint changes. */
-const _liveLayout = new WeakMap();
-
 /**
- * Walk an already-laid-out element (no iframe, no document.write).
- * Coordinates are viewport-relative; caller should have scroll at 0.
+ * Walk an already-laid-out element (no iframe). Always re-walks: a geometry-only
+ * fingerprint would miss text mutations, and a document-keyed cache would mix
+ * sibling roots. Callers that pass a string still go through layout() + iframe.
  */
 export function layoutElement(root, { width, height } = {}) {
   const el = root.nodeType === 9 ? root.documentElement : root;
   const idoc = el.ownerDocument;
-  const w = width || el.clientWidth || 0;
-  const h = height || (idoc.defaultView ? idoc.defaultView.innerHeight : 0);
-  const fp = layoutFingerprint(idoc) + '|' + w + '|' + h;
-  const hit = _liveLayout.get(idoc);
-  if (hit && hit.fp === fp) return hit.result;
   const boxes = [];
   walk(el, idoc, boxes, { prefix: [], seq: { n: 0 }, clips: [], tfms: [] });
+  const w = width || el.clientWidth || 0;
+  const h = height || (idoc.defaultView ? idoc.defaultView.innerHeight : 0);
   const contentHeight = Math.max(h, idoc.documentElement ? idoc.documentElement.scrollHeight : h);
   const forcedBreaks = collectForcedBreaks(idoc).filter(y => y > 0.5 && y < contentHeight - 0.5);
-  const result = { boxes, width: w, height: h, contentHeight, forcedBreaks };
-  _liveLayout.set(idoc, { fp, result });
-  return result;
+  return { boxes, width: w, height: h, contentHeight, forcedBreaks };
 }
 
 import { walkSvg } from '../render/svg.js';

@@ -68,9 +68,9 @@ pipeline — not a drop-in client library.
 
 | | Invoice time | Invoice diff | SOW 4p time | SOW 4p worst-page diff |
 |---|---:|---:|---:|---:|
-| **DOMinate** | **1.9 ms** | **0.432%** | **4.6 ms** | **1.714%** |
+| **DOMinate** | 16 ms | **0.432%** | 34 ms | **1.714%** |
 | html2canvas + jsPDF | 93 ms | 68.7% | 124 ms | 73.8% |
-| Chromium `page.pdf()` | 4.3 ms | 0.732% | 7.5 ms | 2.077% |
+| Chromium `page.pdf()` | 4.9 ms | 0.732% | 7.5 ms | 2.077% |
 
 ![Bar chart: warm convert time](docs/assets/bench-bar.svg)
 

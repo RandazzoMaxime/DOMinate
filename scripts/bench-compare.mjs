@@ -244,37 +244,20 @@ async function main() {
     await runner.goto(`${origin}/demo/run.html`, { waitUntil: 'networkidle' });
     await runner.evaluate(() => import('/src/index.js'));
 
-    async function dominateOnPage(page, viewport) {
-      return page.evaluate(async (viewport) => {
+    async function dominatePdf(rel, viewport) {
+      const raw = await readFile(resolve(ROOT, rel), 'utf8');
+      const dir = dirname(rel).replace(/\\/g, '/');
+      const html = withBase(raw, `${origin}/${dir}/`);
+      const base64 = await runner.evaluate(async ({ htmlString, viewport, baseUrl }) => {
         const { htmlToPdf } = await import('/src/index.js');
-        const started = performance.now();
-        const bytes = await htmlToPdf(document.documentElement, { viewport });
-        return { elapsed: performance.now() - started, byteLength: bytes.byteLength };
-      }, viewport);
-    }
-
-    async function dominatePdfOnPage(page, viewport) {
-      const base64 = await page.evaluate(async (viewport) => {
-        const { htmlToPdf } = await import('/src/index.js');
-        const bytes = await htmlToPdf(document.documentElement, { viewport });
+        const bytes = await htmlToPdf(htmlString, { viewport, baseUrl });
         let binary = '';
         for (let offset = 0; offset < bytes.length; offset += 0x8000) {
           binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
         }
         return btoa(binary);
-      }, viewport);
+      }, { htmlString: html, viewport, baseUrl: `${origin}/${dir}/` });
       return Buffer.from(base64, 'base64');
-    }
-
-    async function timeDominate(page, viewport) {
-      await dominateOnPage(page, viewport);
-      const times = [];
-      let last = null;
-      for (let i = 0; i < ITERATIONS; i++) {
-        last = await dominateOnPage(page, viewport);
-        times.push(last.elapsed);
-      }
-      return { ...stats(times), last };
     }
 
     async function openFixture(rel, viewport, keepSections) {
@@ -336,13 +319,13 @@ async function main() {
 
     async function measure(rel, viewport, keepSections, tag) {
       const page = await openFixture(rel, viewport, keepSections);
-      const dTime = await timeDominate(page, viewport);
+      const dTime = await timeSamples(() => dominatePdf(rel, viewport));
       const pTime = await timeSamples(() => playwrightPdf(page, viewport));
       const hTime = process.env.BENCH_FAST
         ? { medianMs: 0, last: null }
         : await timeSamples(() => html2canvasPdf(page, viewport));
 
-      const dPdf = await dominatePdfOnPage(page, viewport);
+      const dPdf = dTime.last;
       const pPdf = pTime.last;
       const hPdf = hTime.last;
 

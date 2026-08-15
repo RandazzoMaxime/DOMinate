@@ -105,16 +105,17 @@ export async function htmlToPdf(input, opts = {}) {
     pageHeightPdfUnits: viewport.height * 0.75,
   });
 
-  const live = typeof input !== 'string' && input && input.nodeType === 1;
   const _t0 = opts.profile ? performance.now() : 0;
-  const { boxes, contentHeight, forcedBreaks } = live
+  // HTMLElement uses outerHTML so the documented snapshot path stays the default
+  // (USAGE.md). Pass { live: true } to walk the already-laid-out node instead.
+  const useLive = opts.live && typeof input !== 'string' && input && input.nodeType === 1;
+  const { boxes, contentHeight, forcedBreaks } = useLive
     ? layoutElement(input, viewport)
     : await layout(typeof input === 'string' ? input : input.outerHTML, {
       ...viewport,
       baseUrl: opts.baseUrl,
     });
   const _tLayout = opts.profile ? performance.now() : 0;
-  const _mark = (k, from) => { if (opts.profile) globalThis.__dominateProfile = { ...(globalThis.__dominateProfile || {}), [k]: Number((performance.now() - from).toFixed(2)) }; };
 
   // Scan the render boxes to find which faces the document ACTUALLY needs, so we
   // only embed those (a full embed of all 11 bundled faces costs ~450 KB per PDF).
@@ -232,7 +233,6 @@ export async function htmlToPdf(input, opts = {}) {
     return pending;
   };
   const _tFonts = opts.profile ? performance.now() : 0;
-  _mark('fontsMs', _tLayout);
   const bgUrl = (value) => {
     if (!value) return null;
     const m = /url\(["']?([^"')]+)["']?\)/.exec(value);

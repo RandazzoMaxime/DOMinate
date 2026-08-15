@@ -39,7 +39,7 @@
   ],
   "scripts": {
     "loop": "node scripts/loop.mjs",
-    "test": "node scripts/test-validity.mjs",
+    "test": "node scripts/test-validity.mjs && node scripts/test-live-text.mjs",
     "benchmark": "node scripts/benchmark.mjs",
     "render": "node scripts/render-with-lib.mjs",
     "rasterize": "node scripts/pdf-to-png.mjs",
