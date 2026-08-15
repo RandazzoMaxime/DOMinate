@@ -141,8 +141,15 @@ export async function embedTrueTypeFont(doc, fontBytes, baseFontName) {
  * Encode a JS string as a PDF hex string of 16-bit big-endian CIDs (= GIDs since
  * CIDToGIDMap is Identity). Returns a string like "<00480065006C006C006F>".
  */
+const _hexByParsed = new WeakMap();
+
 export function encodeTextAsHex(font, str) {
-  const map = font.font.unicodeToGid;
+  const parsed = font.font;
+  let byStr = _hexByParsed.get(parsed);
+  if (!byStr) { byStr = new Map(); _hexByParsed.set(parsed, byStr); }
+  const hit = byStr.get(str);
+  if (hit) return hit;
+  const map = parsed.unicodeToGid;
   let out = '<';
   for (let i = 0; i < str.length; i++) {
     let cp = str.codePointAt(i);
@@ -156,6 +163,7 @@ export function encodeTextAsHex(font, str) {
     out += hex16(gid);
   }
   out += '>';
+  byStr.set(str, out);
   return out;
 }
 

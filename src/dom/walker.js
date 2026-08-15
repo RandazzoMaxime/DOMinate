@@ -320,7 +320,6 @@ function walk(el, idoc, boxes, ctx) {
     fontFamily: cs.fontFamily,
     fontSize: cs.fontSize,
     fontWeight: cs.fontWeight,
-    resolvedWeight: resolveUsedWeight(idoc, cs.fontFamily, parseInt(cs.fontWeight, 10) || 400),
     fontStyle: cs.fontStyle,
     fontVariant: cs.fontVariant,
     letterSpacing: cs.letterSpacing,
@@ -717,6 +716,9 @@ function pushWordBoxes(node, idoc, boxes, style, el) {
     return;
   }
 
+  if (style.resolvedWeight == null) {
+    style.resolvedWeight = resolveUsedWeight(idoc, style.fontFamily, parseInt(style.fontWeight, 10) || 400);
+  }
   const metrics = fontMetricsFor(idoc, style);
   let lastBox = null;
   const emit = (text, r) => {
