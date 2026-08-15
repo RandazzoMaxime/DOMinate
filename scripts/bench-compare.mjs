@@ -292,8 +292,14 @@ async function timeSamples(fn) {
   let last = null;
   for (let i = 0; i < ITERATIONS; i++) {
     const t0 = performance.now();
-    last = await fn();
-    times.push(performance.now() - t0);
+    const out = await fn();
+    if (out && typeof out === 'object' && typeof out.elapsed === 'number' && out.bytes) {
+      times.push(out.elapsed);
+      last = out.bytes;
+    } else {
+      last = out;
+      times.push(performance.now() - t0);
+    }
   }
   return { ...stats(times), last };
 }
@@ -363,7 +369,7 @@ async function main() {
   const reportRel = 'example/dominate-sow.html';
 
   try {
-    const runner = await browser.newPage({ viewport: { width: 900, height: 1200 }, deviceScaleFactor: 1 });
+    const runner = await browser.newPage({ viewport: { width: 1400, height: 1200 }, deviceScaleFactor: 1 });
     await runner.goto(`${origin}/demo/run.html`, { waitUntil: 'networkidle' });
     await runner.evaluate(() => import('/src/index.js'));
 
@@ -371,16 +377,18 @@ async function main() {
       const raw = await readFile(resolve(ROOT, rel), 'utf8');
       const dir = dirname(rel).replace(/\\/g, '/');
       const html = withBase(raw, `${origin}/${dir}/`);
-      const base64 = await runner.evaluate(async ({ htmlString, viewport, baseUrl }) => {
+      const result = await runner.evaluate(async ({ htmlString, viewport, baseUrl }) => {
         const { htmlToPdf } = await import('/src/index.js');
+        const t0 = performance.now();
         const bytes = await htmlToPdf(htmlString, { viewport, baseUrl });
+        const elapsed = performance.now() - t0;
         let binary = '';
         for (let offset = 0; offset < bytes.length; offset += 0x8000) {
           binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
         }
-        return btoa(binary);
+        return { elapsed, base64: btoa(binary) };
       }, { htmlString: html, viewport, baseUrl: `${origin}/${dir}/` });
-      return Buffer.from(base64, 'base64');
+      return { bytes: Buffer.from(result.base64, 'base64'), elapsed: result.elapsed };
     }
 
     async function openFixture(rel, viewport, keepSections) {

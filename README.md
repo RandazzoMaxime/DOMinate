@@ -80,13 +80,13 @@ headless Chromium print pipeline, not drop-in client libraries.
 
 | | Landing time | Landing diff | Invoice time | Invoice diff | SOW 4p time | SOW 4p worst-page diff |
 |---|---:|---:|---:|---:|---:|---:|
-| **DOMinate** | 16.3 ms | **1.243%** | 30.6 ms | **0.432%** | 46.0 ms | **1.714%** |
-| html2canvas + jsPDF | 92 ms | 80.4% | 105 ms | 68.7% | 138 ms | 73.8% |
-| html2pdf.js | 110 ms | 83.9% | 147 ms | 68.7% | 165 ms | 73.8% |
-| html-to-image + jsPDF | 93 ms | 83.9% | 178 ms | 68.5% | 219 ms | 73.8% |
-| jsPDF.html() | 122 ms | 100% | 145 ms | 69.0% | 185 ms | 100% |
-| Playwright `page.pdf()` | 30.0 ms | 61.3% | 6.5 ms | 0.732% | 9.9 ms | 2.077% |
-| Puppeteer `page.pdf()` | 117 ms | 61.3% | 167 ms | 0.732% | 256 ms | 2.077% |
+| **DOMinate** | 8.6 ms | **1.243%** | 11.6 ms | **0.432%** | 20.7 ms | **1.714%** |
+| html2canvas + jsPDF | 93 ms | 80.4% | 93 ms | 68.7% | 138 ms | 73.8% |
+| html2pdf.js | 111 ms | 83.9% | 122 ms | 68.7% | 173 ms | 73.8% |
+| html-to-image + jsPDF | 92 ms | 83.9% | 173 ms | 68.5% | 232 ms | 73.8% |
+| jsPDF.html() | 123 ms | 100% | 177 ms | 69.0% | 176 ms | 100% |
+| Playwright `page.pdf()` | 35.1 ms | 61.3% | 4.3 ms | 0.732% | 10.1 ms | 2.077% |
+| Puppeteer `page.pdf()` | 118 ms | 61.3% | 166 ms | 0.732% | 263 ms | 2.077% |
 
 ![Bar chart: warm convert time](docs/assets/bench-bar.svg)
 

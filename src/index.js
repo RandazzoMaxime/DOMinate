@@ -109,12 +109,13 @@ export async function htmlToPdf(input, opts = {}) {
   // HTMLElement uses outerHTML so the documented snapshot path stays the default
   // (USAGE.md). Pass { live: true } to walk the already-laid-out node instead.
   const useLive = opts.live && typeof input !== 'string' && input && input.nodeType === 1;
-  const { boxes, contentHeight, forcedBreaks } = useLive
+  const laid = useLive
     ? layoutElement(input, viewport)
     : await layout(typeof input === 'string' ? input : input.outerHTML, {
       ...viewport,
       baseUrl: opts.baseUrl,
     });
+  const { boxes, contentHeight, forcedBreaks } = laid;
   const _tLayout = opts.profile ? performance.now() : 0;
 
   // Scan the render boxes to find which faces the document ACTUALLY needs, so we
@@ -238,14 +239,18 @@ export async function htmlToPdf(input, opts = {}) {
     const m = /url\(["']?([^"')]+)["']?\)/.exec(value);
     return m ? m[1] : null;
   };
-  await Promise.all(boxes.map(async (b) => {
+  const imageJobs = [];
+  for (const b of boxes) {
     if (b.kind === 'image' && b.src) {
-      b.embedded = await fetchAndEmbed(b.src);
+      imageJobs.push(fetchAndEmbed(b.src).then(h => { b.embedded = h; }));
     } else if (b.kind === 'box') {
       const src = bgUrl(b.style.backgroundImage);
-      if (src && !src.startsWith('data:')) b.bgEmbedded = await fetchAndEmbed(src);
+      if (src && !src.startsWith('data:')) {
+        imageJobs.push(fetchAndEmbed(src).then(h => { b.bgEmbedded = h; }));
+      }
     }
-  }));
+  }
+  if (imageJobs.length) await Promise.all(imageJobs);
 
   // Icon fonts (Material Symbols): glyph names resolve through GSUB ligatures.
   // Embedded lazily — only when the page actually contains icon-font runs.
@@ -271,10 +276,14 @@ export async function htmlToPdf(input, opts = {}) {
   // its own top edge, ignoring the half-page floor, since the author asked for it
   // explicitly. This also forces pagination for documents that fit in one viewport
   // but still contain a marker.
+  //
+  // Single-page fast path: invoice-sized documents that already fit do not
+  // walk the box list to invent cuts they will never use.
   const pageH = viewport.height;
+  const fitsOnePage = forcedBreaks.length === 0 && contentHeight <= pageH + 1;
   const cuts = [0];
   const nextForcedAfter = (y) => forcedBreaks.find(fb => fb > y + 0.5);
-  while (cuts.length < 200 &&
+  while (!fitsOnePage && cuts.length < 200 &&
          (cuts[cuts.length - 1] + pageH < contentHeight - 1 || nextForcedAfter(cuts[cuts.length - 1]) !== undefined)) {
     const last = cuts[cuts.length - 1];
     let cut = last + pageH;
@@ -306,9 +315,11 @@ export async function htmlToPdf(input, opts = {}) {
     if (span < pageH - 0.5) {
       page._push(`0 ${(pageH - span) * 0.75} ${viewport.width * 0.75} ${span * 0.75} re W n\n`);
     }
-    const pageBoxes = boxes
-      .filter(b => boxIntersectsBand(b, top, span))
-      .map(b => (top === 0 ? b : shiftBoxForPage(b, top)));
+    const pageBoxes = fitsOnePage
+      ? boxes
+      : boxes
+        .filter(b => boxIntersectsBand(b, top, span))
+        .map(b => (top === 0 ? b : shiftBoxForPage(b, top)));
     paint(doc, fontMap, page, pageBoxes);
   }
   const _tPaint = opts.profile ? performance.now() : 0;
@@ -324,6 +335,11 @@ export async function htmlToPdf(input, opts = {}) {
       toBytesMs: Number((_tEnd - _tPaint).toFixed(2)),
       totalMs: Number((_tEnd - _t0).toFixed(2)),
       boxes: boxes.length,
+      pages: cuts.length,
+      contentHeight,
+      pageH: viewport.height,
+      forcedBreaks: forcedBreaks.length,
+      ...(laid._profile || {}),
     };
   }
   return bytes;

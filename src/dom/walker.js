@@ -64,12 +64,14 @@ function layoutFrame(width, height) {
 
 export async function layout(html, { width, height, baseUrl } = {}) {
   const iframe = layoutFrame(width, height);
+  const t0 = performance.now();
 
   try {
     const idoc = iframe.contentDocument;
     idoc.open();
     idoc.write(injectBase(html, baseUrl));
     idoc.close();
+    const tWrite = performance.now();
 
     // Wait for the iframe's load event (resolves after all <script> and <link> tags have
     // settled — including Tailwind CDN, Google Fonts, etc.). Capped at 4 s so a slow
@@ -80,6 +82,7 @@ export async function layout(html, { width, height, baseUrl } = {}) {
         new Promise(r => setTimeout(r, 4000)),
       ]);
     }
+    const tLoad = performance.now();
 
     if (idoc.fonts && idoc.fonts.ready) {
       await Promise.race([
@@ -87,13 +90,16 @@ export async function layout(html, { width, height, baseUrl } = {}) {
         new Promise(r => setTimeout(r, 1500)),
       ]);
     }
-    // One rAF after fonts.ready. The 6s settle loop only runs when a face is
-    // still loading or a script (Tailwind CDN) may still mutate the CSSOM.
+    const tFonts = performance.now();
+    // One rAF after fonts.ready. Skipping it (even when every face reports
+    // 'loaded') lets the first walk see fallback metrics — invoice jumps
+    // 0.43% → 3.93%. offsetHeight is not a substitute.
     await new Promise(r => requestAnimationFrame(() => r()));
+    const tRaf = performance.now();
+    const scripts = idoc.scripts ? idoc.scripts.length : 0;
     {
       const win = idoc.defaultView;
       const anyLoading = () => idoc.fonts ? [...idoc.fonts].some(f => f.status === 'loading') : false;
-      const scripts = idoc.scripts ? idoc.scripts.length : 0;
       if (anyLoading() || scripts > 0) {
         try { win.performance.setResourceTimingBufferSize(100000); } catch { /* optional */ }
         let prevFp = '', prevRes = -1, stableTicks = 0;
@@ -112,10 +118,14 @@ export async function layout(html, { width, height, baseUrl } = {}) {
         }
       }
     }
+    const tSettle = performance.now();
 
     const root = idoc.documentElement;
     const boxes = [];
-    walk(root, idoc, boxes, { prefix: [], seq: { n: 0 }, clips: [], tfms: [] });
+    walk(root, idoc, boxes, {
+      prefix: [], seq: { n: 0 }, clips: [], tfms: [],
+      hasPseudos: documentHasPseudos(idoc),
+    });
     // (debug logs removed after sanity)
 
     // Content taller than the viewport flows beyond the iframe; report the real
@@ -123,8 +133,25 @@ export async function layout(html, { width, height, baseUrl } = {}) {
     const contentHeight = Math.max(height, idoc.documentElement ? idoc.documentElement.scrollHeight : height);
 
     const forcedBreaks = collectForcedBreaks(idoc).filter(y => y > 0.5 && y < contentHeight - 0.5);
+    const tWalk = performance.now();
 
-    return { boxes, width, height, contentHeight, forcedBreaks };
+    return {
+      boxes, width, height, contentHeight, forcedBreaks,
+      _profile: {
+        writeMs: Number((tWrite - t0).toFixed(2)),
+        loadMs: Number((tLoad - tWrite).toFixed(2)),
+        fontsMs: Number((tFonts - tLoad).toFixed(2)),
+        rafMs: Number((tRaf - tFonts).toFixed(2)),
+        settleMs: Number((tSettle - tRaf).toFixed(2)),
+        walkMs: Number((tWalk - tSettle).toFixed(2)),
+        scripts,
+        nBoxes: boxes.length,
+        nBreaks: forcedBreaks.length,
+        hasPseudos: documentHasPseudos(idoc),
+        contentHeight,
+        pageH: height,
+      },
+    };
   } catch (err) {
     if (_layoutFrame) {
       try { _layoutFrame.remove(); } catch { /* already gone */ }
@@ -182,6 +209,35 @@ function collectForcedBreaks(idoc) {
   return [...ys].sort((a, b) => a - b);
 }
 
+/** True when any stylesheet mentions ::before / ::after (invoice has none). */
+function documentHasPseudos(idoc) {
+  if (idoc.__pdfHasPseudos != null) return idoc.__pdfHasPseudos;
+  let hit = false;
+  try {
+    for (const sheet of idoc.styleSheets) {
+      let rules;
+      try { rules = sheet.cssRules; } catch { hit = true; break; }
+      if (!rules) continue;
+      for (const r of rules) {
+        const sel = r.selectorText;
+        if (sel && /::(?:before|after)\b/i.test(sel)) { hit = true; break; }
+        if (r.cssRules) {
+          for (const inner of r.cssRules) {
+            if (inner.selectorText && /::(?:before|after)\b/i.test(inner.selectorText)) {
+              hit = true;
+              break;
+            }
+          }
+        }
+        if (hit) break;
+      }
+      if (hit) break;
+    }
+  } catch { hit = true; }
+  idoc.__pdfHasPseudos = hit;
+  return hit;
+}
+
 /** Cheap whole-document layout fingerprint: scrollHeight + ~50 sampled element rects. */
 function layoutFingerprint(idoc) {
   let s = idoc.body ? idoc.body.scrollHeight + ':' : '';
@@ -192,6 +248,57 @@ function layoutFingerprint(idoc) {
     s += (r.top | 0) + ',' + (r.left | 0) + ',' + (r.width | 0) + ';';
   }
   return s;
+}
+
+function captureStyle(cs) {
+  return {
+    backgroundColor: cs.backgroundColor,
+    backgroundImage: cs.backgroundImage,
+    color: cs.color,
+    opacity: parseFloat(cs.opacity || '1'),
+    borderTopLeftRadius: cs.borderTopLeftRadius,
+    borderTopRightRadius: cs.borderTopRightRadius,
+    borderBottomRightRadius: cs.borderBottomRightRadius,
+    borderBottomLeftRadius: cs.borderBottomLeftRadius,
+    borderTopWidth: cs.borderTopWidth,
+    borderRightWidth: cs.borderRightWidth,
+    borderBottomWidth: cs.borderBottomWidth,
+    borderLeftWidth: cs.borderLeftWidth,
+    borderTopColor: cs.borderTopColor,
+    borderRightColor: cs.borderRightColor,
+    borderBottomColor: cs.borderBottomColor,
+    borderLeftColor: cs.borderLeftColor,
+    borderTopStyle: cs.borderTopStyle,
+    borderRightStyle: cs.borderRightStyle,
+    borderBottomStyle: cs.borderBottomStyle,
+    borderLeftStyle: cs.borderLeftStyle,
+    boxShadow: cs.boxShadow,
+    textShadow: cs.textShadow,
+    outlineWidth: cs.outlineWidth,
+    outlineStyle: cs.outlineStyle,
+    outlineColor: cs.outlineColor,
+    outlineOffset: cs.outlineOffset,
+    fontFamily: cs.fontFamily,
+    fontSize: cs.fontSize,
+    fontWeight: cs.fontWeight,
+    fontStyle: cs.fontStyle,
+    fontVariant: cs.fontVariant,
+    letterSpacing: cs.letterSpacing,
+    textTransform: cs.textTransform,
+    textAlign: cs.textAlign,
+    textDecoration: cs.textDecorationLine,
+    textDecorationStyle: cs.textDecorationStyle,
+    textDecorationColor: cs.textDecorationColor,
+    textUnderlineOffset: cs.textUnderlineOffset,
+    lineHeight: cs.lineHeight,
+    overflow: cs.overflow,
+    whiteSpace: cs.whiteSpace,
+    borderCollapse: cs.borderCollapse,
+    objectFit: cs.objectFit,
+    backgroundSize: cs.backgroundSize,
+    backgroundPosition: cs.backgroundPosition,
+    backgroundRepeat: cs.backgroundRepeat,
+  };
 }
 
 const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'LINK', 'META', 'TITLE', 'HEAD', 'NOSCRIPT']);
@@ -283,68 +390,37 @@ function walk(el, idoc, boxes, ctx) {
   const clipsForChildren = childClips.length ? childClips : undefined;
   const myTfms = tfmEntry ? [...(ctx.tfms || []), tfmEntry] : (ctx.tfms || []);
   const tfms = myTfms.length ? myTfms : undefined;
-  const childCtx = { prefix: myPrefix, seq: ctx.seq, clips: childClips, tfms: myTfms };
+  const childCtx = { prefix: myPrefix, seq: ctx.seq, clips: childClips, tfms: myTfms, hasPseudos: ctx.hasPseudos };
   const restoreTransform = () => {
     if (!tfmEntry) return;
     if (savedInlineTransform) el.style.setProperty('transform', savedInlineTransform);
     else el.style.removeProperty('transform');
   };
 
-  const style = {
-    backgroundColor: cs.backgroundColor,
-    backgroundImage: cs.backgroundImage,
-    color: cs.color,
+  const bgc = cs.backgroundColor;
+  const bgi = cs.backgroundImage;
+  const hasBg = bgc && bgc !== 'rgba(0, 0, 0, 0)' && bgc !== 'transparent';
+  const hasBgImage = bgi && bgi !== 'none';
+  const hasBorder = parseFloat(cs.borderTopWidth) > 0 || parseFloat(cs.borderRightWidth) > 0
+    || parseFloat(cs.borderBottomWidth) > 0 || parseFloat(cs.borderLeftWidth) > 0;
+  const hasOutline = parseFloat(cs.outlineWidth) > 0 && cs.outlineStyle !== 'none';
+  const boxShadow = cs.boxShadow;
+  const hasShadow = boxShadow && boxShadow !== 'none';
+  let hasDirectText = false;
+  for (const child of el.childNodes) {
+    if (child.nodeType === 3 && child.nodeValue && child.nodeValue.trim()) { hasDirectText = true; break; }
+  }
+  const needsFullStyle = hasBg || hasBgImage || hasBorder || hasOutline || hasShadow || hasDirectText
+    || el.tagName === 'IMG' || el.tagName === 'A' || el.tagName === 'INPUT'
+    || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT'
+    || (cs.display === 'list-item' && cs.listStyleType !== 'none');
+  const style = needsFullStyle ? captureStyle(cs) : {
+    backgroundColor: bgc,
+    backgroundImage: bgi,
     opacity: parseFloat(cs.opacity || '1'),
-    borderTopLeftRadius: cs.borderTopLeftRadius,
-    borderTopRightRadius: cs.borderTopRightRadius,
-    borderBottomRightRadius: cs.borderBottomRightRadius,
-    borderBottomLeftRadius: cs.borderBottomLeftRadius,
-    borderTopWidth: cs.borderTopWidth,
-    borderRightWidth: cs.borderRightWidth,
-    borderBottomWidth: cs.borderBottomWidth,
-    borderLeftWidth: cs.borderLeftWidth,
-    borderTopColor: cs.borderTopColor,
-    borderRightColor: cs.borderRightColor,
-    borderBottomColor: cs.borderBottomColor,
-    borderLeftColor: cs.borderLeftColor,
-    borderTopStyle: cs.borderTopStyle,
-    borderRightStyle: cs.borderRightStyle,
-    borderBottomStyle: cs.borderBottomStyle,
-    borderLeftStyle: cs.borderLeftStyle,
-    boxShadow: cs.boxShadow,
-    textShadow: cs.textShadow,
-    outlineWidth: cs.outlineWidth,
-    outlineStyle: cs.outlineStyle,
-    outlineColor: cs.outlineColor,
-    outlineOffset: cs.outlineOffset,
-    fontFamily: cs.fontFamily,
-    fontSize: cs.fontSize,
-    fontWeight: cs.fontWeight,
-    fontStyle: cs.fontStyle,
-    fontVariant: cs.fontVariant,
-    letterSpacing: cs.letterSpacing,
-    textTransform: cs.textTransform,
-    textAlign: cs.textAlign,
-    textDecoration: cs.textDecorationLine,
-    textDecorationStyle: cs.textDecorationStyle,
-    textDecorationColor: cs.textDecorationColor,
-    textUnderlineOffset: cs.textUnderlineOffset,
-    lineHeight: cs.lineHeight,
-    overflow: cs.overflow,
-    whiteSpace: cs.whiteSpace,
-    borderCollapse: cs.borderCollapse,
-    objectFit: cs.objectFit,
-    backgroundSize: cs.backgroundSize,
-    backgroundPosition: cs.backgroundPosition,
-    backgroundRepeat: cs.backgroundRepeat,
+    overflow: ov,
+    boxShadow,
   };
-
-  // Push the element's own background/border box (skip default transparent/empty).
-  const hasBg = style.backgroundColor && style.backgroundColor !== 'rgba(0, 0, 0, 0)' && style.backgroundColor !== 'transparent';
-  const hasBgImage = style.backgroundImage && style.backgroundImage !== 'none';
-  const hasBorder = ['Top', 'Right', 'Bottom', 'Left'].some(s => parseFloat(style['border' + s + 'Width']) > 0);
-  const hasOutline = parseFloat(style.outlineWidth) > 0 && style.outlineStyle !== 'none';
-  const hasShadow = style.boxShadow && style.boxShadow !== 'none';
 
   if ((hasBg || hasBgImage || hasBorder || hasOutline || hasShadow) && rect.width > 0 && rect.height > 0) {
     boxes.push({
@@ -490,8 +566,9 @@ function walk(el, idoc, boxes, ctx) {
   // ::before / ::after with plain string content — synthesized as text boxes
   // anchored to the element's first/last real word (Chromium exposes the pseudo's
   // computed style but no geometry). Conservative subset: inline, same-line,
-  // literal string content only.
-  for (const which of ['::before', '::after']) {
+  // literal string content only. Skip the two extra getComputedStyle calls when
+  // the document's stylesheets mention no such pseudos (typical invoices).
+  for (const which of (ctx.hasPseudos === false ? [] : ['::before', '::after'])) {
     // Replaced/void elements never generate pseudo boxes (Chromium still REPORTS
     // a computed style for them, so the content check alone is not enough).
     if (NO_PSEUDO_TAGS.has(el.tagName)) break;

@@ -3,15 +3,15 @@
   "results": [
     {
       "name": "landing",
-      "elapsedMs": 46.2,
-      "pdfBytes": 237322,
+      "elapsedMs": 53.5,
+      "pdfBytes": 237321,
       "pageCount": 1,
       "diffPercent": 1.233,
       "pages": [
         {
           "page": 1,
           "diffPercent": 1.233,
-          "diffPx": 12626,
+          "diffPx": 12629,
           "totalPx": 1024000,
           "pass": true
         }
@@ -20,7 +20,7 @@
     },
     {
       "name": "invoice",
-      "elapsedMs": 37.6,
+      "elapsedMs": 27.1,
       "pdfBytes": 178210,
       "pageCount": 1,
       "diffPercent": 0.432,
@@ -37,7 +37,7 @@
     },
     {
       "name": "report",
-      "elapsedMs": 60.1,
+      "elapsedMs": 78.1,
       "pdfBytes": 402025,
       "pageCount": 4,
       "diffPercent": 1.714,

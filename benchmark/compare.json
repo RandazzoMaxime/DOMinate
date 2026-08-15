@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-15T18:56:17.021Z",
+  "generatedAt": "2026-08-15T20:55:44.838Z",
   "iterations": 5,
   "protocol": "HTML screenshot vs PDF raster at 96 DPI, pixelmatch threshold 0.1; worst page retained.",
   "notes": {
@@ -15,13 +15,13 @@
     {
       "name": "Landing",
       "engines": {
-        "dominate": 16.3,
-        "html2canvas": 92.3,
-        "html2pdf": 110.1,
-        "htmltoimage": 92.7,
-        "jspdfhtml": 121.9,
-        "playwright": 30,
-        "puppeteer": 116.7
+        "dominate": 8.6,
+        "html2canvas": 93.4,
+        "html2pdf": 111,
+        "htmltoimage": 91.6,
+        "jspdfhtml": 123.3,
+        "playwright": 35.1,
+        "puppeteer": 117.5
       },
       "diff": {
         "dominate": 1.243,
@@ -136,13 +136,13 @@
     {
       "name": "Invoice (1 page)",
       "engines": {
-        "dominate": 30.6,
-        "html2canvas": 105.2,
-        "html2pdf": 146.8,
-        "htmltoimage": 177.7,
-        "jspdfhtml": 145.3,
-        "playwright": 6.5,
-        "puppeteer": 166.6
+        "dominate": 11.6,
+        "html2canvas": 92.6,
+        "html2pdf": 121.8,
+        "htmltoimage": 172.9,
+        "jspdfhtml": 176.7,
+        "playwright": 4.3,
+        "puppeteer": 166.2
       },
       "diff": {
         "dominate": 0.432,
@@ -250,13 +250,13 @@
     {
       "name": "SOW (4 pages)",
       "engines": {
-        "dominate": 46,
-        "html2canvas": 138.1,
-        "html2pdf": 165,
-        "htmltoimage": 219.1,
-        "jspdfhtml": 184.8,
-        "playwright": 9.9,
-        "puppeteer": 255.7
+        "dominate": 20.7,
+        "html2canvas": 138.3,
+        "html2pdf": 173,
+        "htmltoimage": 232.4,
+        "jspdfhtml": 175.9,
+        "playwright": 10.1,
+        "puppeteer": 262.6
       },
       "diff": {
         "dominate": 1.714,
@@ -498,70 +498,70 @@
   "curve": [
     {
       "pages": 1,
-      "dominate": 18.6,
+      "dominate": 10.7,
       "dominateDiff": 0.802,
-      "html2canvas": 91.9,
+      "html2canvas": 95.5,
       "html2canvasDiff": 72.051,
-      "html2pdf": 100.2,
+      "html2pdf": 107,
       "html2pdfDiff": 72.051,
-      "htmltoimage": 193.2,
+      "htmltoimage": 202.3,
       "htmltoimageDiff": 72.052,
-      "jspdfhtml": 105.3,
+      "jspdfhtml": 126,
       "jspdfhtmlDiff": 100,
-      "playwright": 3.3,
+      "playwright": 3.6,
       "playwrightDiff": 1.564,
-      "puppeteer": 164.9,
+      "puppeteer": 173.1,
       "puppeteerDiff": 1.564
     },
     {
       "pages": 2,
-      "dominate": 32.8,
+      "dominate": 22.5,
       "dominateDiff": 1.714,
-      "html2canvas": 102.3,
+      "html2canvas": 107.5,
       "html2canvasDiff": 72.257,
-      "html2pdf": 140.7,
+      "html2pdf": 134.2,
       "html2pdfDiff": 72.257,
-      "htmltoimage": 207.5,
+      "htmltoimage": 241.4,
       "htmltoimageDiff": 72.416,
-      "jspdfhtml": 136.2,
+      "jspdfhtml": 151.5,
       "jspdfhtmlDiff": 100,
-      "playwright": 5.9,
+      "playwright": 6.9,
       "playwrightDiff": 2.077,
-      "puppeteer": 222.8,
+      "puppeteer": 232.9,
       "puppeteerDiff": 2.077
     },
     {
       "pages": 3,
-      "dominate": 32.7,
+      "dominate": 20.9,
       "dominateDiff": 1.714,
-      "html2canvas": 120.8,
+      "html2canvas": 123.5,
       "html2canvasDiff": 73.784,
-      "html2pdf": 175.6,
+      "html2pdf": 161.6,
       "html2pdfDiff": 73.784,
-      "htmltoimage": 231.9,
+      "htmltoimage": 213.9,
       "htmltoimageDiff": 73.843,
-      "jspdfhtml": 182.9,
+      "jspdfhtml": 178.4,
       "jspdfhtmlDiff": 100,
-      "playwright": 8.9,
+      "playwright": 9.6,
       "playwrightDiff": 2.077,
-      "puppeteer": 250.1,
+      "puppeteer": 264.8,
       "puppeteerDiff": 2.077
     },
     {
       "pages": 4,
-      "dominate": 35,
+      "dominate": 20.8,
       "dominateDiff": 1.714,
-      "html2canvas": 141.7,
+      "html2canvas": 136.4,
       "html2canvasDiff": 73.784,
-      "html2pdf": 189.1,
+      "html2pdf": 171,
       "html2pdfDiff": 73.784,
-      "htmltoimage": 261.1,
+      "htmltoimage": 226,
       "htmltoimageDiff": 73.843,
-      "jspdfhtml": 157.6,
+      "jspdfhtml": 195.1,
       "jspdfhtmlDiff": 100,
-      "playwright": 9.4,
+      "playwright": 9.3,
       "playwrightDiff": 2.077,
-      "puppeteer": 256.3,
+      "puppeteer": 275.3,
       "puppeteerDiff": 2.077
     }
   ]
