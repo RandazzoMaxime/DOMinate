@@ -86,6 +86,7 @@
     @media (max-width: 820px) {
       .layout { grid-template-columns: 1fr; }
       .side { border-right: 0; border-bottom: 1px solid var(--line); }
+      .main { padding: 0 20px; }
     }
 
     .side {
@@ -153,9 +154,20 @@
     }
     .sw[aria-checked="true"] .knob { transform: translateX(18px); background: var(--on-accent); }
 
-    .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-    .topbar { display: flex; align-items: center; gap: 14px; padding: 16px 20px 12px; flex-wrap: wrap; }
-    .ptitle { font-size: 19px; font-weight: 650; letter-spacing: -.015em; }
+    .main {
+      display: flex; flex-direction: column; min-width: 0; min-height: 0;
+      align-items: center;
+      padding: 0 56px;
+    }
+    .topbar, .view {
+      width: 100%;
+      max-width: 640px;
+    }
+    .topbar {
+      display: flex; align-items: center; gap: 14px;
+      padding: 48px 0 20px; flex-wrap: wrap;
+    }
+    .ptitle { font-size: 22px; font-weight: 650; letter-spacing: -.02em; }
     .topact { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .btn {
       display: flex; align-items: center; gap: 7px; padding: 8px 13px;
@@ -167,14 +179,14 @@
     .btn.pri { background: var(--accent); border-color: transparent; color: var(--on-accent); box-shadow: var(--sh-m); }
     .btn.pri:hover { color: var(--on-accent); opacity: .86; }
     select.btn { appearance: none; padding-right: 28px; }
-    .view { flex: 1; min-height: 0; overflow: auto; padding: 4px 20px 28px; }
+    .view { flex: 1; min-height: 0; overflow: auto; padding: 4px 0 80px; }
 
     .drop {
       border: 1px dashed var(--line);
       border-radius: 16px;
       background: var(--glass);
       box-shadow: var(--sh-s);
-      padding: 42px 20px;
+      padding: 48px 32px;
       text-align: center;
       cursor: pointer;
       transition: border-color .14s, transform .14s, box-shadow .14s;
@@ -210,7 +222,7 @@
     .st.run { color: var(--ink); }
 
     .about {
-      max-width: 56ch; color: var(--ink-2); font-size: 13px; line-height: 1.65;
+      max-width: none; color: var(--ink-2); font-size: 13px; line-height: 1.65;
       background: var(--glass); border: 1px solid var(--line); border-radius: 16px;
       padding: 22px 22px 18px; box-shadow: var(--sh-s);
     }
