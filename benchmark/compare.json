@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-15T18:08:28.835Z",
+  "generatedAt": "2026-08-15T18:39:26.330Z",
   "iterations": 5,
   "protocol": "HTML screenshot vs PDF raster at 96 DPI, pixelmatch threshold 0.1; worst page retained.",
   "notes": {
@@ -9,15 +9,69 @@
   },
   "bar": [
     {
+      "name": "Landing",
+      "engines": {
+        "dominate": 16.5,
+        "html2canvas": 95.4,
+        "playwright": 30.2
+      },
+      "diff": {
+        "dominate": 1.243,
+        "html2canvas": 80.454,
+        "playwright": 61.285
+      },
+      "detail": {
+        "dominate": {
+          "pageCount": 1,
+          "worstPercent": 1.243,
+          "worstPage": 1,
+          "pages": [
+            {
+              "page": 1,
+              "percent": 1.243,
+              "diffPx": 12727,
+              "totalPx": 1024000
+            }
+          ]
+        },
+        "html2canvas": {
+          "pageCount": 1,
+          "worstPercent": 80.454,
+          "worstPage": 1,
+          "pages": [
+            {
+              "page": 1,
+              "percent": 80.454,
+              "diffPx": 2605705,
+              "totalPx": 3238748
+            }
+          ]
+        },
+        "playwright": {
+          "pageCount": 1,
+          "worstPercent": 61.285,
+          "worstPage": 1,
+          "pages": [
+            {
+              "page": 1,
+              "percent": 61.285,
+              "diffPx": 1004098,
+              "totalPx": 1638400
+            }
+          ]
+        }
+      }
+    },
+    {
       "name": "Invoice (1 page)",
       "engines": {
-        "dominate": 15.8,
-        "html2canvas": 0,
-        "playwright": 4.9
+        "dominate": 17.1,
+        "html2canvas": 84.7,
+        "playwright": 5
       },
       "diff": {
         "dominate": 0.432,
-        "html2canvas": 0,
+        "html2canvas": 68.726,
         "playwright": 0.732
       },
       "detail": {
@@ -35,10 +89,17 @@
           ]
         },
         "html2canvas": {
-          "worstPercent": 0,
-          "pageCount": 0,
-          "worstPage": 0,
-          "pages": []
+          "pageCount": 1,
+          "worstPercent": 68.726,
+          "worstPage": 1,
+          "pages": [
+            {
+              "page": 1,
+              "percent": 68.726,
+              "diffPx": 2070853,
+              "totalPx": 3013208
+            }
+          ]
         },
         "playwright": {
           "pageCount": 1,
@@ -58,13 +119,13 @@
     {
       "name": "SOW (4 pages)",
       "engines": {
-        "dominate": 33.9,
-        "html2canvas": 0,
-        "playwright": 7.5
+        "dominate": 32.4,
+        "html2canvas": 121.4,
+        "playwright": 8.4
       },
       "diff": {
         "dominate": 1.714,
-        "html2canvas": 0,
+        "html2canvas": 73.832,
         "playwright": 2.077
       },
       "detail": {
@@ -100,10 +161,35 @@
           ]
         },
         "html2canvas": {
-          "worstPercent": 0,
-          "pageCount": 0,
-          "worstPage": 0,
-          "pages": []
+          "pageCount": 4,
+          "worstPercent": 73.832,
+          "worstPage": 3,
+          "pages": [
+            {
+              "page": 1,
+              "percent": 72.075,
+              "diffPx": 2032337,
+              "totalPx": 2819764
+            },
+            {
+              "page": 2,
+              "percent": 72.413,
+              "diffPx": 2041868,
+              "totalPx": 2819764
+            },
+            {
+              "page": 3,
+              "percent": 73.832,
+              "diffPx": 2081882,
+              "totalPx": 2819764
+            },
+            {
+              "page": 4,
+              "percent": 70.274,
+              "diffPx": 1981566,
+              "totalPx": 2819764
+            }
+          ]
         },
         "playwright": {
           "pageCount": 4,
@@ -139,5 +225,42 @@
       }
     }
   ],
-  "curve": []
+  "curve": [
+    {
+      "pages": 1,
+      "dominate": 16.7,
+      "html2canvas": 77.5,
+      "playwright": 3.4,
+      "dominateDiff": 0.802,
+      "html2canvasDiff": 72.075,
+      "playwrightDiff": 1.564
+    },
+    {
+      "pages": 2,
+      "dominate": 30.2,
+      "html2canvas": 95.3,
+      "playwright": 5.5,
+      "dominateDiff": 1.714,
+      "html2canvasDiff": 72.413,
+      "playwrightDiff": 2.077
+    },
+    {
+      "pages": 3,
+      "dominate": 35,
+      "html2canvas": 109.4,
+      "playwright": 6.1,
+      "dominateDiff": 1.714,
+      "html2canvasDiff": 73.832,
+      "playwrightDiff": 2.077
+    },
+    {
+      "pages": 4,
+      "dominate": 34.2,
+      "html2canvas": 124.4,
+      "playwright": 7,
+      "dominateDiff": 1.714,
+      "html2canvasDiff": 73.832,
+      "playwrightDiff": 2.077
+    }
+  ]
 }

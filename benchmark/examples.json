@@ -2,8 +2,25 @@
   "maxDiffPct": 12,
   "results": [
     {
+      "name": "landing",
+      "elapsedMs": 46.2,
+      "pdfBytes": 237322,
+      "pageCount": 1,
+      "diffPercent": 1.233,
+      "pages": [
+        {
+          "page": 1,
+          "diffPercent": 1.233,
+          "diffPx": 12626,
+          "totalPx": 1024000,
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
       "name": "invoice",
-      "elapsedMs": 51.4,
+      "elapsedMs": 37.6,
       "pdfBytes": 178210,
       "pageCount": 1,
       "diffPercent": 0.432,
@@ -20,7 +37,7 @@
     },
     {
       "name": "report",
-      "elapsedMs": 67.2,
+      "elapsedMs": 60.1,
       "pdfBytes": 402025,
       "pageCount": 4,
       "diffPercent": 1.714,

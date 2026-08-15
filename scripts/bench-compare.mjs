@@ -236,6 +236,7 @@ async function main() {
   const origin = `http://127.0.0.1:${port}`;
   const browser = await chromium.launch({ args: ['--disable-lcd-text'] });
 
+  const landingRel = 'example/templatemo_550_diagoona/index.html';
   const invoiceRel = 'example/Ivonne - Template/hotel-booking-invoice.html';
   const reportRel = 'example/dominate-sow.html';
 
@@ -351,9 +352,11 @@ async function main() {
       };
     }
 
+    const landingVp = { width: 1280, height: 800 };
     const invoiceVp = { width: 794, height: 1200 };
     const reportVp = { width: 794, height: 1123 };
 
+    const landing = await measure(landingRel, landingVp, null, 'land');
     const invoice = await measure(invoiceRel, invoiceVp, null, 'inv');
     const sow = await measure(reportRel, reportVp, 4, 'sow');
 
@@ -388,6 +391,7 @@ async function main() {
         playwright: 'Headless Chromium page.pdf — not a drop-in browser library',
       },
       bar: [
+        { name: 'Landing', engines: landing.time, diff: landing.diff, detail: landing.detail },
         { name: 'Invoice (1 page)', engines: invoice.time, diff: invoice.diff, detail: invoice.detail },
         { name: 'SOW (4 pages)', engines: sow.time, diff: sow.diff, detail: sow.detail },
       ],

@@ -39,6 +39,11 @@ const MIME = {
 
 const EXAMPLES = [
   {
+    name: 'landing',
+    rel: 'example/templatemo_550_diagoona/index.html',
+    viewport: { width: 1280, height: 800 },
+  },
+  {
     name: 'invoice',
     rel: 'example/Ivonne - Template/hotel-booking-invoice.html',
     viewport: { width: 794, height: 1200 },
