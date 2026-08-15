@@ -56,14 +56,29 @@ the matching HTML band.
 
 ## How DOMinate compares
 
-Warm convert time on the same machine, same HTML. DOMinate writes a vector PDF
-in the browser. `html2canvas` + jsPDF flattens the page to an image (no
-selectable text). Chromium `page.pdf()` is a headless print pipeline — not a
-drop-in client library.
+Same HTML, same machine. Two scores, both lower-is-better:
 
-![Bar chart: warm convert time for invoice and 4-page SOW](docs/assets/bench-bar.svg)
+- **Time** — warm median of five convert calls after one warmup.
+- **Pixel-diff** — worst page, Chromium HTML screenshot vs PDF raster at 96 DPI
+  (`pixelmatch` threshold 0.1), same protocol as `npm run loop`.
 
-![Curve: warm convert time vs page count on the SOW](docs/assets/bench-curve.svg)
+DOMinate writes a vector PDF in the browser. `html2canvas` + jsPDF flattens the
+page to a JPEG (no selectable text). Chromium `page.pdf()` is a headless print
+pipeline — not a drop-in client library.
+
+| | Invoice time | Invoice diff | SOW 4p time | SOW 4p worst-page diff |
+|---|---:|---:|---:|---:|
+| **DOMinate** | 32 ms | **0.432%** | 55 ms | **1.714%** |
+| html2canvas + jsPDF | 92 ms | 68.7% | 121 ms | 73.8% |
+| Chromium `page.pdf()` | 5 ms | 0.732% | 7 ms | 2.077% |
+
+![Bar chart: warm convert time](docs/assets/bench-bar.svg)
+
+![Bar chart: worst-page pixel-diff vs HTML](docs/assets/bench-diff.svg)
+
+![Curve: warm convert time vs page count](docs/assets/bench-curve.svg)
+
+![Curve: worst-page pixel-diff vs page count](docs/assets/bench-curve-diff.svg)
 
 ### Reproducible benchmark
 

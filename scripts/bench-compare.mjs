@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 // Competitive convert bench: DOMinate vs html2canvas+jsPDF vs Chromium page.pdf.
-// Writes JSON + two SVG graphs (bar + curve). HTML fixtures stay local.
+// Reports warm time AND worst-page pixel-diff vs the live HTML screenshot
+// (same protocol as scripts/loop.mjs). Writes JSON + bar/curve SVGs.
 
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { rasterizeAll } from './pdf-to-png.mjs';
+import { diffPngs } from './diff.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ASSETS = resolve(ROOT, 'docs', 'assets');
@@ -32,6 +35,12 @@ const MIME = {
 
 const H2C = '/example/Ivonne%20-%20Template/assets/js/html2canvas.min.js';
 const JSPDF = '/example/Ivonne%20-%20Template/assets/js/jspdf.min.js';
+
+const ENGINES = [
+  { key: 'dominate', label: 'DOMinate', color: '#55e59a' },
+  { key: 'html2canvas', label: 'html2canvas + jsPDF', color: '#e07a5f' },
+  { key: 'playwright', label: 'Chromium page.pdf', color: '#4edbff' },
+];
 
 function percentile(values, p) {
   const sorted = [...values].sort((a, b) => a - b);
@@ -74,31 +83,36 @@ function withBase(html, baseUrl) {
   return tag + html;
 }
 
-function barSvg(series) {
-  // series: [{ name, engines: { dominate, html2canvas, playwright } }]
-  const engines = [
-    { key: 'dominate', label: 'DOMinate', color: '#55e59a' },
-    { key: 'html2canvas', label: 'html2canvas + jsPDF', color: '#e07a5f' },
-    { key: 'playwright', label: 'Chromium page.pdf', color: '#4edbff' },
-  ];
+function niceMax(maxV, stepHint) {
+  if (maxV <= 0) return stepHint;
+  const raw = maxV * 1.15;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  for (const m of [1, 2, 2.5, 5, 10]) {
+    const step = m * mag;
+    if (step * 2 >= raw) return Math.ceil(raw / step) * step || stepHint;
+  }
+  return Math.ceil(raw / mag) * mag;
+}
+
+function barSvg(series, { title, unit, digits = 0, stepHint = 100 }) {
   const W = 920, H = 420, padL = 70, padR = 24, padT = 48, padB = 70;
   const innerW = W - padL - padR, innerH = H - padT - padB;
   const groupW = innerW / series.length;
-  const barW = groupW / (engines.length + 1);
-  const maxV = Math.max(...series.flatMap(s => engines.map(e => s.engines[e.key] || 0)), 1);
-  const nice = Math.ceil(maxV / 100) * 100;
+  const barW = groupW / (ENGINES.length + 1);
+  const maxV = Math.max(...series.flatMap(s => ENGINES.map(e => s.engines[e.key] || 0)), 0.01);
+  const nice = niceMax(maxV, stepHint);
   const y = v => padT + innerH - (v / nice) * innerH;
 
   let bars = '';
   series.forEach((s, gi) => {
     const gx = padL + gi * groupW;
-    engines.forEach((e, ei) => {
+    ENGINES.forEach((e, ei) => {
       const v = s.engines[e.key] || 0;
       const x = gx + (ei + 0.5) * barW;
       const top = y(v);
-      const h = padT + innerH - top;
+      const h = Math.max(0, padT + innerH - top);
       bars += `<rect x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${(barW * 0.85).toFixed(1)}" height="${h.toFixed(1)}" fill="${e.color}" rx="3"/>`;
-      bars += `<text x="${(x + barW * 0.42).toFixed(1)}" y="${(top - 6).toFixed(1)}" text-anchor="middle" font-size="11" fill="#d7e6ed">${v.toFixed(0)}</text>`;
+      bars += `<text x="${(x + barW * 0.42).toFixed(1)}" y="${(top - 6).toFixed(1)}" text-anchor="middle" font-size="11" fill="#d7e6ed">${v.toFixed(digits)}${unit === '%' && digits ? '' : ''}</text>`;
     });
     bars += `<text x="${(gx + groupW / 2).toFixed(1)}" y="${H - 36}" text-anchor="middle" font-size="13" fill="#f8fbfd">${s.name}</text>`;
   });
@@ -109,10 +123,10 @@ function barSvg(series) {
     const v = (nice / ticks) * i;
     const yy = y(v);
     grid += `<line x1="${padL}" y1="${yy.toFixed(1)}" x2="${W - padR}" y2="${yy.toFixed(1)}" stroke="#1d6179" stroke-opacity=".35"/>`;
-    grid += `<text x="${padL - 8}" y="${(yy + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="#a7b9c6">${v.toFixed(0)}</text>`;
+    grid += `<text x="${padL - 8}" y="${(yy + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="#a7b9c6">${v.toFixed(digits)}</text>`;
   }
 
-  const legend = engines.map((e, i) => {
+  const legend = ENGINES.map((e, i) => {
     const x = padL + i * 210;
     return `<rect x="${x}" y="16" width="12" height="12" fill="${e.color}" rx="2"/><text x="${x + 18}" y="26" font-size="12" fill="#d7e6ed">${e.label}</text>`;
   }).join('');
@@ -120,28 +134,22 @@ function barSvg(series) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <rect width="100%" height="100%" fill="#06111b"/>
-  <text x="${padL}" y="14" font-size="15" font-weight="700" fill="#f8fbfd">Warm convert time (ms) — lower is better</text>
+  <text x="${padL}" y="14" font-size="15" font-weight="700" fill="#f8fbfd">${title}</text>
   ${legend}
   ${grid}
   ${bars}
-  <text x="${padL - 52}" y="${padT + innerH / 2}" fill="#a7b9c6" font-size="11" transform="rotate(-90 ${padL - 52} ${padT + innerH / 2})">milliseconds</text>
+  <text x="${padL - 52}" y="${padT + innerH / 2}" fill="#a7b9c6" font-size="11" transform="rotate(-90 ${padL - 52} ${padT + innerH / 2})">${unit}</text>
 </svg>
 `;
 }
 
-function curveSvg(points) {
-  // points: [{ pages, dominate, html2canvas, playwright }]
-  const engines = [
-    { key: 'dominate', label: 'DOMinate', color: '#55e59a' },
-    { key: 'html2canvas', label: 'html2canvas + jsPDF', color: '#e07a5f' },
-    { key: 'playwright', label: 'Chromium page.pdf', color: '#4edbff' },
-  ];
+function curveSvg(points, keys, { title, unit, digits = 0, stepHint = 100, xLabel = 'A4 pages dispatched' }) {
   const W = 920, H = 420, padL = 70, padR = 24, padT = 48, padB = 60;
   const innerW = W - padL - padR, innerH = H - padT - padB;
   const xs = points.map(p => p.pages);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
-  const maxV = Math.max(...points.flatMap(p => engines.map(e => p[e.key] || 0)), 1);
-  const nice = Math.ceil(maxV / 100) * 100;
+  const maxV = Math.max(...points.flatMap(p => keys.map(k => p[k] || 0)), 0.01);
+  const nice = niceMax(maxV, stepHint);
   const x = v => padL + ((v - minX) / (maxX - minX || 1)) * innerW;
   const y = v => padT + innerH - (v / nice) * innerH;
 
@@ -150,19 +158,21 @@ function curveSvg(points) {
     const v = (nice / 5) * i;
     const yy = y(v);
     grid += `<line x1="${padL}" y1="${yy.toFixed(1)}" x2="${W - padR}" y2="${yy.toFixed(1)}" stroke="#1d6179" stroke-opacity=".35"/>`;
-    grid += `<text x="${padL - 8}" y="${(yy + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="#a7b9c6">${v.toFixed(0)}</text>`;
+    grid += `<text x="${padL - 8}" y="${(yy + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="#a7b9c6">${v.toFixed(digits)}</text>`;
   }
   for (const p of points) {
     grid += `<text x="${x(p.pages).toFixed(1)}" y="${H - 28}" text-anchor="middle" font-size="13" fill="#f8fbfd">${p.pages}p</text>`;
   }
 
-  const lines = engines.map(e => {
-    const d = points.map((p, i) => `${i ? 'L' : 'M'} ${x(p.pages).toFixed(1)} ${y(p[e.key] || 0).toFixed(1)}`).join(' ');
-    const dots = points.map(p => `<circle cx="${x(p.pages).toFixed(1)}" cy="${y(p[e.key] || 0).toFixed(1)}" r="4.5" fill="${e.color}"/>`).join('');
+  const lines = ENGINES.map(e => {
+    const key = keys.find(k => k === e.key || k === `${e.key}Diff`);
+    if (!key) return '';
+    const d = points.map((p, i) => `${i ? 'L' : 'M'} ${x(p.pages).toFixed(1)} ${y(p[key] || 0).toFixed(1)}`).join(' ');
+    const dots = points.map(p => `<circle cx="${x(p.pages).toFixed(1)}" cy="${y(p[key] || 0).toFixed(1)}" r="4.5" fill="${e.color}"/>`).join('');
     return `<path d="${d}" fill="none" stroke="${e.color}" stroke-width="2.4"/>${dots}`;
   }).join('');
 
-  const legend = engines.map((e, i) => {
+  const legend = ENGINES.map((e, i) => {
     const lx = padL + i * 210;
     return `<rect x="${lx}" y="16" width="12" height="12" fill="${e.color}" rx="2"/><text x="${lx + 18}" y="26" font-size="12" fill="#d7e6ed">${e.label}</text>`;
   }).join('');
@@ -170,12 +180,12 @@ function curveSvg(points) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <rect width="100%" height="100%" fill="#06111b"/>
-  <text x="${padL}" y="14" font-size="15" font-weight="700" fill="#f8fbfd">Warm convert time vs page count — SOW fixture</text>
+  <text x="${padL}" y="14" font-size="15" font-weight="700" fill="#f8fbfd">${title}</text>
   ${legend}
   ${grid}
   ${lines}
-  <text x="${padL - 52}" y="${padT + innerH / 2}" fill="#a7b9c6" font-size="11" transform="rotate(-90 ${padL - 52} ${padT + innerH / 2})">milliseconds</text>
-  <text x="${padL + innerW / 2}" y="${H - 10}" text-anchor="middle" font-size="12" fill="#a7b9c6">A4 pages dispatched</text>
+  <text x="${padL - 52}" y="${padT + innerH / 2}" fill="#a7b9c6" font-size="11" transform="rotate(-90 ${padL - 52} ${padT + innerH / 2})">${unit}</text>
+  <text x="${padL + innerW / 2}" y="${H - 10}" text-anchor="middle" font-size="12" fill="#a7b9c6">${xLabel}</text>
 </svg>
 `;
 }
@@ -190,6 +200,33 @@ async function timeSamples(fn) {
     times.push(performance.now() - t0);
   }
   return { ...stats(times), last };
+}
+
+async function worstPageDiff(shot, pdfBytes, viewport, tag) {
+  const pdfPath = resolve(OUT, `_cmp-${tag}.pdf`);
+  await writeFile(pdfPath, pdfBytes);
+  const all = await rasterizeAll(pdfPath, { dpi: 96 });
+  let worst = { percent: 0, page: 1, pages: [] };
+  for (const page of all.pages) {
+    const pdfPng = resolve(OUT, `_cmp-${tag}-p${page.index}.png`);
+    const htmlPng = resolve(OUT, `_cmp-${tag}-h${page.index}.png`);
+    const diffPng = resolve(OUT, `_cmp-${tag}-d${page.index}.png`);
+    await writeFile(pdfPng, page.png);
+    const y = (page.index - 1) * viewport.height;
+    await shot.screenshot({
+      path: htmlPng,
+      fullPage: true,
+      clip: { x: 0, y, width: viewport.width, height: viewport.height },
+    });
+    const diff = await diffPngs(htmlPng, pdfPng, diffPng);
+    const row = { page: page.index, percent: Number(diff.percent.toFixed(3)), diffPx: diff.diffPx, totalPx: diff.totalPx };
+    worst.pages.push(row);
+    if (diff.percent > worst.percent) {
+      worst.percent = Number(diff.percent.toFixed(3));
+      worst.page = page.index;
+    }
+  }
+  return { pageCount: all.pageCount, worstPercent: worst.percent, worstPage: worst.page, pages: worst.pages };
 }
 
 async function main() {
@@ -207,20 +244,24 @@ async function main() {
     await runner.goto(`${origin}/demo/run.html`, { waitUntil: 'networkidle' });
     await runner.evaluate(() => import('/src/index.js'));
 
-    async function dominate(rel, viewport) {
+    async function dominatePdf(rel, viewport) {
       const raw = await readFile(resolve(ROOT, rel), 'utf8');
       const dir = dirname(rel).replace(/\\/g, '/');
       const html = withBase(raw, `${origin}/${dir}/`);
-      return runner.evaluate(async ({ htmlString, viewport, baseUrl }) => {
+      const base64 = await runner.evaluate(async ({ htmlString, viewport, baseUrl }) => {
         const { htmlToPdf } = await import('/src/index.js');
         const bytes = await htmlToPdf(htmlString, { viewport, baseUrl });
-        return bytes.byteLength;
+        let binary = '';
+        for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+          binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+        }
+        return btoa(binary);
       }, { htmlString: html, viewport, baseUrl: `${origin}/${dir}/` });
+      return Buffer.from(base64, 'base64');
     }
 
-    async function rasterStack(rel, viewport, keepSections) {
+    async function openFixture(rel, viewport, keepSections) {
       const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
-      await page.addInitScript((n) => { window.__KEEP = n; }, keepSections ?? 99);
       await page.goto(`${origin}/${rel.replace(/\\/g, '/')}`, { waitUntil: 'networkidle' });
       if (keepSections != null) {
         await page.evaluate((n) => {
@@ -236,14 +277,17 @@ async function main() {
       await page.addScriptTag({ url: `${origin}${H2C}` });
       await page.addScriptTag({ url: `${origin}${JSPDF}` });
       await page.evaluate(() => document.fonts.ready);
+      await new Promise(r => setTimeout(r, 80));
+      return page;
+    }
 
-      const raster = async () => page.evaluate(async ({ vw, vh }) => {
+    async function html2canvasPdf(page, viewport) {
+      const base64 = await page.evaluate(async ({ vw, vh }) => {
         const canvas = await html2canvas(document.documentElement, {
           scale: 1, useCORS: true, windowWidth: vw, windowHeight: vh, logging: false,
         });
         const JsPDF = window.jspdf?.jsPDF || window.jsPDF;
         const pdf = new JsPDF({ unit: 'px', format: [vw, vh], orientation: vh >= vw ? 'portrait' : 'landscape' });
-        const pageH = vh;
         let y = 0;
         let first = true;
         while (y < canvas.height - 1) {
@@ -251,90 +295,111 @@ async function main() {
           first = false;
           const slice = document.createElement('canvas');
           slice.width = vw;
-          slice.height = Math.min(pageH, canvas.height - y);
+          slice.height = Math.min(vh, canvas.height - y);
           slice.getContext('2d').drawImage(canvas, 0, y, vw, slice.height, 0, 0, vw, slice.height);
           pdf.addImage(slice.toDataURL('image/jpeg', 0.85), 'JPEG', 0, 0, vw, slice.height);
-          y += pageH;
+          y += vh;
         }
-        return pdf.output('arraybuffer').byteLength;
+        return pdf.output('datauristring').split(',')[1];
       }, { vw: viewport.width, vh: viewport.height });
+      return Buffer.from(base64, 'base64');
+    }
 
-      const play = async () => {
-        const buf = await page.pdf({
-          width: `${viewport.width}px`,
-          height: `${viewport.height}px`,
-          printBackground: true,
-          margin: { top: '0', right: '0', bottom: '0', left: '0' },
-        });
-        return buf.byteLength;
-      };
+    async function playwrightPdf(page, viewport) {
+      return page.pdf({
+        width: `${viewport.width}px`,
+        height: `${viewport.height}px`,
+        printBackground: true,
+        margin: { top: '0', right: '0', bottom: '0', left: '0' },
+      });
+    }
 
-      const rasterTimed = await timeSamples(raster);
-      const playTimed = await timeSamples(play);
+    async function measure(rel, viewport, keepSections, tag) {
+      const page = await openFixture(rel, viewport, keepSections);
+      const dTime = await timeSamples(() => dominatePdf(rel, viewport));
+      const hTime = await timeSamples(() => html2canvasPdf(page, viewport));
+      const pTime = await timeSamples(() => playwrightPdf(page, viewport));
+
+      const dPdf = dTime.last;
+      const hPdf = hTime.last;
+      const pPdf = pTime.last;
+
+      const dDiff = await worstPageDiff(page, dPdf, viewport, `${tag}-dom`);
+      const hDiff = await worstPageDiff(page, hPdf, viewport, `${tag}-h2c`);
+      const pDiff = await worstPageDiff(page, pPdf, viewport, `${tag}-pw`);
       await page.close();
-      return { html2canvas: rasterTimed, playwright: playTimed };
+
+      return {
+        time: {
+          dominate: dTime.medianMs,
+          html2canvas: hTime.medianMs,
+          playwright: pTime.medianMs,
+        },
+        diff: {
+          dominate: dDiff.worstPercent,
+          html2canvas: hDiff.worstPercent,
+          playwright: pDiff.worstPercent,
+        },
+        detail: { dominate: dDiff, html2canvas: hDiff, playwright: pDiff },
+      };
     }
 
     const invoiceVp = { width: 794, height: 1200 };
     const reportVp = { width: 794, height: 1123 };
 
-    const invDom = await timeSamples(() => dominate(invoiceRel, invoiceVp));
-    const invOthers = await rasterStack(invoiceRel, invoiceVp, null);
-
-    const repDom = await timeSamples(() => dominate(reportRel, reportVp));
-    const repOthers = await rasterStack(reportRel, reportVp, 4);
+    const invoice = await measure(invoiceRel, invoiceVp, null, 'inv');
+    const sow = await measure(reportRel, reportVp, 4, 'sow');
 
     const curve = [];
     for (let pages = 1; pages <= 4; pages++) {
       const raw = await readFile(resolve(ROOT, reportRel), 'utf8');
       const hidden = raw.replace(
         '</head>',
-        `<style>${[1, 2, 3, 4].filter(i => i > pages).map(i => `#sec-${i},.page-break:nth-of-type(${i}){display:none!important}`).join('')}</style></head>`,
+        `<style>${[1, 2, 3, 4].filter(i => i > pages).map(i => `#sec-${i}{display:none!important}`).join('')}</style></head>`,
       );
       await writeFile(resolve(ROOT, 'example', `._sow-${pages}.html`), hidden);
-      const rel = `example/._sow-${pages}.html`;
-      const d = await timeSamples(() => dominate(rel, reportVp));
-      const o = await rasterStack(rel, reportVp, pages);
+      const m = await measure(`example/._sow-${pages}.html`, reportVp, pages, `sow${pages}`);
       curve.push({
         pages,
-        dominate: d.medianMs,
-        html2canvas: o.html2canvas.medianMs,
-        playwright: o.playwright.medianMs,
+        dominate: m.time.dominate,
+        html2canvas: m.time.html2canvas,
+        playwright: m.time.playwright,
+        dominateDiff: m.diff.dominate,
+        html2canvasDiff: m.diff.html2canvas,
+        playwrightDiff: m.diff.playwright,
       });
     }
 
     const payload = {
       generatedAt: new Date().toISOString(),
       iterations: ITERATIONS,
+      protocol: 'HTML screenshot vs PDF raster at 96 DPI, pixelmatch threshold 0.1; worst page retained.',
       notes: {
         dominate: 'Vector PDF, selectable text, in-browser htmlToPdf',
         html2canvas: 'Raster screenshot sliced into jsPDF pages (no selectable text)',
         playwright: 'Headless Chromium page.pdf — not a drop-in browser library',
       },
       bar: [
-        {
-          name: 'Invoice (1 page)',
-          engines: {
-            dominate: invDom.medianMs,
-            html2canvas: invOthers.html2canvas.medianMs,
-            playwright: invOthers.playwright.medianMs,
-          },
-        },
-        {
-          name: 'SOW (4 pages)',
-          engines: {
-            dominate: repDom.medianMs,
-            html2canvas: repOthers.html2canvas.medianMs,
-            playwright: repOthers.playwright.medianMs,
-          },
-        },
+        { name: 'Invoice (1 page)', engines: invoice.time, diff: invoice.diff, detail: invoice.detail },
+        { name: 'SOW (4 pages)', engines: sow.time, diff: sow.diff, detail: sow.detail },
       ],
       curve,
     };
 
     await writeFile(resolve(OUT, 'compare.json'), `${JSON.stringify(payload, null, 2)}\n`);
-    await writeFile(resolve(ASSETS, 'bench-bar.svg'), barSvg(payload.bar));
-    await writeFile(resolve(ASSETS, 'bench-curve.svg'), curveSvg(payload.curve));
+    await writeFile(resolve(ASSETS, 'bench-bar.svg'), barSvg(payload.bar, {
+      title: 'Warm convert time (ms) — lower is better', unit: 'milliseconds', digits: 0, stepHint: 20,
+    }));
+    await writeFile(resolve(ASSETS, 'bench-diff.svg'), barSvg(
+      payload.bar.map(s => ({ name: s.name, engines: s.diff })),
+      { title: 'Worst-page pixel-diff vs HTML (%) — lower is better', unit: 'percent', digits: 2, stepHint: 2 },
+    ));
+    await writeFile(resolve(ASSETS, 'bench-curve.svg'), curveSvg(curve, ['dominate', 'html2canvas', 'playwright'], {
+      title: 'Warm convert time vs page count — SOW fixture', unit: 'milliseconds', digits: 0, stepHint: 20,
+    }));
+    await writeFile(resolve(ASSETS, 'bench-curve-diff.svg'), curveSvg(curve, ['dominateDiff', 'html2canvasDiff', 'playwrightDiff'], {
+      title: 'Worst-page pixel-diff vs HTML (%) — SOW fixture', unit: 'percent', digits: 2, stepHint: 2,
+    }));
     console.log(JSON.stringify(payload, null, 2));
   } finally {
     await browser.close();
