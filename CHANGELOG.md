@@ -16,7 +16,9 @@ versioning from the first public release.
 
 ### Changed
 
-- Live converter defaults to a 1200px screen viewport (A4 remains a choice).
+- Live converter defaults to A4 portrait. Importing HTML opens an accordion
+  preview: first file expanded, HTML beside PDF, sized to the selected format.
+  Clicking another row closes the previous preview.
 
 ## [1.1.0] - 2026-08-15
 

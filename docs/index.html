@@ -161,7 +161,7 @@
     }
     .topbar, .view {
       width: 100%;
-      max-width: 640px;
+      max-width: 1100px;
     }
     .topbar {
       display: flex; align-items: center; gap: 14px;
@@ -182,6 +182,8 @@
     .view { flex: 1; min-height: 0; overflow: auto; padding: 4px 0 80px; }
 
     .drop {
+      max-width: 640px;
+      margin: 0 auto;
       border: 1px dashed var(--line);
       border-radius: 16px;
       background: var(--glass);
@@ -200,17 +202,54 @@
     .drop p { color: var(--ink-3); font-size: 12.5px; margin: 0; }
 
     .queue { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+    .item {
+      border-radius: 14px;
+      background: var(--glass); border: 1px solid var(--line); box-shadow: var(--sh-s);
+      overflow: hidden;
+    }
+    .item.open { border-color: color-mix(in srgb, var(--accent) 22%, var(--line)); }
     .row {
       display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-      padding: 12px 14px; border-radius: 14px;
-      background: var(--glass); border: 1px solid var(--line); box-shadow: var(--sh-s);
+      width: 100%; padding: 12px 14px; text-align: left;
     }
+    .row { cursor: pointer; }
+    .row:hover { background: var(--glass-2); }
     .row .file {
       min-width: 0; flex: 1 1 180px;
       display: flex; align-items: center; gap: 10px;
     }
     .row .name { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .row .meta { color: var(--ink-3); font-size: 11.5px; font-family: var(--mono); margin-left: auto; }
+    .compare {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+      padding: 0 14px 14px;
+    }
+    @media (max-width: 820px) { .compare { grid-template-columns: 1fr; } }
+    .pane { margin: 0; min-width: 0; }
+    .pane figcaption {
+      font-size: 10px; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--ink-3); margin: 0 0 6px;
+    }
+    .sheet {
+      container-type: inline-size;
+      position: relative; width: 100%;
+      aspect-ratio: var(--pw) / var(--ph);
+      overflow: hidden; background: #fff;
+      border: 1px solid var(--line); border-radius: 10px;
+    }
+    .sheet iframe {
+      position: absolute; top: 0; left: 0; border: 0;
+      width: calc(var(--pw) * 1px); height: calc(var(--ph) * 1px);
+      transform-origin: 0 0;
+      transform: scale(calc(100cqi / var(--pw)));
+      background: #fff;
+    }
+    .sheet .empty {
+      position: absolute; inset: 0;
+      display: grid; place-items: center;
+      color: var(--ink-3); font-size: 12.5px; text-align: center; padding: 16px;
+      background: var(--glass-2);
+    }
     .st {
       font-family: var(--mono); font-size: 11px; font-weight: 650;
       padding: 3px 8px; border-radius: 999px; background: var(--glass-2); color: var(--ink-2);
@@ -252,13 +291,6 @@
           </button>
         </nav>
         <div class="side-foot">
-          <div class="lanchip">
-            <span class="dot"></span>
-            <div>
-              <b>client-side</b>
-              <small>nothing uploaded</small>
-            </div>
-          </div>
           <div class="themerow">
             <span class="nl">Dark</span>
             <button class="sw" id="theme" role="switch" aria-checked="false" aria-label="Dark theme"><span class="knob"></span></button>
@@ -271,9 +303,9 @@
           <div class="ptitle" id="ptitle">Convert</div>
           <div class="topact" id="convert-actions">
             <select class="btn" id="page" aria-label="Page format">
-              <option value="screen">Screen 1200</option>
               <option value="portrait">A4 portrait</option>
               <option value="landscape">A4 landscape</option>
+              <option value="screen">Screen 1200</option>
             </select>
             <button class="btn" id="clear" disabled>Clear</button>
             <button class="btn" id="all" disabled>Download all</button>
@@ -306,8 +338,39 @@
     import { htmlToPdf } from './app/dominate.js';
 
     const THEME_KEY = 'dominate-pages-theme';
+    const FORMATS = {
+      portrait: { w: 794, h: 1123 },
+      landscape: { w: 1123, h: 794 },
+      screen: { w: 1200, h: 1697 },
+    };
     const queue = [];
+    let openId = null;
     const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+    function formatSize() {
+      return FORMATS[$('page').value] || FORMATS.portrait;
+    }
+    function htmlOpts() {
+      const page = $('page').value;
+      return page === 'screen'
+        ? { viewport: { width: 1200, height: 1697 } }
+        : { pageSize: 'A4', orientation: page };
+    }
+    function revokeJob(job) {
+      if (job.htmlUrl) { URL.revokeObjectURL(job.htmlUrl); job.htmlUrl = null; }
+      if (job.pdfUrl) { URL.revokeObjectURL(job.pdfUrl); job.pdfUrl = null; }
+    }
+    function htmlUrl(job) {
+      if (!job.htmlUrl) job.htmlUrl = URL.createObjectURL(new Blob([job.html], { type: 'text/html' }));
+      return job.htmlUrl;
+    }
+    function pdfUrl(job) {
+      if (!job.pdf) return '';
+      if (!job.pdfUrl) job.pdfUrl = URL.createObjectURL(new Blob([job.pdf], { type: 'application/pdf' }));
+      return job.pdfUrl;
+    }
     const drop = $('drop');
     const fileInput = $('file');
     const list = $('queue');
@@ -436,11 +499,18 @@
       setTimeout(() => URL.revokeObjectURL(url), 1500);
     }
 
+    function ensureOpen() {
+      if (!queue.length) { openId = null; return; }
+      if (!queue.some((j) => j.id === openId)) openId = queue[0].id;
+    }
+
     function render() {
+      ensureOpen();
       $('count-em').textContent = String(queue.length);
       runBtn.disabled = !queue.some((j) => j.status === 'ready' || j.status === 'err');
       allBtn.disabled = !queue.some((j) => j.pdf);
       clearBtn.disabled = !queue.length;
+      const fmt = formatSize();
       list.innerHTML = queue.map((j) => {
         const st = j.status === 'ok' ? 'ok' : j.status === 'err' ? 'err' : j.status === 'run' ? 'run' : '';
         const label = j.status === 'ok' ? `${j.ms.toFixed(0)} ms` : j.status === 'err' ? 'failed' : j.status === 'run' ? 'converting' : 'queued';
@@ -448,18 +518,36 @@
           ? `<button class="btn dl" type="button" data-dl="${j.id}">Download PDF</button>`
           : '';
         const size = j.pdf ? fmtKb(j.pdf.byteLength) : fmtKb(j.bytes);
-        return `<article class="row">
-          <div class="file">
-            <div class="name" title="${j.path}">${j.name}</div>
-            ${dl}
+        const open = j.id === openId;
+        const pdfSrc = pdfUrl(j);
+        const preview = open ? `<div class="compare">
+          <figure class="pane">
+            <figcaption>HTML</figcaption>
+            <div class="sheet" style="--pw:${fmt.w};--ph:${fmt.h}">
+              <iframe title="HTML preview" src="${htmlUrl(j)}"></iframe>
+            </div>
+          </figure>
+          <figure class="pane">
+            <figcaption>PDF</figcaption>
+            <div class="sheet" style="--pw:${fmt.w};--ph:${fmt.h}">
+              ${pdfSrc
+                ? `<iframe title="PDF preview" src="${pdfSrc}#toolbar=0&navpanes=0&scrollbar=0"></iframe>`
+                : `<div class="empty">${j.status === 'run' ? 'Converting…' : 'Convert to compare with the PDF'}</div>`}
+            </div>
+          </figure>
+        </div>` : '';
+        return `<article class="item${open ? ' open' : ''}">
+          <div class="row" role="button" tabindex="0" data-toggle="${j.id}">
+            <div class="file">
+              <div class="name" title="${esc(j.path)}">${esc(j.name)}</div>
+              ${dl}
+            </div>
+            <span class="st ${st}">${label}</span>
+            <div class="meta">${size}</div>
           </div>
-          <span class="st ${st}">${label}</span>
-          <div class="meta">${size}</div>
+          ${preview}
         </article>`;
       }).join('');
-      list.querySelectorAll('[data-dl]').forEach((btn) => {
-        btn.addEventListener('click', () => downloadOne(btn.dataset.dl));
-      });
     }
 
     function downloadOne(id) {
@@ -519,7 +607,6 @@
     }
 
     async function convertAll() {
-      const page = $('page').value;
       runBtn.disabled = true;
       for (const job of queue) {
         if (job.pdf && job.status === 'ok') continue;
@@ -527,10 +614,8 @@
         render();
         try {
           const t0 = performance.now();
-          const opts = page === 'screen'
-            ? { viewport: { width: 1200, height: 1697 } }
-            : { pageSize: 'A4', orientation: page };
-          job.pdf = await htmlToPdf(job.html, opts);
+          if (job.pdfUrl) { URL.revokeObjectURL(job.pdfUrl); job.pdfUrl = null; }
+          job.pdf = await htmlToPdf(job.html, htmlOpts());
           job.ms = performance.now() - t0;
           job.status = 'ok';
         } catch (error) {
@@ -557,8 +642,44 @@
       await ingest(e.dataTransfer.files, e.dataTransfer.items);
     });
 
+    list.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const tog = e.target.closest('[data-toggle]');
+      if (!tog || e.target.closest('[data-dl]')) return;
+      e.preventDefault();
+      openId = tog.dataset.toggle;
+      render();
+    });
+    list.addEventListener('click', (e) => {
+      const dl = e.target.closest('[data-dl]');
+      if (dl) {
+        e.preventDefault();
+        e.stopPropagation();
+        downloadOne(dl.dataset.dl);
+        return;
+      }
+      const tog = e.target.closest('[data-toggle]');
+      if (!tog) return;
+      openId = tog.dataset.toggle;
+      render();
+    });
+    $('page').addEventListener('change', () => {
+      const had = queue.some((j) => j.pdf);
+      for (const j of queue) {
+        if (j.pdfUrl) { URL.revokeObjectURL(j.pdfUrl); j.pdfUrl = null; }
+        j.pdf = null;
+        if (j.status === 'ok' || j.status === 'err') j.status = 'ready';
+      }
+      render();
+      if (had) convertAll();
+    });
     runBtn.addEventListener('click', convertAll);
-    clearBtn.addEventListener('click', () => { queue.length = 0; render(); });
+    clearBtn.addEventListener('click', () => {
+      for (const j of queue) revokeJob(j);
+      queue.length = 0;
+      openId = null;
+      render();
+    });
     allBtn.addEventListener('click', () => {
       const done = queue.filter((j) => j.pdf);
       if (done.length === 1) return downloadOne(done[0].id);
