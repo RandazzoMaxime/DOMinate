@@ -352,18 +352,43 @@
     function formatSize() {
       return FORMATS[$('page').value] || FORMATS.portrait;
     }
+    function preferredScheme() {
+      if (document.documentElement.dataset.theme === 'dark') return 'dark';
+      try {
+        if (matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+      } catch { /* ignore */ }
+      return 'light';
+    }
     function htmlOpts() {
       const page = $('page').value;
-      return page === 'screen'
+      const base = page === 'screen'
         ? { viewport: { width: 1200, height: 1697 } }
         : { pageSize: 'A4', orientation: page };
+      return { ...base, colorScheme: preferredScheme() };
     }
     function revokeJob(job) {
       if (job.htmlUrl) { URL.revokeObjectURL(job.htmlUrl); job.htmlUrl = null; }
       if (job.pdfUrl) { URL.revokeObjectURL(job.pdfUrl); job.pdfUrl = null; }
     }
+    function previewHtml(job) {
+      const scheme = preferredScheme();
+      if (scheme !== 'dark') return job.html;
+      if (/data-theme\s*=\s*["']dark["']/.test(job.html)) return job.html;
+      if (/<html\b/i.test(job.html)) {
+        return job.html.replace(/<html\b([^>]*)>/i, (m, attrs) => {
+          if (/data-theme\s*=/.test(attrs)) return m;
+          return `<html${attrs} data-theme="dark">`;
+        });
+      }
+      return `<html data-theme="dark">${job.html}</html>`;
+    }
     function htmlUrl(job) {
-      if (!job.htmlUrl) job.htmlUrl = URL.createObjectURL(new Blob([job.html], { type: 'text/html' }));
+      const key = preferredScheme();
+      if (!job.htmlUrl || job.htmlUrlScheme !== key) {
+        if (job.htmlUrl) URL.revokeObjectURL(job.htmlUrl);
+        job.htmlUrl = URL.createObjectURL(new Blob([previewHtml(job)], { type: 'text/html' }));
+        job.htmlUrlScheme = key;
+      }
       return job.htmlUrl;
     }
     function pdfUrl(job) {
@@ -386,6 +411,15 @@
     setTheme(localStorage.getItem(THEME_KEY) === 'dark');
     $('theme').addEventListener('click', () => {
       setTheme(document.documentElement.dataset.theme !== 'dark');
+      const had = queue.some((j) => j.pdf);
+      for (const j of queue) {
+        if (j.pdfUrl) { URL.revokeObjectURL(j.pdfUrl); j.pdfUrl = null; }
+        if (j.htmlUrl) { URL.revokeObjectURL(j.htmlUrl); j.htmlUrl = null; j.htmlUrlScheme = null; }
+        j.pdf = null;
+        if (j.status === 'ok' || j.status === 'err') j.status = 'ready';
+      }
+      render();
+      if (had) convertAll();
     });
 
     document.querySelectorAll('.navtab').forEach((tab) => {
@@ -524,7 +558,7 @@
           <figure class="pane">
             <figcaption>HTML</figcaption>
             <div class="sheet" style="--pw:${fmt.w};--ph:${fmt.h}">
-              <iframe title="HTML preview" src="${htmlUrl(j)}"></iframe>
+              <iframe title="HTML preview" src="${htmlUrl(j)}" style="color-scheme:${preferredScheme()}"></iframe>
             </div>
           </figure>
           <figure class="pane">
@@ -667,6 +701,7 @@
       const had = queue.some((j) => j.pdf);
       for (const j of queue) {
         if (j.pdfUrl) { URL.revokeObjectURL(j.pdfUrl); j.pdfUrl = null; }
+        if (j.htmlUrl) { URL.revokeObjectURL(j.htmlUrl); j.htmlUrl = null; j.htmlUrlScheme = null; }
         j.pdf = null;
         if (j.status === 'ok' || j.status === 'err') j.status = 'ready';
       }

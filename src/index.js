@@ -87,6 +87,9 @@ async function loadInter(needWeights, needGreek, needMono) {
  * @param {'A4'} [opts.pageSize]
  * @param {'portrait'|'landscape'} [opts.orientation]
  * @param {string} [opts.baseUrl]  resolve relative CSS/images against this URL
+ * @param {'dark'|'light'} [opts.colorScheme]  force the layout iframe's preferred
+ *   color scheme so `@media (prefers-color-scheme: dark)` documents paint dark.
+ *   When omitted, follows the host page / OS preference.
  * @returns {Promise<Uint8Array>}
  */
 export async function htmlToPdf(input, opts = {}) {
@@ -115,6 +118,7 @@ export async function htmlToPdf(input, opts = {}) {
     : await layout(typeof input === 'string' ? input : input.outerHTML, {
       ...viewport,
       baseUrl: opts.baseUrl,
+      colorScheme: opts.colorScheme,
     });
   const { boxes, contentHeight, forcedBreaks, pageBackground } = laid;
   const _tLayout = opts.profile ? performance.now() : 0;

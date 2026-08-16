@@ -3,7 +3,7 @@
 ## Install from the v1 GitHub release
 
 ```bash
-npm install github:RandazzoMaxime/DOMinate#v1.1.0
+npm install github:RandazzoMaxime/DOMinate#v1.1.1
 ```
 
 DOMinate v1 loads its bundled fonts from `/assets/fonts`. Copy
@@ -62,6 +62,7 @@ htmlToPdf(
     viewport?: { width: number; height: number };
     pageSize?: 'A4';
     orientation?: 'portrait' | 'landscape';
+    colorScheme?: 'dark' | 'light';
   }
 ): Promise<Uint8Array>
 ```
@@ -73,6 +74,9 @@ htmlToPdf(
   `pageSize` and `orientation`.
 - `pageSize`: currently `A4`; defaults to A4 landscape when no size is provided.
 - `orientation`: `portrait` or `landscape` for A4.
+- `colorScheme`: `'dark'` or `'light'` to force the layout iframe's preferred
+  scheme (so `@media (prefers-color-scheme: dark)` and `data-theme="dark"`
+  documents paint that canvas). When omitted, follows the host page / OS.
 
 CSS pixels are mapped to PDF points at 96 CSS DPI → 72 PDF DPI.
 

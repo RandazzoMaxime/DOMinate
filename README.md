@@ -152,7 +152,7 @@ Open <http://localhost:5173> and drop an HTML file into the converter.
 To consume the GitHub release before an npm package is published:
 
 ```bash
-npm install github:RandazzoMaxime/DOMinate#v1.1.0
+npm install github:RandazzoMaxime/DOMinate#v1.1.1
 ```
 
 The current release loads bundled fonts from `/assets/fonts`. Copy the package's

@@ -5,7 +5,14 @@ versioning from the first public release.
 
 ## Unreleased
 
+## [1.1.1] - 2026-08-16
+
 ### Fixed
+
+- Layout and converter preview no longer pin `color-scheme: light`. Documents
+  that select dark tokens via `prefers-color-scheme: dark` or `data-theme="dark"`
+  paint that canvas when the host prefers dark (or `opts.colorScheme` is
+  `'dark'`).
 
 - Words laid out in condensed system fonts (Segoe, Bahnschrift, …) no longer
   overflow into the next word when painted with Inter — inter-word gaps stay.
@@ -36,6 +43,7 @@ versioning from the first public release.
 - Single-page documents skip unused pagination cuts.
 - Public showcase invoice and SOW no longer mention other products.
 
+[1.1.1]: https://github.com/RandazzoMaxime/DOMinate/releases/tag/v1.1.1
 [1.1.0]: https://github.com/RandazzoMaxime/DOMinate/releases/tag/v1.1.0
 
 ## [1.0.1] - 2026-07-10

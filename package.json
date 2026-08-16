@@ -1,6 +1,6 @@
 {
   "name": "@randazzomaxime/dominate",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Client-side, vector-first HTML to PDF conversion with selectable text, embedded fonts, and clickable links.",
   "type": "module",
   "license": "Apache-2.0",
@@ -39,7 +39,7 @@
   ],
   "scripts": {
     "loop": "node scripts/loop.mjs",
-    "test": "node scripts/test-validity.mjs && node scripts/test-live-text.mjs",
+    "test": "node scripts/test-validity.mjs && node scripts/test-live-text.mjs && node scripts/test-color-scheme.mjs",
     "benchmark": "node scripts/benchmark.mjs",
     "pages:build": "node scripts/build-pages.mjs",
     "compare": "node scripts/bench-compare.mjs",

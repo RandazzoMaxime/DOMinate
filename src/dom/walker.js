@@ -40,11 +40,22 @@ function injectBase(html, baseUrl) {
 /** Reused off-screen iframe — creating one per call dominates warm convert time. */
 let _layoutFrame = null;
 
-function layoutFrame(width, height) {
+function resolveColorScheme(requested) {
+  if (requested === 'dark' || requested === 'light') return requested;
+  try {
+    if (typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'dark';
+    }
+  } catch { /* ignore */ }
+  return 'light dark';
+}
+
+function layoutFrame(width, height, colorScheme) {
+  const scheme = resolveColorScheme(colorScheme);
   if (_layoutFrame && _layoutFrame.contentDocument) {
     _layoutFrame.style.width = width + 'px';
     _layoutFrame.style.height = height + 'px';
-    _layoutFrame.style.colorScheme = 'light';
+    _layoutFrame.style.colorScheme = scheme;
     return _layoutFrame;
   }
   const iframe = document.createElement('iframe');
@@ -57,15 +68,15 @@ function layoutFrame(width, height) {
     height: ${height}px;
     border: 0;
     visibility: hidden;
-    color-scheme: light;
+    color-scheme: ${scheme};
   `;
   document.body.appendChild(iframe);
   _layoutFrame = iframe;
   return iframe;
 }
 
-export async function layout(html, { width, height, baseUrl } = {}) {
-  const iframe = layoutFrame(width, height);
+export async function layout(html, { width, height, baseUrl, colorScheme } = {}) {
+  const iframe = layoutFrame(width, height, colorScheme);
   const t0 = performance.now();
 
   try {
@@ -73,6 +84,10 @@ export async function layout(html, { width, height, baseUrl } = {}) {
     idoc.open();
     idoc.write(injectBase(html, baseUrl));
     idoc.close();
+    if (resolveColorScheme(colorScheme) === 'dark' && idoc.documentElement) {
+      idoc.documentElement.dataset.theme = 'dark';
+      idoc.documentElement.style.colorScheme = 'dark';
+    }
     const tWrite = performance.now();
 
     // Wait for the iframe's load event (resolves after all <script> and <link> tags have

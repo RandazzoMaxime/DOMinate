@@ -1178,11 +1178,22 @@ function injectBase(html, baseUrl) {
   return tag + html;
 }
 var _layoutFrame = null;
-function layoutFrame(width, height) {
+function resolveColorScheme(requested) {
+  if (requested === "dark" || requested === "light") return requested;
+  try {
+    if (typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches) {
+      return "dark";
+    }
+  } catch {
+  }
+  return "light dark";
+}
+function layoutFrame(width, height, colorScheme) {
+  const scheme = resolveColorScheme(colorScheme);
   if (_layoutFrame && _layoutFrame.contentDocument) {
     _layoutFrame.style.width = width + "px";
     _layoutFrame.style.height = height + "px";
-    _layoutFrame.style.colorScheme = "light";
+    _layoutFrame.style.colorScheme = scheme;
     return _layoutFrame;
   }
   const iframe = document.createElement("iframe");
@@ -1195,20 +1206,24 @@ function layoutFrame(width, height) {
     height: ${height}px;
     border: 0;
     visibility: hidden;
-    color-scheme: light;
+    color-scheme: ${scheme};
   `;
   document.body.appendChild(iframe);
   _layoutFrame = iframe;
   return iframe;
 }
-async function layout(html, { width, height, baseUrl } = {}) {
-  const iframe = layoutFrame(width, height);
+async function layout(html, { width, height, baseUrl, colorScheme } = {}) {
+  const iframe = layoutFrame(width, height, colorScheme);
   const t0 = performance.now();
   try {
     const idoc = iframe.contentDocument;
     idoc.open();
     idoc.write(injectBase(html, baseUrl));
     idoc.close();
+    if (resolveColorScheme(colorScheme) === "dark" && idoc.documentElement) {
+      idoc.documentElement.dataset.theme = "dark";
+      idoc.documentElement.style.colorScheme = "dark";
+    }
     const tWrite = performance.now();
     if (iframe.contentWindow.document.readyState !== "complete") {
       await Promise.race([
@@ -4184,7 +4199,8 @@ async function htmlToPdf(input, opts = {}) {
   const useLive = opts.live && typeof input !== "string" && input && input.nodeType === 1;
   const laid = useLive ? layoutElement(input, viewport) : await layout(typeof input === "string" ? input : input.outerHTML, {
     ...viewport,
-    baseUrl: opts.baseUrl
+    baseUrl: opts.baseUrl,
+    colorScheme: opts.colorScheme
   });
   const { boxes, contentHeight, forcedBreaks, pageBackground } = laid;
   const _tLayout = opts.profile ? performance.now() : 0;
